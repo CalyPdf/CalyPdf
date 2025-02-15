@@ -92,7 +92,7 @@ internal sealed partial class PdfPigDocumentService
                 float size = 9;
                 using (var drawTypeface = SKTypeface.CreateDefault())
                 using (var skFont = drawTypeface.ToFont(size))
-                using (var paint = new SKPaint())
+                using (var paint = new SKPaint(skFont))
                 {
                     paint.Color = SKColors.Red;
                     paint.IsAntialias = true;
@@ -100,7 +100,7 @@ internal sealed partial class PdfPigDocumentService
                     float lineY = size + 1;
                     foreach (var textLine in ex.ToString().Split('\n'))
                     {
-                        canvas.DrawShapedText(textLine, new SKPoint(0, lineY), skFont, paint);
+                        canvas.DrawShapedText(textLine, new SKPoint(0, lineY), paint);
                         lineY += size;
                     }
                 }

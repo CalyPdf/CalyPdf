@@ -10,8 +10,16 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="PdfPig" Version="0.1.15-alpha-20260517-35045" />
 		<PackageReference Include="CommunityToolkit.HighPerformance" Version="8.4.2" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\external\PdfPig\src\UglyToad.PdfPig.Core\UglyToad.PdfPig.Core.csproj" />
+		<ProjectReference Include="..\external\PdfPig\src\UglyToad.PdfPig.DocumentLayoutAnalysis\UglyToad.PdfPig.DocumentLayoutAnalysis.csproj" />
+		<ProjectReference Include="..\external\PdfPig\src\UglyToad.PdfPig.Fonts\UglyToad.PdfPig.Fonts.csproj" />
+		<ProjectReference Include="..\external\PdfPig\src\UglyToad.PdfPig.Tokenization\UglyToad.PdfPig.Tokenization.csproj" />
+		<ProjectReference Include="..\external\PdfPig\src\UglyToad.PdfPig.Tokens\UglyToad.PdfPig.Tokens.csproj" />
+		<ProjectReference Include="..\external\PdfPig\src\UglyToad.PdfPig\UglyToad.PdfPig.csproj" />
 	</ItemGroup>
 
 </Project>
