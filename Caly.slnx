@@ -4,6 +4,61 @@
     <BuildType Name="Debug" />
     <BuildType Name="Release" />
   </Configurations>
+  <Folder Name="/external/" />
+  <Folder Name="/external/PdfPig.Filters.Dct.JpegLibrary/">
+    <Project Path="external/UglyToad.PdfPig.Filters.Dct.JpegLibrary/UglyToad.PdfPig.Filters.Dct.JpegLibrary/UglyToad.PdfPig.Filters.Dct.JpegLibrary.csproj">
+      <BuildType Solution="AOT|*" Project="Debug" />
+    </Project>
+  </Folder>
+  <Folder Name="/external/PdfPig.Filters.Jbig2.PdfboxJbig2/">
+    <Project Path="external/UglyToad.PdfPig.Filters.Jbig2.PdfboxJbig2/UglyToad.PdfPig.Filters.Jbig2.PdfboxJbig2/UglyToad.PdfPig.Filters.Jbig2.PdfboxJbig2.csproj">
+      <BuildType Solution="AOT|*" Project="Debug" />
+    </Project>
+  </Folder>
+  <Folder Name="/external/PdfPig.Filters.Jpx.OpenJpeg/">
+    <Project Path="external/UglyToad.PdfPig.Filters.Jpx.OpenJpeg/external/OpenJPEG.net/OpenJpeg.net.csproj">
+      <BuildType Solution="AOT|*" Project="Debug" />
+    </Project>
+    <Project Path="external/UglyToad.PdfPig.Filters.Jpx.OpenJpeg/UglyToad.PdfPig.Filters.Jpx.OpenJpeg/UglyToad.PdfPig.Filters.Jpx.OpenJpeg.csproj">
+      <BuildType Solution="AOT|*" Project="Debug" />
+    </Project>
+  </Folder>
+  <Folder Name="/external/PdfPig.Rendering.Skia/">
+    <Project Path="external/PdfPig.Rendering.Skia/UglyToad.PdfPig.Rendering.Skia.Tests/UglyToad.PdfPig.Rendering.Skia.Tests.csproj">
+      <BuildType Solution="AOT|*" Project="Debug" />
+    </Project>
+    <Project Path="external/PdfPig.Rendering.Skia/UglyToad.PdfPig.Rendering.Skia/UglyToad.PdfPig.Rendering.Skia.csproj">
+      <BuildType Solution="AOT|*" Project="Debug" />
+    </Project>
+  </Folder>
+  <Folder Name="/external/PdfPig/">
+    <Project Path="external/PdfPig/src/UglyToad.PdfPig.Core/UglyToad.PdfPig.Core.csproj">
+      <BuildType Solution="AOT|*" Project="Debug" />
+    </Project>
+    <Project Path="external/PdfPig/src/UglyToad.PdfPig.DocumentLayoutAnalysis/UglyToad.PdfPig.DocumentLayoutAnalysis.csproj">
+      <BuildType Solution="AOT|*" Project="Debug" />
+    </Project>
+    <Project Path="external/PdfPig/src/UglyToad.PdfPig.Fonts/UglyToad.PdfPig.Fonts.csproj">
+      <BuildType Solution="AOT|*" Project="Debug" />
+    </Project>
+    <Project Path="external/PdfPig/src/UglyToad.PdfPig.Tests/UglyToad.PdfPig.Tests.csproj">
+      <BuildType Solution="AOT|*" Project="Debug" />
+    </Project>
+    <Project Path="external/PdfPig/src/UglyToad.PdfPig.Tokenization/UglyToad.PdfPig.Tokenization.csproj">
+      <BuildType Solution="AOT|*" Project="Debug" />
+    </Project>
+    <Project Path="external/PdfPig/src/UglyToad.PdfPig.Tokens/UglyToad.PdfPig.Tokens.csproj">
+      <BuildType Solution="AOT|*" Project="Debug" />
+    </Project>
+    <Project Path="external/PdfPig/src/UglyToad.PdfPig/UglyToad.PdfPig.csproj">
+      <BuildType Solution="AOT|*" Project="Debug" />
+    </Project>
+  </Folder>
+  <Folder Name="/external/Tabalonia/">
+    <Project Path="external/Tabalonia/Tabalonia/Tabalonia.csproj">
+      <BuildType Solution="AOT|*" Project="Debug" />
+    </Project>
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
   </Folder>
