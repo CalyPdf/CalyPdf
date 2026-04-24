@@ -23,6 +23,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Caly.Core.Events;
 using Caly.Core.Models;
+using Caly.Core.Services.Rendering;
 using Caly.Core.Utilities;
 using Caly.Pdf.Models;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -88,6 +89,8 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
     public TextSelection TextSelection { get; }
 
     public double PpiScale { get; }
+
+    public TileRenderService TileRenderService { get; }
 
     public bool IsPageVisible => VisibleArea.HasValue;
 
@@ -166,13 +169,15 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
         }
 
         TextSelection = null!;
+        TileRenderService = null!;
     }
 #endif
     
-    public PageViewModel(int pageNumber, TextSelection textSelection, double ppiScale)
+    public PageViewModel(int pageNumber, TextSelection textSelection, TileRenderService tileRenderService, double ppiScale)
     {
         ArgumentNullException.ThrowIfNull(textSelection, nameof(textSelection));
         PageNumber = pageNumber;
+        TileRenderService = tileRenderService;
         PpiScale = ppiScale;
         TextSelection = textSelection;
 
