@@ -30,7 +30,7 @@ using Avalonia.Skia;
 using Caly.Core.Utilities;
 using SkiaSharp;
 
-namespace Caly.Core.Controls;
+namespace Caly.Core.Controls.Rendering;
 
     /*
      * We render the SKPicture directly on the Avalonia Skia canvas, i.e. we don't rasterize it to a bitmap first.
