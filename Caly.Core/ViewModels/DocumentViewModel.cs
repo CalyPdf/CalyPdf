@@ -391,7 +391,7 @@ public sealed partial class DocumentViewModel : ViewModelBase
             }
 
             // Use 1st page size as default page size
-            var firstPage = new PageViewModel(1, TextSelection, _pdfService.PpiScale);
+            var firstPage = new PageViewModel(1, TextSelection, _pdfPageService.TileRenderService, _pdfService.PpiScale);
             var pageSize = await _pdfPageService.GetPageSize(1, _mainToken).ConfigureAwait(false);
             if (pageSize.HasValue)
             {
@@ -406,7 +406,7 @@ public sealed partial class DocumentViewModel : ViewModelBase
             for (int p = 2; p <= PageCount; ++p)
             {
                 _mainToken.ThrowIfCancellationRequested();
-                var newPage = new PageViewModel(p, TextSelection, _pdfService.PpiScale)
+                var newPage = new PageViewModel(p, TextSelection, _pdfPageService.TileRenderService, _pdfService.PpiScale)
                 {
                     Size = defaultSize
                 };
