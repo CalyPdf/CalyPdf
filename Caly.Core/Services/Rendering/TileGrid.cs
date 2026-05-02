@@ -23,8 +23,8 @@ public static class TileGrid
     /// <summary>
     /// The size of each tile in pixels (at the tile level's resolution).
     /// </summary>
-    public const int TilePixelSize = 256;
-
+    public const int TilePixelSize = 256 * 3;
+    
     /// <summary>
     /// Hard floor on the tile level. Below this, the page shrinks into sub-pixel territory,
     /// <see cref="TileRenderService"/> would render a zero-sized surface, and tiles stop

@@ -115,10 +115,11 @@ public sealed class TileRenderService : IAsyncDisposable
     private readonly ConcurrentDictionary<int, CancellationTokenSource> _pageTokens = new();
 
     /// <summary>
-    /// Per-thread reusable SKPaint to avoid allocating one per tile render.
+    /// Pool of reusable SKPaint instances to avoid allocating one per tile render.
+    /// Bag size is bounded by the number of concurrent workers, since each rent is
+    /// matched by a return on the same render call.
     /// </summary>
-    [ThreadStatic]
-    private static SKPaint? t_renderPaint;
+    private readonly ConcurrentBag<SKPaint> _paintPool = new();
 
     /// <summary>
     /// Fired when a tile has been rendered and is available in the cache.
@@ -242,9 +243,16 @@ public sealed class TileRenderService : IAsyncDisposable
 
                 canvas.SetMatrix(in matrix);
                 canvas.Clear(SKColors.White);
-                // Reuse thread-local paint
-                var paint = t_renderPaint ??= new SKPaint { IsAntialias = false, IsDither = true };
-                canvas.DrawPicture(request.Picture.Item, paint);
+
+                var paint = RentPaint();
+                try
+                {
+                    canvas.DrawPicture(request.Picture.Item, paint);
+                }
+                finally
+                {
+                    ReturnPaint(paint);
+                }
 
                 request.Token.ThrowIfCancellationRequested();
 
@@ -300,6 +308,18 @@ public sealed class TileRenderService : IAsyncDisposable
             // that contains elements to render (SKPicture is recorded with the RTree optimisation).
             Cache.Add(request.Key, GetEmptyImage());
         }
+    }
+
+    private SKPaint RentPaint()
+    {
+        return _paintPool.TryTake(out var paint)
+            ? paint
+            : new SKPaint { IsAntialias = false, IsDither = true };
+    }
+
+    private void ReturnPaint(SKPaint paint)
+    {
+        _paintPool.Add(paint);
     }
 
     /// <summary>
@@ -495,6 +515,12 @@ public sealed class TileRenderService : IAsyncDisposable
 
         _pageTokens.Clear();
         _inFlight.Clear();
+
+        while (_paintPool.TryTake(out var paint))
+        {
+            paint.Dispose();
+        }
+
         Cache.Dispose();
         _mainCts.Dispose();
     }
