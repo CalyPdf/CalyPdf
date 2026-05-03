@@ -40,12 +40,13 @@ public partial class TiledPdfPageControl
     /// in quality isn't noticeable while the scene is moving.
     /// </summary>
     private static readonly SKSamplingOptions InteractiveSamplingOptions = new(SKFilterMode.Nearest, SKMipmapMode.None);
-
+    
     /// <summary>
     /// Sampling used when the scene is idle. Bilinear filtering for smooth tile scaling
     /// when the zoom ratio is not exactly 1:1 with the tile level resolution.
     /// </summary>
     private static readonly SKSamplingOptions IdleSamplingOptions = new(SKFilterMode.Linear, SKMipmapMode.Nearest);
+    private static readonly SKSamplingOptions IdleSamplingOptionsFast = new(SKFilterMode.Nearest, SKMipmapMode.None);
 
     /// <summary>
     /// The tile level used on the previous render pass, used to detect zoom-level changes
@@ -252,7 +253,9 @@ public partial class TiledPdfPageControl
         CollectionsMarshal.AsSpan(_renderTileEntries).CopyTo(tileBuffer);
         _renderTileEntries.Clear();
 
-        var samplingOptions = _isInteracting ? InteractiveSamplingOptions : IdleSamplingOptions;
+        SKSamplingOptions samplingOptions = _isInteracting
+            ? InteractiveSamplingOptions
+            : (tileLevel > 0) ? IdleSamplingOptionsFast : IdleSamplingOptions;
         context.Custom(new TiledDrawOperation(viewPort, cullRect, tileBuffer, entryCount, samplingOptions));
     }
 

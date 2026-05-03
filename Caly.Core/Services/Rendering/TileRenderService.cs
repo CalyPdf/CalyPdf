@@ -157,9 +157,11 @@ public sealed class TileRenderService : IAsyncDisposable
 
     private async Task ProcessingLoop()
     {
+        int maxDegreeOfParallelism = Math.Max(2, Environment.ProcessorCount / 2);
+        System.Diagnostics.Debug.WriteLine($"TileRenderService: MaxDegreeOfParallelism = {maxDegreeOfParallelism}");
         var options = new ParallelOptions()
         {
-            MaxDegreeOfParallelism = 2,
+            MaxDegreeOfParallelism = maxDegreeOfParallelism,
             CancellationToken = _mainToken
         };
 
@@ -176,14 +178,8 @@ public sealed class TileRenderService : IAsyncDisposable
 
                     RenderTile(in request);
                 }
-                catch (OperationCanceledException)
-                {
-                    // Expected when pages scroll out of view
-                }
-                catch (Exception e)
-                {
-                    Debug.WriteExceptionToFile(e);
-                }
+                catch (OperationCanceledException) { }
+                catch (Exception e) { Debug.WriteExceptionToFile(e); }
                 finally
                 {
                     _inFlight.TryRemove(request.Key, out _);
