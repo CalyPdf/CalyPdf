@@ -46,7 +46,6 @@ public partial class TiledPdfPageControl
     /// when the zoom ratio is not exactly 1:1 with the tile level resolution.
     /// </summary>
     private static readonly SKSamplingOptions IdleSamplingOptions = new(SKFilterMode.Linear, SKMipmapMode.Nearest);
-    private static readonly SKSamplingOptions IdleSamplingOptionsFast = new(SKFilterMode.Nearest, SKMipmapMode.None);
 
     /// <summary>
     /// The tile level used on the previous render pass, used to detect zoom-level changes
@@ -255,7 +254,7 @@ public partial class TiledPdfPageControl
 
         SKSamplingOptions samplingOptions = _isInteracting
             ? InteractiveSamplingOptions
-            : (tileLevel > 0) ? IdleSamplingOptionsFast : IdleSamplingOptions;
+            : IdleSamplingOptions;
         context.Custom(new TiledDrawOperation(viewPort, cullRect, tileBuffer, entryCount, samplingOptions));
     }
 

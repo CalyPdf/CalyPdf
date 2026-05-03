@@ -32,18 +32,6 @@ public partial class TiledPdfPageControl
 {
     private sealed class TiledDrawOperation : ICustomDrawOperation
     {
-        // Shared across all draw operations — these are only used on the render thread
-        // which is single-threaded, so no synchronization needed.
-        //
-        // IsAntialias is deliberately false: with AA on, tile edges at fractional screen
-        // pixel positions (after the zoom transform) get partial coverage which blends
-        // with the canvas background, creating visible white seams between tiles.
-        private static readonly SKPaint RenderPaint = new()
-        {
-            IsAntialias = false,
-            IsDither = true
-        };
-
         private TileDrawEntry[]? _tiles;
         private readonly int _tileCount;
         private readonly SKSamplingOptions _samplingOptions;
@@ -112,7 +100,10 @@ public partial class TiledPdfPageControl
                 ref readonly var tile = ref tiles[i];
                 if (tile is { CanRender: true, ImageRef.IsAlive: true } && !canvas.QuickReject(tile.DestRect))
                 {
-                    canvas.DrawImage(tile.ImageRef.Item, tile.SrcRect, tile.DestRect, _samplingOptions, RenderPaint);
+                    // Paint param is null. IsAntialias is deliberately false: with AA on, tile edges at
+                    // fractional screen pixel positions (after the zoom transform) get partial coverage
+                    // which blends with the canvas background, creating visible white seams between tiles.
+                    canvas.DrawImage(tile.ImageRef.Item, tile.SrcRect, tile.DestRect, _samplingOptions, null);
                 }
             }
 
@@ -147,8 +138,9 @@ public partial class TiledPdfPageControl
 
             for (int i = 0; i < _tileCount; ++i)
             {
-                tiles[i].Dispose();
-                tiles[i] = default;
+                ref var tile = ref tiles[i];
+                tile.Dispose();
+                tile = default;
             }
 
             ArrayPool<TileDrawEntry>.Shared.Return(tiles, clearArray: false);
