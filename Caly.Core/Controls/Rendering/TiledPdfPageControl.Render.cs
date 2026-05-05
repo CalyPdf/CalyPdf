@@ -48,6 +48,13 @@ public partial class TiledPdfPageControl
     private static readonly SKSamplingOptions IdleSamplingOptions = new(SKFilterMode.Linear, SKMipmapMode.Nearest);
 
     /// <summary>
+    /// Reusable buffer for building tile draw entries in <see cref="Render"/>.
+    /// Entries are transferred to an <see cref="ArrayPool{T}"/>-backed array for the draw operation.
+    /// Only accessed on the UI thread.
+    /// </summary>
+    private readonly List<TileDrawEntry> _renderTileEntries = new();
+
+    /// <summary>
     /// The tile level used on the previous render pass, used to detect zoom-level changes
     /// and trigger deferred eviction of stale tile levels from the cache.
     /// Only accessed on the UI thread in <see cref="Render"/>.
@@ -79,12 +86,7 @@ public partial class TiledPdfPageControl
     /// </summary>
     private bool _staleLevelEvictionPending;
 
-    /// <summary>
-    /// Reusable buffer for building tile draw entries in <see cref="Render"/>.
-    /// Entries are transferred to an <see cref="ArrayPool{T}"/>-backed array for the draw operation.
-    /// Only accessed on the UI thread.
-    /// </summary>
-    private readonly List<TileDrawEntry> _renderTileEntries = new();
+    private SKMatrix _ppiScaleMatrix = SKMatrix.Identity;
 
     /// <summary>
     /// This operation is executed on the UI thread.
@@ -112,9 +114,7 @@ public partial class TiledPdfPageControl
             return;
         }
 
-        var scale = (float)PpiScale;
-        var cullRect = SKMatrix.CreateScale(scale, scale).MapRect(picture.Item.CullRect);
-
+        var cullRect = _ppiScaleMatrix.MapRect(picture.Item.CullRect);
         int tileLevel = TileGrid.ComputeTileLevel(ZoomLevel);
         int pageNumber = PageNumber;
 
@@ -132,8 +132,13 @@ public partial class TiledPdfPageControl
         // viewport are pre-drawn, so the compositor can handle short scrolls without
         // triggering a new render pass. At high zoom levels this keeps per-frame work
         // bounded by viewport size rather than growing with the full tile grid.
-        GetTileRange(visibleArea.Value, in pageDisplaySize, tileLevel, RenderTileMargin,
-            out int startCol, out int startRow, out int endCol, out int endRow);
+        if (!GetTileRange(visibleArea.Value, in pageDisplaySize, tileLevel, RenderTileMargin,
+                out int startCol, out int startRow, out int endCol, out int endRow))
+        {
+            _lastRenderedTileRangeValid = false;
+            base.Render(context);
+            return;
+        }
 
         // Record the rendered range so subsequent VisibleArea changes can skip
         // invalidation when the tile range is unchanged.

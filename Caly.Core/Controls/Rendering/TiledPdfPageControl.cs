@@ -200,6 +200,14 @@ public sealed partial class TiledPdfPageControl : Control
         {
             _cachedPageNumber = change.GetNewValue<int>();
         }
+        else if (change.Property == PpiScaleProperty)
+        {
+            if (change.NewValue is double ppi)
+            {
+                var scale = (float)ppi;
+                _ppiScaleMatrix = SKMatrix.CreateScale(scale, scale);
+            }
+        }
         else if (change.Property == TileRenderServiceProperty)
         {
             if (change.OldValue is TileRenderService oldService)
@@ -334,8 +342,11 @@ public sealed partial class TiledPdfPageControl : Control
         {
             try
             {
-                GetTileRange(_visibleArea, _pageDisplaySize, _tileLevel, RenderTileMargin,
-                    out int startCol, out int startRow, out int endCol, out int endRow);
+                if (!GetTileRange(_visibleArea, _pageDisplaySize, _tileLevel, RenderTileMargin,
+                        out int startCol, out int startRow, out int endCol, out int endRow))
+                {
+                    return;
+                }
 
                 var missing = new List<TileCoord>();
                 _service.Cache.FindMissing(_pageNumber, _tileLevel, startCol, startRow, endCol, endRow, missing);
@@ -389,8 +400,13 @@ public sealed partial class TiledPdfPageControl : Control
         }
 
         int tileLevel = TileGrid.ComputeTileLevel(ZoomLevel);
-        var range = GetTileRange(visibleArea.Value, in pageDisplaySize, tileLevel, RenderTileMargin);
+        if (!GetTileRange(visibleArea.Value, in pageDisplaySize, tileLevel, RenderTileMargin,
+                out int startCol, out int startRow, out int endCol, out int endRow))
+        {
+            return;
+        }
 
+        var range = new TileRange(tileLevel, startCol, startRow, endCol, endRow);
         if (_lastRenderedTileRangeValid && _lastRenderedTileRange == range)
         {
             // Same tile range as the last render — no new tiles to request and
@@ -406,27 +422,18 @@ public sealed partial class TiledPdfPageControl : Control
     /// Computes the tile column/row range for the given visible area, expanded by a margin
     /// and clamped to the grid dimensions.
     /// </summary>
-    private static void GetTileRange(in Rect visibleArea, in Size pageDisplaySize, int tileLevel, int margin,
+    private static bool GetTileRange(in Rect visibleArea, in Size pageDisplaySize, int tileLevel, int margin,
         out int startCol, out int startRow, out int endCol, out int endRow)
     {
-        var gridDims = TileGrid.GetGridDimensions(in pageDisplaySize, tileLevel);
+        PixelSize gridDims = TileGrid.GetGridDimensions(in pageDisplaySize, tileLevel);
         double tileDisplaySize = TileGrid.TilePixelSize / TileGrid.GetTileLevelScale(tileLevel);
 
         startCol = Math.Max(0, (int)(visibleArea.Left / tileDisplaySize) - margin);
         startRow = Math.Max(0, (int)(visibleArea.Top / tileDisplaySize) - margin);
         endCol = Math.Min(gridDims.Width - 1, (int)Math.Ceiling(visibleArea.Right / tileDisplaySize) - 1 + margin);
         endRow = Math.Min(gridDims.Height - 1, (int)Math.Ceiling(visibleArea.Bottom / tileDisplaySize) - 1 + margin);
-    }
 
-    /// <summary>
-    /// Computes the tile column/row range for the given visible area, expanded by a margin
-    /// and clamped to the grid dimensions.
-    /// </summary>
-    private static TileRange GetTileRange(in Rect visibleArea, in Size pageDisplaySize, int tileLevel, int margin)
-    {
-        GetTileRange(in visibleArea, in pageDisplaySize, tileLevel, margin,
-            out int startCol, out int startRow, out int endCol, out int endRow);
-        return new TileRange(tileLevel, startCol, startRow, endCol, endRow);
+        return startCol < endCol && startRow < endRow; // false happens when int overflow
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
