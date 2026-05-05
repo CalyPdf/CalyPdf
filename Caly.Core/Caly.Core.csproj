@@ -23,7 +23,7 @@
 		<PackageReference Include="Avalonia.Skia" Version="12.0.2" />
 		<PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.2" />
 		<PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.2" />
-		<PackageReference Include="Caly.Avalonia.Controls.TreeDataGrid" Version="12.0.1" />
+		<PackageReference Include="Caly.Avalonia.Controls.TreeDataGrid" Version="12.0.1.1" />
 		<PackageReference Include="Caly.Tabalonia" Version="12.0.1" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
 		<PackageReference Include="Deadpikle.AvaloniaProgressRing" Version="0.11.0" />
