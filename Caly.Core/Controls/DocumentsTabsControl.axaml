@@ -286,7 +286,8 @@
                                             <TreeDataGrid Source="{Binding BookmarksSource^}"
                                                           ShowColumnHeaders="False"
                                                           CanUserSortColumns="False"
-                                                          HorizontalAlignment="Stretch"/>
+                                                          HorizontalAlignment="Stretch"
+                                                          AutoScrollHorizontally="False"/>
 										</TabItem>
 
 										<!-- Search tab -->

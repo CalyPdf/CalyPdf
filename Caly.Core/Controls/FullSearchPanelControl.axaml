@@ -45,7 +45,8 @@
                                   IsVisible="{Binding !!SearchResults.Count}"
                                   Source="{Binding SearchResultsSource}"
                                   ShowColumnHeaders="False"
-                                  CanUserSortColumns="False"/>
+                                  CanUserSortColumns="False"
+                                  AutoScrollHorizontally="False"/>
 				</DockPanel>
 
 			</ControlTemplate>
