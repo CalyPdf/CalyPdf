@@ -433,7 +433,7 @@ public sealed partial class TiledPdfPageControl : Control
         endCol = Math.Min(gridDims.Width - 1, (int)Math.Ceiling(visibleArea.Right / tileDisplaySize) - 1 + margin);
         endRow = Math.Min(gridDims.Height - 1, (int)Math.Ceiling(visibleArea.Bottom / tileDisplaySize) - 1 + margin);
 
-        return startCol < endCol && startRow < endRow; // false happens when int overflow
+        return startCol <= endCol && startRow <= endRow; // false happens when int overflow
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
