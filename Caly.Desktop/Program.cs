@@ -84,7 +84,6 @@ namespace Caly.Desktop
                             ex = a.Flatten();
                         }
 
-                        Debug.WriteExceptionToFile(ex);
                         ShowExceptionSafely(ex);
                         throw;
                     }
@@ -153,12 +152,15 @@ namespace Caly.Desktop
         {
             try
             {
-                if (ex is null) return;
+                if (ex is null)
+                {
+                    return;
+                }
 
                 var dialogService = App.Current?.Services?.GetRequiredService<IDialogService>();
                 dialogService?.ShowExceptionWindow(ex);
             }
-            catch
+            finally
             {
                 Debug.WriteExceptionToFile(ex);
             }
@@ -171,7 +173,6 @@ namespace Caly.Desktop
 
             var exception = e.Exception.Flatten();
             ShowExceptionSafely(exception);
-            Debug.WriteExceptionToFile(exception);
         }
 
         private static void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
@@ -187,7 +188,6 @@ namespace Caly.Desktop
                 exception = aEx.Flatten();
             }
             ShowExceptionSafely(exception);
-            Debug.WriteExceptionToFile(exception);
         }
 
         // Avalonia configuration, don't remove; also used by visual designer.
@@ -195,14 +195,28 @@ namespace Caly.Desktop
         {
             try
             {
+                // GPU rendering disabled for now
                 return AppBuilder.Configure<App>()
                     .UsePlatformDetect()
                     .WithInterFont()
                     .UseSkia()
-                    // https://github.com/AvaloniaUI/Avalonia/discussions/12597
-                    .With(new Win32PlatformOptions { RenderingMode = [Win32RenderingMode.Software] })
-                    .With(new X11PlatformOptions { RenderingMode = [X11RenderingMode.Software], WmClass = _appName })
-                    .With(new AvaloniaNativePlatformOptions { RenderingMode = [AvaloniaNativeRenderingMode.Software] })
+                    .With(new Win32PlatformOptions
+                    {
+                        RenderingMode = [Win32RenderingMode.Software],
+                    })
+                    .With(new X11PlatformOptions
+                    {
+                        RenderingMode = [X11RenderingMode.Software],
+                        WmClass = _appName,
+                        ExternalGLibMainLoopExceptionLogger = ShowExceptionSafely,
+#pragma warning disable AVALONIA_X11_CSD
+                        EnableDrawnDecorations = true,
+#pragma warning restore AVALONIA_X11_CSD
+                    })
+                    .With(new AvaloniaNativePlatformOptions
+                    {
+                        RenderingMode = [AvaloniaNativeRenderingMode.Software]
+                    })
                     .LogToTrace();
             }
             catch (Exception e)
