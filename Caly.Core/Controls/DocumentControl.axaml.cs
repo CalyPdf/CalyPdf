@@ -273,6 +273,12 @@ public sealed class DocumentControl : CalyTemplatedControl
             {
                 return;
             }
+            
+            var currentScale = _pageItemsControl.LayoutTransform.LayoutTransform?.Value.M11;
+            if (currentScale.HasValue && Math.Abs(currentScale.Value - newZoom) < 1e-9)
+            {
+                return; // Ignore as no change in zoom level
+            }
 
             double dZoom = newZoom / (double?)change.OldValue ?? 1.0;
 

@@ -184,6 +184,12 @@ public sealed class PageItemsControl : ItemsControl
     {
         _scrollChangedHandler = (_, _) => PostUpdatePagesVisibility();
         _sizeChangedHandler = (_, _) => PostUpdatePagesVisibility();
+
+        // Use a Tunnel handler to ensure zoom checks run before bubble-phase handlers
+        // and avoid unwanted event scrolls by 50px before we can reject them.
+        // No need to RemoveHandler() as it is on 'this', so it's GC'd with the control.
+        AddHandler(PointerWheelChangedEvent, OnPointerWheelChangedHandler, RoutingStrategies.Tunnel);
+
         ResetState();
     }
 
@@ -1127,7 +1133,6 @@ public sealed class PageItemsControl : ItemsControl
         Scroll.Focus(); // Make sure the Scroll has focus
 
         LayoutTransform = e.NameScope.FindFromNameScope<LayoutTransformControl>("PART_LayoutTransformControl");
-        LayoutTransform.AddHandler(PointerWheelChangedEvent, OnPointerWheelChangedHandler);
         LayoutTransform.AddHandler(PointerPressedEvent, OnPointerPressed);
         LayoutTransform.AddHandler(PointerMovedEvent, OnPointerMoved);
         LayoutTransform.AddHandler(PointerReleasedEvent, OnPointerReleased);
@@ -1155,7 +1160,6 @@ public sealed class PageItemsControl : ItemsControl
 
         if (LayoutTransform is not null)
         {
-            LayoutTransform.RemoveHandler(PointerWheelChangedEvent, OnPointerWheelChangedHandler);
             LayoutTransform.RemoveHandler(PointerPressedEvent, OnPointerPressed);
             LayoutTransform.RemoveHandler(PointerMovedEvent, OnPointerMoved);
             LayoutTransform.RemoveHandler(PointerReleasedEvent, OnPointerReleased);
