@@ -22,6 +22,7 @@ using System;
 using Avalonia;
 using Avalonia.Controls.Primitives;
 using Avalonia.Media;
+using Avalonia.Media.Immutable;
 
 namespace Caly.Core.Controls;
 
@@ -44,9 +45,9 @@ public sealed class ThumbnailControl : TemplatedControl
 #endif
     
     private static readonly Color AreaColor = Colors.DodgerBlue;
-    private static readonly Brush AreaBrush = new SolidColorBrush(AreaColor);
-    private static readonly Brush AreaTransparentBrush = new SolidColorBrush(AreaColor, 0.3);
-    private static readonly Pen AreaPen = new Pen() { Brush = AreaBrush, Thickness = _borderThickness };
+    private static readonly IImmutableBrush AreaBrush = new SolidColorBrush(AreaColor).ToImmutable();
+    private static readonly IImmutableBrush AreaTransparentBrush = new SolidColorBrush(AreaColor, 0.3).ToImmutable();
+    private static readonly ImmutablePen AreaPen = new Pen() { Brush = AreaBrush, Thickness = _borderThickness }.ToImmutable();
 
     private Matrix _scale = Matrix.Identity;
 
@@ -122,10 +123,6 @@ public sealed class ThumbnailControl : TemplatedControl
 
         try
         {
-            // Bitmap might not be null here but already disposed.
-            // We use Dispatcher.UIThread.Invoke(() => t?.Dispose(), DispatcherPriority.Loaded);
-            // in the PageViewModel to avoid this issue
-            
             var thumbnail = Thumbnail;
             if (thumbnail is not null && Bounds is { Width: > 0, Height: > 0 })
             {
@@ -148,24 +145,43 @@ public sealed class ThumbnailControl : TemplatedControl
             return;
         }
 
-        var area = VisibleArea.Value.TransformToAABB(_scale);
-
-        const double minSize = _borderThickness * 2;
-        if (area is { Width: > minSize, Height: > minSize })
+        var area = GetAdjustedVisibleArea(VisibleArea.Value.TransformToAABB(_scale), out bool isFull);
+        if (isFull)
         {
-            context.DrawRectangle(AreaTransparentBrush.ToImmutable(), AreaPen.ToImmutable(),
-                area.Deflate(_borderThickness / 2.0));
+            context.DrawRectangle(AreaTransparentBrush, AreaPen, area);
         }
         else
         {
-            // Make sure the area is still visible even zoom level is large.
-            // We create a rect with a min size and same aspect ratio that
-            // has the same center as the actual area.
-            var rect = area.CenterRect(new Rect(0, 0, area.Size.AspectRatio * minSize, minSize));
-            context.DrawRectangle(AreaBrush.ToImmutable(), null, rect);
+            context.DrawRectangle(AreaBrush, null, area);
         }
     }
-    
+
+    private static Rect GetAdjustedVisibleArea(in Rect area, out bool isFull)
+    {
+        const double minSize = _borderThickness * 2;
+        isFull = true;
+
+        switch (area)
+        {
+            case { Width: > minSize, Height: > minSize }:
+            {
+                return area.Deflate(_borderThickness / 2.0);
+            }
+            case { Width: <= minSize, Height: <= minSize }:
+            {
+                isFull = false;
+                return area.CenterRect(new Rect(0, 0, minSize, minSize));
+            }
+            default:
+            {
+                isFull = false;
+                return area.CenterRect(area.Width > minSize
+                    ? new Rect(0, 0, area.Width, minSize)
+                    : new Rect(0, 0, minSize, area.Height));
+            }
+        }
+    }
+
     private void UpdateScaleMatrix()
     {
         if (IsNotValid(PageSize))
