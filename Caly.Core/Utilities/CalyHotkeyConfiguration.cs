@@ -50,6 +50,11 @@ internal static class CalyHotkeyConfiguration
     public static KeyGesture OpenFileGesture => new KeyGesture(Key.O, CommandModifiers);
 
     /// <summary>
+    /// Gets a platform-specific <see cref="KeyGesture"/> for the 'Print Document' action.
+    /// </summary>
+    public static KeyGesture DocumentPrintGesture => new KeyGesture(Key.P, CommandModifiers);
+
+    /// <summary>
     /// Gets a platform-specific <see cref="KeyGesture"/> for the 'Go to Specific Page' action.
     /// </summary>
     public static KeyGesture DocumentGoToGesture => new KeyGesture(Key.G, CommandModifiers);

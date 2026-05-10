@@ -173,6 +173,18 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
     }
 
     [RelayCommand]
+    private Task PrintDocument(CancellationToken token)
+    {
+        DocumentViewModel? vm = SelectedDocument;
+        if (vm is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        return vm.PrintCommand.ExecuteAsync(token);
+    }
+
+    [RelayCommand]
     private void ActivateSearchTextTab()
     {
         SelectedDocument?.ActivateSearchTextTabCommand.Execute(null);

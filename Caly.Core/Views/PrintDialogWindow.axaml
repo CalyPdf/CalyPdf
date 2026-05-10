@@ -1,0 +1,126 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:Caly.Core.ViewModels"
+        mc:Ignorable="d" d:DesignWidth="380" d:DesignHeight="400"
+        x:Class="Caly.Core.Views.PrintDialogWindow"
+        x:DataType="vm:PrintDialogViewModel"
+        Width="380" MinHeight="240" MaxHeight="400"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        WindowDecorations="None"
+        ExtendClientAreaToDecorationsHint="True"
+        ShowActivated="True"
+        Title="Print">
+
+    <DockPanel Margin="12">
+
+        <!-- Printer selection -->
+        <TextBlock DockPanel.Dock="Top" Text="Printer" FontWeight="SemiBold" Margin="0,4,0,4"/>
+
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+            <ComboBox Grid.Column="0"
+                      HorizontalAlignment="Stretch"
+                      ItemsSource="{Binding AvailablePrinters}"
+                      SelectedItem="{Binding SelectedPrinter}"
+                      IsEnabled="{Binding !IsPrinting}"
+                      PlaceholderText="Select a printer…">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Name}"/>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+            <Button Grid.Column="1"
+                    Margin="6,0,0,0"
+                    VerticalAlignment="Stretch"
+                    ToolTip.Tip="Refresh printer list"
+                    IsEnabled="{Binding !IsPrinting}"
+                    Command="{Binding LoadPrintersCommand}">
+                <PathIcon Width="14" Height="14" Data="{StaticResource arrow_sync_regular}"/>
+            </Button>
+        </Grid>
+
+        <!-- Loading indicator while printer list is being fetched -->
+        <ProgressBar DockPanel.Dock="Top"
+                     IsIndeterminate="True"
+                     IsVisible="{Binding IsLoadingPrinters}"
+                     IsEnabled="{Binding IsLoadingPrinters}"/>
+
+        <!-- Page range -->
+        <TextBlock DockPanel.Dock="Top" Text="Pages" FontWeight="SemiBold" Margin="0,8,0,4"/>
+
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+
+            <RadioButton GroupName="PageRange"
+                         Content="All pages"
+                         IsChecked="{Binding IsAllPagesSelected}"
+                         IsEnabled="{Binding !IsPrinting}"/>
+
+            <RadioButton GroupName="PageRange"
+                         Content="{Binding CurrentPageLabel}"
+                         IsChecked="{Binding IsCurrentPageSelected}"
+                         IsEnabled="{Binding !IsPrinting}"/>
+
+            <StackPanel>
+                <RadioButton GroupName="PageRange"
+                             Content="Custom range:"
+                             IsChecked="{Binding IsCustomRangeSelected}"
+                             IsEnabled="{Binding !IsPrinting}"/>
+                <TextBox Margin="20,2,0,0"
+                         PlaceholderText="e.g.  1-3, 5, 7-9"
+                         Text="{Binding CustomPageRange}"
+                         IsEnabled="{Binding IsCustomRangeSelected}"
+                         IsReadOnly="{Binding IsPrinting}"/>
+            </StackPanel>
+
+        </StackPanel>
+
+        <!-- Status / progress while printing -->
+        <ProgressBar DockPanel.Dock="Top"
+                     IsIndeterminate="{Binding !PrintPagesProcessed}"
+                     Maximum="{Binding PrintTotalPages}"
+                     Value="{Binding PrintPagesProcessed}"
+                     IsVisible="{Binding IsPrinting}"
+                     IsEnabled="{Binding IsPrinting}"/>
+
+        <TextBlock DockPanel.Dock="Top"
+                   Text="{Binding StatusMessage}"
+                   TextWrapping="Wrap"
+                   Margin="0,0,0,8"
+                   Foreground="{DynamicResource SystemErrorTextColor}"
+                   IsVisible="{Binding HasError}"/>
+
+        <TextBlock DockPanel.Dock="Top"
+                   Text="{Binding StatusMessage}"
+                   TextWrapping="Wrap"
+                   Margin="0,0,0,8"
+                   IsVisible="{Binding IsPrinting}"/>
+
+        <!-- Buttons -->
+        <StackPanel DockPanel.Dock="Bottom"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,4,0,0">
+
+            <Button Content="Cancel"
+                    IsDefault="False"
+                    Click="CancelButton_OnClick"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Margin="0,0,8,0"/>
+
+            <Button Content="Print"
+                    IsDefault="True"
+                    Command="{Binding PrintCommand}"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"/>
+
+        </StackPanel>
+
+        <Grid/>
+
+    </DockPanel>
+</Window>

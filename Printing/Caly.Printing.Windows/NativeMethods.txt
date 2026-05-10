@@ -1,0 +1,9 @@
+EnumPrinters
+CreateDC
+DeleteDC
+GetDeviceCaps
+StartDoc
+StartPage
+EndPage
+EndDoc
+StretchDIBits

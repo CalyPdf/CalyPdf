@@ -454,6 +454,8 @@ $RECYCLE.BIN/
 !.vscode/extensions.json
 /local
 
+.claude
+
 # Caly 
 /caly_settings
 /Caly.Core/caly_settings
