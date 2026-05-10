@@ -177,6 +177,22 @@
 								   VerticalAlignment="Center"
 								   HorizontalAlignment="Center"/>
 
+						<controls:VerticalSeparator/>
+
+						<!-- Print -->
+						<Button DockPanel.Dock="Right"
+                                Margin="0,0,5,0"
+								HorizontalAlignment="Center"
+								VerticalAlignment="Stretch"
+								Background="Transparent"
+								Command="{Binding PrintCommand}">
+							<PathIcon Width="17"
+									  Height="17"
+									  Data="{StaticResource print_regular}">
+								<ToolTip.Tip>Print</ToolTip.Tip>
+							</PathIcon>
+						</Button>
+
 						<Grid/>
 
 					</DockPanel>

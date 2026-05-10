@@ -22,6 +22,12 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Caly.Tests", "Caly.Tests\Caly.Tests.csproj", "{F8503ADA-DC76-4399-BAD3-ED27E52FF7B0}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Caly.Printing.Core", "Printing\Caly.Printing.Core\Caly.Printing.Core.csproj", "{B4096E2A-8FC5-429D-B933-6577B3799EA3}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Caly.Printing.Windows", "Printing\Caly.Printing.Windows\Caly.Printing.Windows.csproj", "{F9D9191E-1F79-47FD-9639-50C756A38322}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Caly.Printing.Unix", "Printing\Caly.Printing.Unix\Caly.Printing.Unix.csproj", "{3C8C0676-60BB-4E1A-ADAA-7F52374E5648}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		AOT|Any CPU = AOT|Any CPU
@@ -75,6 +81,24 @@ Global
 		{F8503ADA-DC76-4399-BAD3-ED27E52FF7B0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F8503ADA-DC76-4399-BAD3-ED27E52FF7B0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F8503ADA-DC76-4399-BAD3-ED27E52FF7B0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B4096E2A-8FC5-429D-B933-6577B3799EA3}.AOT|Any CPU.ActiveCfg = Release|Any CPU
+		{B4096E2A-8FC5-429D-B933-6577B3799EA3}.AOT|Any CPU.Build.0 = Release|Any CPU
+		{B4096E2A-8FC5-429D-B933-6577B3799EA3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B4096E2A-8FC5-429D-B933-6577B3799EA3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B4096E2A-8FC5-429D-B933-6577B3799EA3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B4096E2A-8FC5-429D-B933-6577B3799EA3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F9D9191E-1F79-47FD-9639-50C756A38322}.AOT|Any CPU.ActiveCfg = Release|Any CPU
+		{F9D9191E-1F79-47FD-9639-50C756A38322}.AOT|Any CPU.Build.0 = Release|Any CPU
+		{F9D9191E-1F79-47FD-9639-50C756A38322}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F9D9191E-1F79-47FD-9639-50C756A38322}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F9D9191E-1F79-47FD-9639-50C756A38322}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F9D9191E-1F79-47FD-9639-50C756A38322}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3C8C0676-60BB-4E1A-ADAA-7F52374E5648}.AOT|Any CPU.ActiveCfg = Release|Any CPU
+		{3C8C0676-60BB-4E1A-ADAA-7F52374E5648}.AOT|Any CPU.Build.0 = Release|Any CPU
+		{3C8C0676-60BB-4E1A-ADAA-7F52374E5648}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3C8C0676-60BB-4E1A-ADAA-7F52374E5648}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3C8C0676-60BB-4E1A-ADAA-7F52374E5648}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3C8C0676-60BB-4E1A-ADAA-7F52374E5648}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

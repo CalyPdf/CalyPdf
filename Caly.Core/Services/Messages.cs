@@ -5,6 +5,7 @@ using Caly.Core.ViewModels;
 using CommunityToolkit.Mvvm.Messaging.Messages;
 using System.Collections.Generic;
 using System.Threading;
+using Caly.Core.Services.Interfaces;
 
 namespace Caly.Core.Services;
 
@@ -39,6 +40,22 @@ internal sealed class CopyToClipboardRequestMessage : AsyncRequestMessage<bool>
 }
 
 internal sealed class ShowPdfPasswordDialogRequestMessage : AsyncRequestMessage<string?>;
+
+internal sealed class ShowPrintDialogRequestMessage : AsyncRequestMessage<bool>
+{
+    public IPdfDocumentService PdfDocumentService { get; }
+
+    public int CurrentPage { get; }
+
+    public CancellationToken Token { get; }
+
+    public ShowPrintDialogRequestMessage(IPdfDocumentService pdfDocumentService, int currentPage, CancellationToken token)
+    {
+        PdfDocumentService = pdfDocumentService;
+        CurrentPage = currentPage;
+        Token = token;
+    }
+}
 
 internal sealed class OpenLoadDocumentsRequestMessage : AsyncRequestMessage<int>
 {

@@ -1,7 +1,6 @@
 ﻿using Avalonia.Platform.Storage;
 using Caly.Core.Utilities;
 using CommunityToolkit.Mvvm.Messaging;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace Caly.Core.Services;
@@ -15,6 +14,7 @@ internal partial class PdfDocumentsManagerService
         App.Messenger.Register<CopyToClipboardRequestMessage>(this, HandleCopyToClipboardRequestMessage);
         App.Messenger.Register<ShowNotificationMessage>(this, HandleShowNotificationMessage);
         App.Messenger.Register<ShowPdfPasswordDialogRequestMessage>(this, HandleShowPdfPasswordDialogRequestMessage);
+        App.Messenger.Register<ShowPrintDialogRequestMessage>(this, HandleShowPrintDialogRequestMessage);
         App.Messenger.Register<OpenEmbeddedFileRequestMessage>(this, HandleOpenEmbeddedFileRequestMessage);
         App.Messenger.Register<SaveEmbeddedFileRequestMessage>(this, HandleSaveEmbeddedFileRequestMessage);
     }
@@ -48,6 +48,17 @@ internal partial class PdfDocumentsManagerService
     private void HandleShowPdfPasswordDialogRequestMessage(object r, ShowPdfPasswordDialogRequestMessage m)
     {
         m.Reply(_dialogService.ShowPdfPasswordDialogAsync());
+    }
+    private void HandleShowPrintDialogRequestMessage(object r, ShowPrintDialogRequestMessage m)
+    {
+        m.Reply(HandleShowPrintDialogAsync(m));
+    }
+
+    private async Task<bool> HandleShowPrintDialogAsync(ShowPrintDialogRequestMessage m)
+    {
+        await _dialogService.ShowPrintDialogAsync(m.PdfDocumentService, m.CurrentPage, m.Token)
+            .ConfigureAwait(false);
+        return true;
     }
 
     private void HandleShowNotificationMessage(object r, ShowNotificationMessage m)

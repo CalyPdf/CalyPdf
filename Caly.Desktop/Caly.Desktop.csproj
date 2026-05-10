@@ -90,5 +90,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\Caly.Core\Caly.Core.csproj" />
+		<ProjectReference Include="..\Printing\Caly.Printing.Windows\Caly.Printing.Windows.csproj" />
+		<ProjectReference Include="..\Printing\Caly.Printing.Unix\Caly.Printing.Unix.csproj" />
 	</ItemGroup>
 </Project>
