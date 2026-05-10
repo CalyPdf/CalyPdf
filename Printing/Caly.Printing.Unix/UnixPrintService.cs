@@ -1,4 +1,4 @@
-// Copyright (c) 2025 BobLd
+// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -27,6 +27,7 @@ using Caly.Core;
 using Caly.Core.Services.Interfaces;
 using Caly.Printing.Core;
 using SharpIpp;
+using SkiaSharp;
 using SharpIpp.Models.Requests;
 using SharpIpp.Protocol.Models;
 
@@ -158,16 +159,92 @@ public sealed class UnixPrintService : IPrintService, IDisposable
     // Printing
     // -------------------------------------------------------------------------
 
+    public async Task<PrinterCapabilities> GetPrinterCapabilitiesAsync(
+        PrinterInfo printer,
+        CancellationToken token = default)
+    {
+        Debug.ThrowOnUiThread();
+
+        var ippUri = printer.IppUri ?? BuildCupsUri(printer.Name);
+
+        try
+        {
+            var request = new GetPrinterAttributesRequest
+            {
+                OperationAttributes = new GetPrinterAttributesOperationAttributes
+                {
+                    PrinterUri = ippUri,
+                    RequestingUserName = Environment.UserName
+                }
+            };
+
+            var response = await _ippClient.GetPrinterAttributesAsync(request, token).ConfigureAwait(false);
+            var attrs = response.PrinterAttributes;
+            if (attrs is null)
+            {
+                return ConservativeDefaults();
+            }
+
+            // OrientationRequestedSupported is Orientation[] (enum: Portrait=3, Landscape=4).
+            bool supportsLandscape = attrs.OrientationRequestedSupported is { Length: > 0 } orient
+                && Array.Exists(orient, o => o == Orientation.Landscape);
+
+            // PrintColorModeSupported is PrintColorMode[] (enum: Color=3, Monochrome=5, etc.).
+            // ColorSupported (bool?) is a simpler fallback when the mode list is absent.
+            var modes = attrs.PrintColorModeSupported;
+            bool isColor;
+            bool monoDirective;
+
+            if (modes is { Length: > 0 })
+            {
+                isColor = Array.Exists(modes, m => m == SharpIpp.Protocol.Models.PrintColorMode.Color);
+                monoDirective = Array.Exists(modes, m =>
+                    m == SharpIpp.Protocol.Models.PrintColorMode.Monochrome ||
+                    m == SharpIpp.Protocol.Models.PrintColorMode.ProcessMonochrome ||
+                    m == SharpIpp.Protocol.Models.PrintColorMode.AutoMonochrome);
+            }
+            else
+            {
+                // Attribute missing — fall back to ColorSupported bool if present,
+                // otherwise assume color + monochrome both supported.
+                isColor = attrs.ColorSupported ?? true;
+                monoDirective = true;
+            }
+
+            // NumberUpSupported is not exposed by PrinterDescriptionAttributes in SharpIppNext 3.x.
+            // Fall back to the conventional N-up set {1, 2, 4} which CUPS supports by default.
+            IReadOnlyList<int> nUp = [1, 2, 4];
+
+            return new PrinterCapabilities(
+                SupportsLandscape: supportsLandscape,
+                IsColorDevice: isColor,
+                SupportsMonochromeDirective: monoDirective,
+                SupportedNumberUp: nUp);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"UnixPrintService: Get-Printer-Attributes failed: {ex.Message}");
+            return ConservativeDefaults();
+        }
+    }
+
+    private static PrinterCapabilities ConservativeDefaults() => new(
+        SupportsLandscape: true,
+        IsColorDevice: true,
+        SupportsMonochromeDirective: true,
+        SupportedNumberUp: [1, 2, 4]);
+
     public Task PrintDocumentAsync(
         PrinterInfo printer,
         IPdfDocumentService documentService,
         IReadOnlyList<PrintPageInfo> pages,
+        PrintSettings settings,
         IProgress<int>? progress,
         CancellationToken token)
     {
         Debug.ThrowOnUiThread();
 
-        return PrintIppAsync(printer, documentService, pages, progress, token);
+        return PrintIppAsync(printer, documentService, pages, settings, progress, token);
     }
 
     // -------------------------------------------------------------------------
@@ -188,11 +265,19 @@ public sealed class UnixPrintService : IPrintService, IDisposable
         PrinterInfo printer,
         IPdfDocumentService documentService,
         IReadOnlyList<PrintPageInfo> pages,
+        PrintSettings settings,
         IProgress<int>? progress,
         CancellationToken token)
     {
-        // PDF points are 1/72 inch; render at 200 DPI for print quality.
-        const float printScale = 200f / 72f;
+        // Default 200 DPI render; CustomScale renders at the requested scale so CUPS doesn't
+        // re-scale the bitmap.
+        const float baseDpi = 200f;
+        float baseScale = baseDpi / 72f;
+        float printScale = settings.FitMode == PrintFitMode.CustomScale
+            ? baseScale * Math.Clamp(settings.CustomScalePercent, 10, 400) / 100f
+            : baseScale;
+
+        var caps = await GetPrinterCapabilitiesAsync(printer, token).ConfigureAwait(false);
 
         string docName = documentService.FileName ?? "Document";
         string userName = Environment.UserName;
@@ -202,6 +287,22 @@ public sealed class UnixPrintService : IPrintService, IDisposable
 
         try
         {
+            var ippScaling = IppAttributeMapping.MapFitMode(settings) switch
+            {
+                IppAttributeMapping.IppPrintScaling.Fit     => PrintScaling.Fit,
+                IppAttributeMapping.IppPrintScaling.None    => PrintScaling.None,
+                IppAttributeMapping.IppPrintScaling.AutoFit => PrintScaling.AutoFit,
+                _ => PrintScaling.Fit,
+            };
+
+            var jobTemplate = new JobTemplateAttributes
+            {
+                OrientationRequested = MapToSharpIppOrientation(IppAttributeMapping.MapOrientation(settings, caps)),
+                PrintColorMode = MapToSharpIppColorMode(IppAttributeMapping.MapColorMode(settings, caps)),
+                NumberUp = IppAttributeMapping.MapNumberUp(settings, caps),
+                PrintScaling = ippScaling,
+            };
+
             // Create-Job owns all pages in one queue entry and sets the job owner so
             // subsequent Send-Document requests pass the @OWNER policy check.
             var createRequest = new CreateJobRequest
@@ -212,11 +313,7 @@ public sealed class UnixPrintService : IPrintService, IDisposable
                     RequestingUserName = userName,
                     JobName = docName
                 },
-                JobTemplateAttributes = new JobTemplateAttributes
-                {
-                    PrintScaling = PrintScaling.Fit,
-                    //PrinterResolution = new Resolution(200, 200, ResolutionUnit.DotsPerInch)
-                }
+                JobTemplateAttributes = jobTemplate
             };
 
             var createResponse = await _ippClient.CreateJobAsync(createRequest, token)
@@ -235,45 +332,71 @@ public sealed class UnixPrintService : IPrintService, IDisposable
                 token.ThrowIfCancellationRequested();
 
                 // Render one page, encode it, then dispose — only one bitmap in memory at a time.
-                using var bitmap = await PrintServiceHelper.RenderPageToBitmapAsync(documentService, pages[i], token, printScale)
+                var bitmap = await PrintServiceHelper.RenderPageToBitmapAsync(documentService, pages[i], token, printScale)
                     .ConfigureAwait(false);
 
-                if (bitmap is null)
+                try
                 {
-                    continue;
-                }
-
-                bool isLast = i == pages.Count - 1;
-
-                using var jpegStream = PrintServiceHelper.EncodeJpeg(bitmap);
-
-                var sendRequest = new SendDocumentRequest
-                {
-                    Document = jpegStream,
-                    OperationAttributes = new SendDocumentOperationAttributes
+                    if (bitmap is null)
                     {
-                        PrinterUri = printer.IppUri,
-                        RequestingUserName = userName,
-                        JobId = jobId.Value,
-                        DocumentFormat = "image/jpeg",
-                        LastDocument = isLast
+                        continue;
                     }
-                };
 
-                var sendResponse = await _ippClient.SendDocumentAsync(sendRequest, token)
-                    .ConfigureAwait(false);
+                    // Auto-orientation: rotate the bitmap if the page is wider than tall.
+                    if (settings.Orientation == PrintOrientation.Auto)
+                    {
+                        var size = await documentService.GetPageSizeAsync(pages[i].PageNumber, token).ConfigureAwait(false);
+                        if (size is not null && PrintLayout.ShouldRotateForAutoOrientation((float)size.Value.Width, (float)size.Value.Height))
+                        {
+                            // Replace bitmap with a 90°-rotated copy.
+                            var rotated = PrintServiceHelper.RotateBitmap90Cw(bitmap);
+                            bitmap.Dispose();
+                            bitmap = rotated;
+                        }
+                    }
 
-                if ((short)sendResponse.StatusCode >= 0x0100)
-                {
-                    throw new InvalidOperationException($"Send-Document failed (IPP status {sendResponse.StatusCode:X4}: {sendResponse.StatusCode}).");
+                    // Grayscale fallback when caps say no.
+                    if (IppAttributeMapping.NeedsAppSideGrayscale(settings, caps))
+                    {
+                        PrintServiceHelper.ConvertToGrayscaleInPlace(bitmap);
+                    }
+
+                    bool isLast = i == pages.Count - 1;
+
+                    using var jpegStream = PrintServiceHelper.EncodeJpeg(bitmap);
+
+                    var sendRequest = new SendDocumentRequest
+                    {
+                        Document = jpegStream,
+                        OperationAttributes = new SendDocumentOperationAttributes
+                        {
+                            PrinterUri = printer.IppUri,
+                            RequestingUserName = userName,
+                            JobId = jobId.Value,
+                            DocumentFormat = "image/jpeg",
+                            LastDocument = isLast
+                        }
+                    };
+
+                    var sendResponse = await _ippClient.SendDocumentAsync(sendRequest, token)
+                        .ConfigureAwait(false);
+
+                    if ((short)sendResponse.StatusCode >= 0x0100)
+                    {
+                        throw new InvalidOperationException($"Send-Document failed (IPP status {sendResponse.StatusCode:X4}: {sendResponse.StatusCode}).");
+                    }
+
+                    if (isLast)
+                    {
+                        jobClosed = true;
+                    }
+
+                    progress?.Report(++pagesProcessed);
                 }
-
-                if (isLast)
+                finally
                 {
-                    jobClosed = true;
+                    bitmap?.Dispose();
                 }
-
-                progress?.Report(++pagesProcessed);
             }
         }
         finally
@@ -305,6 +428,20 @@ public sealed class UnixPrintService : IPrintService, IDisposable
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    private static Orientation? MapToSharpIppOrientation(int? value) => value switch
+    {
+        3 => Orientation.Portrait,
+        4 => Orientation.Landscape,
+        _ => null,
+    };
+
+    private static SharpIpp.Protocol.Models.PrintColorMode? MapToSharpIppColorMode(string? value) => value switch
+    {
+        "monochrome" => SharpIpp.Protocol.Models.PrintColorMode.Monochrome,
+        "color"      => SharpIpp.Protocol.Models.PrintColorMode.Color,
+        _ => null,
+    };
 
     private static async Task<string> RunProcessAsync(string command, string[] args, CancellationToken token)
     {

@@ -38,12 +38,60 @@ public sealed record PrinterInfo(string Name, Uri? IppUri)
     public override string ToString() => Name;
 }
 
+public enum PrintOrientation : byte
+{
+    Auto = 0,
+    Portrait = 1,
+    Landscape = 2,
+}
+
+public enum PrintFitMode : byte
+{
+    FitToPage = 0,
+    ActualSize = 1,
+    ShrinkToFit = 2,
+    CustomScale = 3
+}
+
+public enum PrintColorMode : byte
+{
+    Color = 0,
+    Monochrome = 1
+}
+
+/// <summary>
+/// Per-job print settings selected in the dialog.
+/// </summary>
+public sealed record PrintSettings(
+    PrintOrientation Orientation = PrintOrientation.Auto,
+    PrintFitMode FitMode = PrintFitMode.FitToPage,
+    int CustomScalePercent = 100,
+    int PagesPerSheet = 1,
+    PrintColorMode ColorMode = PrintColorMode.Color);
+
+/// <summary>
+/// Subset of printer capabilities relevant to the print dialog.
+/// </summary>
+public sealed record PrinterCapabilities(
+    bool SupportsLandscape,
+    bool IsColorDevice,
+    bool SupportsMonochromeDirective,
+    IReadOnlyList<int> SupportedNumberUp);
+
 public interface IPrintService
 {
     /// <summary>
     /// Get all available printers.
     /// </summary>
-    Task<IReadOnlyList<PrinterInfo>> GetAvailablePrintersAsync(CancellationToken token = default);
+    Task<IReadOnlyList<PrinterInfo>> GetAvailablePrintersAsync(CancellationToken token);
+
+    /// <summary>
+    /// Get the printer capability subset used to drive the print dialog
+    /// (orientation, color, supported N-up values).
+    /// </summary>
+    Task<PrinterCapabilities> GetPrinterCapabilitiesAsync(
+        PrinterInfo printer,
+        CancellationToken token);
 
     /// <summary>
     /// Print the document.
@@ -51,6 +99,7 @@ public interface IPrintService
     /// <param name="printer">The printer to which the document will be sent. Cannot be null.</param>
     /// <param name="documentService">The PDF document service used to access and render the document content. Cannot be null.</param>
     /// <param name="pages">A read-only list of page information specifying which pages to print and their print settings. Cannot be null or empty.</param>
+    /// <param name="settings">Print settings.</param>
     /// <param name="progress">Optional progress sink; receives the count of pages processed so far after each page completes.</param>
     /// <param name="token">A cancellation token that can be used to cancel the print operation.</param>
     /// <returns>A task that represents the asynchronous print operation.</returns>
@@ -58,6 +107,7 @@ public interface IPrintService
         PrinterInfo printer,
         IPdfDocumentService documentService,
         IReadOnlyList<PrintPageInfo> pages,
+        PrintSettings settings,
         IProgress<int>? progress,
         CancellationToken token);
 }

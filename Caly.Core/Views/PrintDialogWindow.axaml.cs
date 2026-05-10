@@ -28,8 +28,6 @@ namespace Caly.Core.Views;
 
 public sealed partial class PrintDialogWindow : Window
 {
-    private PrintDialogViewModel? _subscribedVm;
-
     public PrintDialogWindow()
     {
         InitializeComponent();
@@ -38,16 +36,10 @@ public sealed partial class PrintDialogWindow : Window
     protected override void OnDataContextChanged(EventArgs e)
     {
         base.OnDataContextChanged(e);
-
-        if (_subscribedVm is not null)
-        {
-            _subscribedVm.PrintCompleted -= OnPrintCompleted;
-            _subscribedVm = null;
-        }
-
+        
         if (DataContext is PrintDialogViewModel vm)
         {
-            _subscribedVm = vm;
+            vm.PrintCompleted -= OnPrintCompleted;
             vm.PrintCompleted += OnPrintCompleted;
             // Kick off printer enumeration as soon as the ViewModel is attached.
             vm.LoadPrintersCommand.Execute(null);
@@ -56,10 +48,10 @@ public sealed partial class PrintDialogWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
-        if (_subscribedVm is not null)
+        if (DataContext is PrintDialogViewModel vm)
         {
-            _subscribedVm.PrintCompleted -= OnPrintCompleted;
-            _subscribedVm = null;
+            vm.PrintCompleted -= OnPrintCompleted;
+            vm.Dispose();
         }
         base.OnClosed(e);
     }
