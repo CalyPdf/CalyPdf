@@ -1,4 +1,4 @@
-// Copyright (c) 2025 BobLd
+// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -110,5 +110,51 @@ public static class PrintServiceHelper
         data.SaveTo(stream);
         stream.Position = 0;
         return stream;
+    }
+
+    /// <summary>
+    /// Converts a BGRA8888 bitmap to grayscale in-place using a SkiaSharp color matrix
+    /// instead of manual per-pixel iteration. Alpha is preserved.
+    /// </summary>
+    public static void ConvertToGrayscaleInPlace(SKBitmap bitmap)
+    {
+        if (bitmap is null)
+        {
+            throw new ArgumentNullException(nameof(bitmap));
+        }
+
+        if (bitmap.ColorType != SKColorType.Bgra8888)
+        {
+            throw new ArgumentException("Bitmap must be BGRA8888.", nameof(bitmap));
+        }
+
+        using var paint = new SKPaint
+        {
+            ColorFilter = SKColorFilter.CreateColorMatrix(new float[]
+            {
+                // R' = 0.299R + 0.587G + 0.114B
+                0.299f, 0.587f, 0.114f, 0f, 0f,
+                // G' = 0.299R + 0.587G + 0.114B
+                0.299f, 0.587f, 0.114f, 0f, 0f,
+                // B' = 0.299R + 0.587G + 0.114B
+                0.299f, 0.587f, 0.114f, 0f, 0f,
+                // A' = A
+                0f,    0f,    0f,    1f, 0f
+            })
+        };
+
+        using var canvas = new SKCanvas(bitmap);
+        canvas.DrawBitmap(bitmap, 0, 0, paint);
+    }
+
+    public static SKBitmap RotateBitmap90Cw(SKBitmap source)
+    {
+        var rotated = new SKBitmap(source.Height, source.Width, source.ColorType, source.AlphaType);
+        using var canvas = new SKCanvas(rotated);
+        canvas.Translate(rotated.Width, 0);
+        canvas.RotateDegrees(90);
+        canvas.DrawBitmap(source, 0, 0);
+        canvas.Flush();
+        return rotated;
     }
 }

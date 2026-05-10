@@ -7,3 +7,9 @@ StartPage
 EndPage
 EndDoc
 StretchDIBits
+OpenPrinter
+ClosePrinter
+DocumentProperties
+ResetDC
+DeviceCapabilities
+DEVMODEW

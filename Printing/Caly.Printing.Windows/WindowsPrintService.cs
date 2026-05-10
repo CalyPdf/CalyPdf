@@ -1,4 +1,4 @@
-// Copyright (c) 2025 BobLd
+// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -28,9 +28,13 @@ using Caly.Core.Services.Interfaces;
 using Caly.Printing.Core;
 using SkiaSharp;
 using Windows.Win32;
+using Windows.Win32.Foundation;
 using Windows.Win32.Graphics.Gdi;
+using Windows.Win32.Graphics.Printing;
 using Windows.Win32.Storage.Xps;
 using Caly.Core;
+using static Windows.Win32.Storage.Xps.PRINTER_DEVICE_CAPABILITIES;
+using static Windows.Win32.Graphics.Gdi.DEVMODE_FIELD_FLAGS;
 
 namespace Caly.Printing.Windows;
 
@@ -79,7 +83,7 @@ public sealed class WindowsPrintService : IPrintService
                 return [];
             }
 
-            byte[] buffer = new byte[needed];
+            Span<byte> buffer = needed <= 1024 ? stackalloc byte[(int)needed] : new byte[needed];
             if (!PInvoke.EnumPrinters(flags, null, level, buffer, out _, out uint count))
             {
                 return [];
@@ -109,16 +113,168 @@ public sealed class WindowsPrintService : IPrintService
         return [];
     }
 
+    public Task<PrinterCapabilities> GetPrinterCapabilitiesAsync(
+        PrinterInfo printer,
+        CancellationToken token = default)
+    {
+        return Task.Run(() =>
+        {
+            Debug.ThrowOnUiThread();
+            token.ThrowIfCancellationRequested();
+
+            bool supportsLandscape = false;
+            bool isColorDevice = false;
+
+            try
+            {
+                // DC_ORIENTATION returns 90 if landscape is supported, 0 otherwise.
+                int orient = PInvoke.DeviceCapabilities(printer.Name, null, DC_ORIENTATION, (DEVMODEW?)null);
+                supportsLandscape = orient == 90;
+
+                // DC_COLORDEVICE returns 1 for color, 0 for monochrome-only.
+                int color = PInvoke.DeviceCapabilities(printer.Name, null, DC_COLORDEVICE, (DEVMODEW?)null);
+                isColorDevice = color == 1;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"WindowsPrintService: DeviceCapabilities failed for '{printer.Name}': {ex.Message}");
+            }
+
+            return new PrinterCapabilities(
+                SupportsLandscape: supportsLandscape,
+                IsColorDevice: isColorDevice,
+                SupportsMonochromeDirective: isColorDevice, // every color-capable Windows driver honors DMCOLOR_MONOCHROME
+                SupportedNumberUp: [1, 2, 4]);              // GDI does not expose N-up; we tile app-side
+        }, token);
+    }
+
     public Task PrintDocumentAsync(
         PrinterInfo printer,
         IPdfDocumentService documentService,
         IReadOnlyList<PrintPageInfo> pages,
+        PrintSettings settings,
         IProgress<int>? progress,
         CancellationToken token)
     {
         Debug.ThrowOnUiThread();
 
-        return Task.Run(() => PrintWindowsCoreAsync(printer, documentService, pages, progress, token), token);
+        return Task.Run(() => PrintWindowsCoreAsync(printer, documentService, pages, settings, progress, token), token);
+    }
+
+    // dmOrientation values (wingdi.h)
+    private const short DMORIENT_PORTRAIT  = 1;
+    private const short DMORIENT_LANDSCAPE = 2;
+
+    /// <summary>
+    /// Opens the printer, gets a default DEVMODE, mutates orientation and color according
+    /// to <paramref name="settings"/> and <paramref name="caps"/>, and round-trips it through
+    /// <c>DocumentProperties</c> so the driver merges defaults. Returns the buffer (or
+    /// <see langword="null"/> if any driver call fails) together with a flag indicating
+    /// whether the color directive was preserved by the driver.
+    /// </summary>
+    private static unsafe (byte[]? Buffer, bool ColorDirectiveAccepted) BuildDevModeBuffer(
+        string printerName, PrintSettings settings, PrinterCapabilities caps)
+    {
+        // Friendly overload returns a SafeHandle that calls ClosePrinter on Dispose.
+        if (!PInvoke.OpenPrinter(printerName, out ClosePrinterSafeHandle hPrinter, null))
+        {
+            return (null, false);
+        }
+
+        using (hPrinter)
+        {
+            // Step 1: ask for the required DEVMODE buffer size (fMode = 0).
+            int needed;
+            fixed (char* pname = printerName)
+            {
+                PRINTER_HANDLE rawHandle = (PRINTER_HANDLE)hPrinter.DangerousGetHandle();
+
+                needed = PInvoke.DocumentProperties(
+                    default,
+                    rawHandle,
+                    new PWSTR(pname),
+                    null,
+                    null,
+                    0);
+            }
+
+            if (needed <= 0)
+            {
+                return (null, false);
+            }
+
+            var buffer = new byte[needed];
+
+            // Step 2: fill buffer with the driver's default DEVMODE (DM_OUT_BUFFER = 2).
+            fixed (byte* p = buffer)
+            fixed (char* pname = printerName)
+            {
+                PRINTER_HANDLE rawHandle = (PRINTER_HANDLE)hPrinter.DangerousGetHandle();
+
+                int r = PInvoke.DocumentProperties(
+                    default,
+                    rawHandle,
+                    new PWSTR(pname),
+                    (DEVMODEW*)p,
+                    null,
+                    (uint)DM_OUT_BUFFER);
+
+                if (r < 0)
+                {
+                    return (null, false);
+                }
+            }
+
+            // Step 3: mutate orientation and color fields.
+            fixed (byte* p = buffer)
+            {
+                var dm = (DEVMODEW*)p;
+
+                short orient = settings.Orientation == PrintOrientation.Landscape
+                    ? DMORIENT_LANDSCAPE
+                    : DMORIENT_PORTRAIT;
+                dm->Anonymous1.Anonymous1.dmOrientation = orient;
+                dm->dmFields |= DM_ORIENTATION;
+
+                if (settings.ColorMode == PrintColorMode.Monochrome && caps.SupportsMonochromeDirective)
+                {
+                    dm->dmColor = DEVMODE_COLOR.DMCOLOR_MONOCHROME;
+                    dm->dmFields |= DM_COLOR;
+                }
+            }
+
+            // Step 4: round-trip through DocumentProperties so the driver merges defaults
+            // (DM_IN_BUFFER | DM_OUT_BUFFER = 8 | 2 = 10).
+            fixed (byte* p = buffer)
+            fixed (char* pname = printerName)
+            {
+                PRINTER_HANDLE rawHandle = (PRINTER_HANDLE)hPrinter.DangerousGetHandle();
+
+                int r = PInvoke.DocumentProperties(
+                    default,
+                    rawHandle,
+                    new PWSTR(pname),
+                    (DEVMODEW*)p,
+                    (DEVMODEW*)p,
+                    (uint)(DM_IN_BUFFER | DM_OUT_BUFFER));
+                if (r < 0)
+                {
+                    return (null, false);
+                }
+            }
+
+            bool colorOk;
+            fixed (byte* p = buffer)
+            {
+                var dm = (DEVMODEW*)p;
+                colorOk = (dm->dmFields & DM_COLOR) != 0
+                          && (settings.ColorMode != PrintColorMode.Monochrome
+                              || dm->dmColor == DEVMODE_COLOR.DMCOLOR_MONOCHROME);
+            }
+
+            return (buffer, colorOk);
+        }
     }
 
     /// <summary>
@@ -135,13 +291,17 @@ public sealed class WindowsPrintService : IPrintService
         PrinterInfo printer,
         IPdfDocumentService documentService,
         IReadOnlyList<PrintPageInfo> pages,
+        PrintSettings settings,
         IProgress<int>? progress,
         CancellationToken token)
     {
         Debug.ThrowOnUiThread();
 
-        // CreateDCW has a friendly string overload generated by CsWin32.
-        HDC hdc = PInvoke.CreateDCW(null, printer.Name, null, null);
+        var caps = await new WindowsPrintService().GetPrinterCapabilitiesAsync(printer, token).ConfigureAwait(false);
+        var (devMode, colorDirectiveAccepted) = BuildDevModeBuffer(printer.Name, settings, caps);
+
+        HDC hdc = CreateDCUnsafe(printer.Name, devMode);
+
         if (hdc.IsNull)
         {
             throw new InvalidOperationException($"Cannot create DC for printer '{printer.Name}' (Win32 error {Marshal.GetLastWin32Error()}).");
@@ -159,40 +319,73 @@ public sealed class WindowsPrintService : IPrintService
             {
                 int printerW = PInvoke.GetDeviceCaps(hdc, GET_DEVICE_CAPS_INDEX.HORZRES);
                 int printerH = PInvoke.GetDeviceCaps(hdc, GET_DEVICE_CAPS_INDEX.VERTRES);
-                int pagesProcessed = 0;
 
-                foreach (var pageInfo in pages)
+                int dpiX = PInvoke.GetDeviceCaps(hdc, GET_DEVICE_CAPS_INDEX.LOGPIXELSX);
+                int dpiY = PInvoke.GetDeviceCaps(hdc, GET_DEVICE_CAPS_INDEX.LOGPIXELSY);
+
+                int idx = 0;
+                while (idx < pages.Count)
                 {
                     token.ThrowIfCancellationRequested();
 
-                    // Render the page asynchronously before touching the DC.
-                    // This keeps all GDI calls (StartPage / StretchDIBits / EndPage) in the
-                    // synchronous section below, with no await in between, avoiding any
-                    // thread-pool thread switch while the printer DC is in use.
-                    using var bitmap = await PrintServiceHelper.RenderPageToBitmapAsync(documentService, pageInfo, token)
-                        .ConfigureAwait(false);
+                    int chunkSize = Math.Min(settings.PagesPerSheet, pages.Count - idx);
+                    var renderedChunk = new List<(SKBitmap Bitmap, float PdfPointsW, float PdfPointsH)>(chunkSize);
 
-                    token.ThrowIfCancellationRequested();
+                    for (int j = 0; j < chunkSize; j++)
+                    {
+                        var pi = pages[idx + j];
+                        var size = await documentService.GetPageSizeAsync(pi.PageNumber, token)
+                            .ConfigureAwait(false);
+                        var bm = await PrintServiceHelper.RenderPageToBitmapAsync(documentService, pi, token)
+                            .ConfigureAwait(false);
 
-                    // --- No awaits below this point until EndPage ---
+                        if (bm is not null && size is not null)
+                        {
+                            if (settings.ColorMode == PrintColorMode.Monochrome && !colorDirectiveAccepted)
+                            {
+                                PrintServiceHelper.ConvertToGrayscaleInPlace(bm);
+                            }
+
+                            renderedChunk.Add((bm, (float)size.Value.Width, (float)size.Value.Height));
+                        }
+                    }
+
+                    // Auto-orientation: flip DEVMODE based on the FIRST page in the chunk.
+                    if (settings.Orientation == PrintOrientation.Auto && devMode is not null && renderedChunk.Count > 0)
+                    {
+                        bool wantLandscape = PrintLayout.ShouldRotateForAutoOrientation(
+                            renderedChunk[0].PdfPointsW, renderedChunk[0].PdfPointsH);
+                        SetDevModeOrientation(devMode, wantLandscape ? DMORIENT_LANDSCAPE : DMORIENT_PORTRAIT);
+                        ResetDcWithDevMode(hdc, devMode);
+                        printerW = PInvoke.GetDeviceCaps(hdc, GET_DEVICE_CAPS_INDEX.HORZRES);
+                        printerH = PInvoke.GetDeviceCaps(hdc, GET_DEVICE_CAPS_INDEX.VERTRES);
+                    }
+
                     if (PInvoke.StartPage(hdc) <= 0)
                     {
+                        foreach (var (bm, _, _) in renderedChunk)
+                        {
+                            bm.Dispose();
+                        }
+
                         throw new InvalidOperationException($"StartPage failed (Win32 error {Marshal.GetLastWin32Error()}).");
                     }
 
                     try
                     {
-                        if (bitmap is not null)
-                        {
-                            DrawBitmapToHdc(hdc, bitmap, printerW, printerH);
-                        }
+                        DrawSheetToHdc(hdc, renderedChunk, settings, printerW, printerH, dpiX, dpiY);
                     }
                     finally
                     {
                         _ = PInvoke.EndPage(hdc);
+                        foreach (var (bm, _, _) in renderedChunk)
+                        {
+                            bm.Dispose();
+                        }
                     }
 
-                    progress?.Report(++pagesProcessed);
+                    idx += chunkSize;
+                    progress?.Report(idx);
                 }
             }
             finally
@@ -203,6 +396,25 @@ public sealed class WindowsPrintService : IPrintService
         finally
         {
             _ = PInvoke.DeleteDC(hdc);
+        }
+    }
+
+    /// <summary>
+    /// Calls the raw <c>CreateDCW</c> pointer overload so that the full DEVMODE buffer
+    /// (public fields + private driver data) is passed intact.
+    /// Separated from the <c>async</c> printing method because C# forbids unsafe code in
+    /// async methods.
+    /// </summary>
+    private static unsafe HDC CreateDCUnsafe(string printerName, byte[]? devMode)
+    {
+        fixed (char* pname = printerName)
+        fixed (byte* pdm = devMode) // pdm is null when devMode is null
+        {
+            return PInvoke.CreateDCW(
+                default,    // pwszDriver = null (ignored for printers)
+                new PCWSTR(pname),
+                default,    // pszPort = null
+                (DEVMODEW*)pdm);    // null when devMode is null — uses driver default
         }
     }
 
@@ -225,47 +437,80 @@ public sealed class WindowsPrintService : IPrintService
     }
 
     /// <summary>
-    /// Blits <paramref name="bitmap"/> onto the printer DC using <c>StretchDIBits</c>,
-    /// scaling to fill the entire printable area while preserving aspect ratio.
+    /// Mutates the <c>dmOrientation</c> field in a raw DEVMODE byte buffer in-place.
     /// </summary>
-    private static unsafe void DrawBitmapToHdc(HDC hdc, SKBitmap bitmap, int printerW, int printerH)
+    private static unsafe void SetDevModeOrientation(byte[] buffer, short orientation)
     {
-        // Compute destination rect preserving aspect ratio.
-        float bitmapAspect = (float)bitmap.Width / bitmap.Height;
-        float printerAspect = (float)printerW / printerH;
-
-        int destW, destH, destX, destY;
-        if (bitmapAspect >= printerAspect)
+        fixed (byte* p = buffer)
         {
-            destW = printerW;
-            destH = (int)(printerW / bitmapAspect);
-            destX = 0;
-            destY = (printerH - destH) / 2;
+            var dm = (DEVMODEW*)p;
+            dm->Anonymous1.Anonymous1.dmOrientation = orientation;
+            dm->dmFields |= DM_ORIENTATION;
         }
-        else
+    }
+
+    /// <summary>
+    /// Calls <c>ResetDCW</c> with the supplied DEVMODE buffer to apply orientation or
+    /// other setting changes to an already-open printer DC.
+    /// Separated from the <c>async</c> printing method because C# forbids unsafe code in
+    /// async methods.
+    /// </summary>
+    private static unsafe void ResetDcWithDevMode(HDC hdc, byte[] buffer)
+    {
+        fixed (byte* p = buffer)
         {
-            destH = printerH;
-            destW = (int)(printerH * bitmapAspect);
-            destX = (printerW - destW) / 2;
-            destY = 0;
+            _ = PInvoke.ResetDCW(hdc, (DEVMODEW*)p);
         }
+    }
 
-        // SKBitmap with BGRA8888 matches the Windows DIB RGBQUAD memory layout.
-        // Negative biHeight signals a top-down bitmap (matching SkiaSharp's origin).
-        BITMAPINFO bmi = default;
-        bmi.bmiHeader.biSize = (uint)sizeof(BITMAPINFOHEADER);
-        bmi.bmiHeader.biWidth = bitmap.Width;
-        bmi.bmiHeader.biHeight = -bitmap.Height;
-        bmi.bmiHeader.biPlanes = 1;
-        bmi.bmiHeader.biBitCount = 32;
-        bmi.bmiHeader.biCompression = 0; // BI_RGB
+    /// <summary>
+    /// Draws zero-or-more page bitmaps onto the printer DC using the cell layout from
+    /// <see cref="PrintLayout.ComputeCells"/>. Each cell is sized according to <paramref name="settings"/>'s
+    /// fit mode. Used inside a single StartPage / EndPage block.
+    /// </summary>
+    private static unsafe void DrawSheetToHdc(
+        HDC hdc,
+        IReadOnlyList<(SKBitmap Bitmap, float PdfPointsW, float PdfPointsH)> sourcePages,
+        PrintSettings settings,
+        int printerW,
+        int printerH,
+        int dpiX,
+        int dpiY)
+    {
+        var cells = PrintLayout.ComputeCells(printerW, printerH, settings.PagesPerSheet);
 
-        _ = PInvoke.StretchDIBits(hdc,
-            destX, destY, destW, destH,
-            0, 0, bitmap.Width, bitmap.Height,
-            (void*)bitmap.GetPixels(),
-            &bmi,
-            DIB_USAGE.DIB_RGB_COLORS,
-            ROP_CODE.SRCCOPY);
+        for (int i = 0; i < sourcePages.Count && i < cells.Count; i++)
+        {
+            var (bitmap, ppW, ppH) = sourcePages[i];
+            if (bitmap is null)
+            {
+                continue;
+            }
+
+            // 2-up rotation note: cells are split along the longer paper edge. On portrait
+            // paper, 2-up stacks pages top/bottom; on landscape paper, side-by-side. This
+            // is a deliberate v1 simplification — Adobe-style per-page 90° rotation can be
+            // added later. The unit tests in PrintLayoutCellsTests lock in the cell behavior.
+
+            var dest = PrintLayout.ComputeDestRect(
+                cells[i], bitmap.Width, bitmap.Height, ppW, ppH, dpiX, dpiY,
+                settings.FitMode, settings.CustomScalePercent);
+
+            BITMAPINFO bmi = default;
+            bmi.bmiHeader.biSize = (uint)sizeof(BITMAPINFOHEADER);
+            bmi.bmiHeader.biWidth = bitmap.Width;
+            bmi.bmiHeader.biHeight = -bitmap.Height;
+            bmi.bmiHeader.biPlanes = 1;
+            bmi.bmiHeader.biBitCount = 32;
+            bmi.bmiHeader.biCompression = 0;
+
+            _ = PInvoke.StretchDIBits(hdc,
+                dest.X, dest.Y, dest.Width, dest.Height,
+                0, 0, bitmap.Width, bitmap.Height,
+                (void*)bitmap.GetPixels(),
+                &bmi,
+                DIB_USAGE.DIB_RGB_COLORS,
+                ROP_CODE.SRCCOPY);
+        }
     }
 }

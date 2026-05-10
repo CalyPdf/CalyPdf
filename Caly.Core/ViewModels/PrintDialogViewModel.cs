@@ -30,7 +30,7 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace Caly.Core.ViewModels;
 
-public sealed partial class PrintDialogViewModel : ViewModelBase
+public sealed partial class PrintDialogViewModel : ViewModelBase, IDisposable
 {
     private readonly IPrintService _printService;
     private readonly IPdfDocumentService _documentService;
@@ -75,12 +75,150 @@ public sealed partial class PrintDialogViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(PrintCommand))]
     private string _customPageRange = string.Empty;
 
+    // --- Orientation (mutually exclusive radios) ---
+
+    [ObservableProperty] private bool _isOrientationAuto = true;
+    [ObservableProperty] private bool _isOrientationPortrait;
+    [ObservableProperty] private bool _isOrientationLandscape;
+
+    partial void OnIsOrientationAutoChanged(bool value)
+    {
+        if (!value) return;
+        IsOrientationPortrait = false;
+        IsOrientationLandscape = false;
+    }
+
+    partial void OnIsOrientationPortraitChanged(bool value)
+    {
+        if (!value) return;
+        IsOrientationAuto = false;
+        IsOrientationLandscape = false;
+    }
+
+    partial void OnIsOrientationLandscapeChanged(bool value)
+    {
+        if (!value) return;
+        IsOrientationAuto = false;
+        IsOrientationPortrait = false;
+    }
+
+    // --- Fit (mutually exclusive radios) ---
+
+    [ObservableProperty] private bool _isFitToPage = true;
+    [ObservableProperty] private bool _isActualSize;
+    [ObservableProperty] private bool _isShrinkToFit;
+    [ObservableProperty] private bool _isCustomScale;
+    [ObservableProperty] private int _customScalePercent = 100;
+
+    partial void OnIsFitToPageChanged(bool value)
+    {
+        if (!value) return;
+        IsActualSize = false;
+        IsShrinkToFit = false;
+        IsCustomScale = false;
+    }
+
+    partial void OnIsActualSizeChanged(bool value)
+    {
+        if (!value) return;
+        IsFitToPage = false;
+        IsShrinkToFit = false;
+        IsCustomScale = false;
+    }
+
+    partial void OnIsShrinkToFitChanged(bool value)
+    {
+        if (!value) return;
+        IsFitToPage = false;
+        IsActualSize = false;
+        IsCustomScale = false;
+    }
+
+    partial void OnIsCustomScaleChanged(bool value)
+    {
+        if (!value) return;
+        IsFitToPage = false;
+        IsActualSize = false;
+        IsShrinkToFit = false;
+    }
+
+    // --- Printer capabilities ---
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSelectLandscape))]
+    [NotifyPropertyChangedFor(nameof(IsNUp2Supported))]
+    [NotifyPropertyChangedFor(nameof(IsNUp4Supported))]
+    private PrinterCapabilities? _selectedPrinterCapabilities;
+
+    public bool CanSelectLandscape =>
+        SelectedPrinterCapabilities is null || SelectedPrinterCapabilities.SupportsLandscape;
+
+    public bool IsNUp2Supported =>
+        SelectedPrinterCapabilities is null || SelectedPrinterCapabilities.SupportedNumberUp.Contains(2);
+
+    public bool IsNUp4Supported =>
+        SelectedPrinterCapabilities is null || SelectedPrinterCapabilities.SupportedNumberUp.Contains(4);
+
+    private CancellationTokenSource? _capabilitiesCts;
+
+    partial void OnSelectedPrinterChanged(PrinterInfo? value)
+    {
+        _capabilitiesCts?.Cancel();
+        _capabilitiesCts?.Dispose();
+        _capabilitiesCts = new CancellationTokenSource();
+        if (value is null)
+        {
+            SelectedPrinterCapabilities = null;
+            return;
+        }
+        _ = LoadCapabilitiesAsync(value, _capabilitiesCts.Token);
+    }
+
+    private async Task LoadCapabilitiesAsync(PrinterInfo printer, CancellationToken token)
+    {
+        HasInfo = false;
+        try
+        {
+            var caps = await _printService.GetPrinterCapabilitiesAsync(printer, token).ConfigureAwait(true);
+            if (token.IsCancellationRequested) return;
+            SelectedPrinterCapabilities = caps;
+            ResetIncompatibleSelections(caps);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Could not load printer capabilities: {ex.Message}";
+        }
+    }
+
+    private void ResetIncompatibleSelections(PrinterCapabilities caps)
+    {
+        if (IsOrientationLandscape && !caps.SupportsLandscape)
+        {
+            IsOrientationAuto = true;
+            StatusMessage = "Landscape not supported by this printer; using Auto.";
+            HasInfo = true;
+        }
+        if (!caps.SupportedNumberUp.Contains(PagesPerSheet))
+        {
+            PagesPerSheet = 1;
+            StatusMessage = "Selected pages-per-sheet not supported by this printer; using 1.";
+            HasInfo = true;
+        }
+    }
+
+    // --- Pages per sheet and colour ---
+
+    [ObservableProperty] private int _pagesPerSheet = 1;
+    [ObservableProperty] private bool _isBlackAndWhite;
+
     // --- Status ---
 
     [ObservableProperty] private bool _isPrinting;
     [ObservableProperty] private bool _isLoadingPrinters;
     [ObservableProperty] private string? _statusMessage;
     [ObservableProperty] private bool _hasError;
+    [ObservableProperty] private bool _hasInfo;
 
     // --- Print progress ---
 
@@ -204,7 +342,8 @@ public sealed partial class PrintDialogViewModel : ViewModelBase
                     var pages = pageNumbers
                         .Select(n => new PrintPageInfo(n, _pageRotations.GetValueOrDefault(n, 0)))
                         .ToArray();
-                    await _printService.PrintDocumentAsync(printer, _documentService, pages, progress, token);
+                    var settings = BuildPrintSettings();
+                    await _printService.PrintDocumentAsync(printer, _documentService, pages, settings, progress, token);
                 },
                 token);
 
@@ -224,6 +363,26 @@ public sealed partial class PrintDialogViewModel : ViewModelBase
         {
             IsPrinting = false;
         }
+    }
+
+    private PrintSettings BuildPrintSettings()
+    {
+        var orientation = IsOrientationPortrait
+            ? PrintOrientation.Portrait
+            : IsOrientationLandscape ? PrintOrientation.Landscape
+            : PrintOrientation.Auto;
+
+        var fit = IsActualSize ? PrintFitMode.ActualSize
+            : IsShrinkToFit ? PrintFitMode.ShrinkToFit
+            : IsCustomScale ? PrintFitMode.CustomScale
+            : PrintFitMode.FitToPage;
+
+        return new PrintSettings(
+            Orientation: orientation,
+            FitMode: fit,
+            CustomScalePercent: Math.Clamp(CustomScalePercent, 10, 400),
+            PagesPerSheet: PagesPerSheet,
+            ColorMode: IsBlackAndWhite ? PrintColorMode.Monochrome : PrintColorMode.Color);
     }
 
     private bool CanPrint()
@@ -313,5 +472,12 @@ public sealed partial class PrintDialogViewModel : ViewModelBase
         }
 
         return result.Count > 0 ? result : null;
+    }
+
+    public void Dispose()
+    {
+        _capabilitiesCts?.Cancel();
+        _capabilitiesCts?.Dispose();
+        _capabilitiesCts = null;
     }
 }

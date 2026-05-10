@@ -6,7 +6,7 @@
         mc:Ignorable="d" d:DesignWidth="380" d:DesignHeight="400"
         x:Class="Caly.Core.Views.PrintDialogWindow"
         x:DataType="vm:PrintDialogViewModel"
-        Width="380" MinHeight="240" MaxHeight="400"
+        Width="380" MinHeight="540" MaxHeight="640"
         CanResize="False"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
@@ -78,6 +78,77 @@
 
         </StackPanel>
 
+        <!-- Orientation -->
+        <TextBlock DockPanel.Dock="Top" Text="Orientation" FontWeight="SemiBold" Margin="0,8,0,4"/>
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,10">
+            <RadioButton GroupName="Orientation"
+                         Content="Auto"
+                         IsChecked="{Binding IsOrientationAuto}"
+                         IsEnabled="{Binding !IsPrinting}"
+                         Margin="0,0,12,0"/>
+            <RadioButton GroupName="Orientation"
+                         Content="Portrait"
+                         IsChecked="{Binding IsOrientationPortrait}"
+                         IsEnabled="{Binding !IsPrinting}"
+                         Margin="0,0,12,0"/>
+            <RadioButton GroupName="Orientation"
+                         Content="Landscape"
+                         IsChecked="{Binding IsOrientationLandscape}"
+                         IsEnabled="{Binding CanSelectLandscape}"/>
+        </StackPanel>
+
+        <!-- Fit -->
+        <TextBlock DockPanel.Dock="Top" Text="Fit" FontWeight="SemiBold" Margin="0,8,0,4"/>
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+            <RadioButton GroupName="Fit"
+                         Content="Fit to page"
+                         IsChecked="{Binding IsFitToPage}"
+                         IsEnabled="{Binding !IsPrinting}"/>
+            <RadioButton GroupName="Fit"
+                         Content="Actual size"
+                         IsChecked="{Binding IsActualSize}"
+                         IsEnabled="{Binding !IsPrinting}"/>
+            <RadioButton GroupName="Fit"
+                         Content="Shrink to fit"
+                         IsChecked="{Binding IsShrinkToFit}"
+                         IsEnabled="{Binding !IsPrinting}"/>
+            <StackPanel Orientation="Horizontal">
+                <RadioButton GroupName="Fit"
+                             Content="Custom scale:"
+                             IsChecked="{Binding IsCustomScale}"
+                             IsEnabled="{Binding !IsPrinting}"/>
+                <NumericUpDown Width="120"
+                               Margin="6,0,0,0"
+                               Minimum="10"
+                               Maximum="400"
+                               Increment="5"
+                               Value="{Binding CustomScalePercent}"
+                               IsEnabled="{Binding IsCustomScale}"/>
+                <TextBlock Text="%" VerticalAlignment="Center" Margin="2,0,0,0"/>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Pages per sheet -->
+        <TextBlock DockPanel.Dock="Top" Text="Pages per sheet" FontWeight="SemiBold" Margin="0,8,0,4"/>
+        <ComboBox DockPanel.Dock="Top"
+                  Width="80"
+                  HorizontalAlignment="Left"
+                  Margin="0,0,0,10"
+                  SelectedValue="{Binding PagesPerSheet}"
+                  SelectedValueBinding="{Binding}"
+                  IsEnabled="{Binding !IsPrinting}">
+            <x:Int32>1</x:Int32>
+            <x:Int32>2</x:Int32>
+            <x:Int32>4</x:Int32>
+        </ComboBox>
+
+        <!-- Black and white -->
+        <CheckBox DockPanel.Dock="Top"
+                  Content="Print in black and white"
+                  IsChecked="{Binding IsBlackAndWhite}"
+                  IsEnabled="{Binding !IsPrinting}"
+                  Margin="0,0,0,10"/>
+
         <!-- Status / progress while printing -->
         <ProgressBar DockPanel.Dock="Top"
                      IsIndeterminate="{Binding !PrintPagesProcessed}"
@@ -92,6 +163,12 @@
                    Margin="0,0,0,8"
                    Foreground="{DynamicResource SystemErrorTextColor}"
                    IsVisible="{Binding HasError}"/>
+
+        <TextBlock DockPanel.Dock="Top"
+                   Text="{Binding StatusMessage}"
+                   TextWrapping="Wrap"
+                   Margin="0,0,0,8"
+                   IsVisible="{Binding HasInfo}"/>
 
         <TextBlock DockPanel.Dock="Top"
                    Text="{Binding StatusMessage}"

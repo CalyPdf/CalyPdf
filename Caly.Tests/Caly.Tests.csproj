@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFrameworks>net9.0;net10.0</TargetFrameworks>
@@ -7,6 +7,8 @@
 
 		<IsPackable>false</IsPackable>
 		<IsTestProject>true</IsTestProject>
+		<SignAssembly>True</SignAssembly>
+		<AssemblyOriginatorKeyFile>..\Caly.snk</AssemblyOriginatorKeyFile>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -20,6 +22,8 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\Caly.Core\Caly.Core.csproj" />
+		<ProjectReference Include="..\Printing\Caly.Printing.Core\Caly.Printing.Core.csproj" />
+		<ProjectReference Include="..\Printing\Caly.Printing.Unix\Caly.Printing.Unix.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
