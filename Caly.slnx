@@ -30,4 +30,9 @@
   <Project Path="Caly.Tests/Caly.Tests.csproj">
     <BuildType Solution="AOT|*" Project="Release" />
   </Project>
+  <Project Path="Caly.UiTests/Caly.UiTests.csproj">
+    <BuildType Solution="AOT|*" Project="Release" />
+    <Build Solution="AOT|*" Project="false" />
+    <Build Solution="Debug|*" Project="false" />
+  </Project>
 </Solution>

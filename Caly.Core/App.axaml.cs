@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2025 BobLd
+﻿// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -56,7 +56,7 @@ public partial class App : Application
 
     public static readonly IMessenger Messenger = StrongReferenceMessenger.Default;
 
-    private readonly FilePipeStream _pipeServer = new();
+    private readonly FilePipeStream _pipeServer;
     private readonly CancellationTokenSource _listeningToFilesCts = new();
     private readonly CancellationToken _listeningToFilesToken;
     private Task? _listeningToFiles;
@@ -72,9 +72,12 @@ public partial class App : Application
     /// </summary>
     public IServiceProvider? Services { get; private set; }
 
-    public App() : base()
+    public App() : this(true) { }
+
+    public App(bool singleInstance) : base()
     {
         _listeningToFilesToken = _listeningToFilesCts.Token;
+        _pipeServer = new FilePipeStream(singleInstance && !Design.IsDesignMode);
     }
 
     public override void Initialize()
@@ -283,7 +286,7 @@ public partial class App : Application
         }
     }
 
-    private async Task OpenDoc(string? path, CancellationToken token)
+    protected async Task OpenDoc(string? path, CancellationToken token)
     {
         Debug.ThrowOnUiThread();
 

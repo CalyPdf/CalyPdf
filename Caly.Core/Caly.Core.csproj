@@ -44,4 +44,13 @@
 			<SubType>Designer</SubType>
 		</AvaloniaResource>
 	</ItemGroup>
+
+	<ItemGroup>
+		<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+			<_Parameter1>Caly.Tests, PublicKey=0024000004800000940000000602000000240000525341310004000001000100512e743ab1639311b6c83dc543bb720507ee89716b651cc1d4c527260431b5b22f19ec8a5e91d6078c9fd0e5074dd0d6997e523f9639d2efbcb16927715aecba619b597e7a945e369ca9d8ab569d91ea0a17b21184733e871b90fc3029ec705bc55b33f7edef03090c41c0a576e3e45744d160f162c5896593ab7845f485f7a5</_Parameter1>
+		</AssemblyAttribute>
+		<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+			<_Parameter1>Caly.UiTests, PublicKey=0024000004800000940000000602000000240000525341310004000001000100512e743ab1639311b6c83dc543bb720507ee89716b651cc1d4c527260431b5b22f19ec8a5e91d6078c9fd0e5074dd0d6997e523f9639d2efbcb16927715aecba619b597e7a945e369ca9d8ab569d91ea0a17b21184733e871b90fc3029ec705bc55b33f7edef03090c41c0a576e3e45744d160f162c5896593ab7845f485f7a5</_Parameter1>
+		</AssemblyAttribute>
+	</ItemGroup>
 </Project>

@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2025 BobLd
+﻿// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -47,16 +47,16 @@ public sealed class FilePipeStream : IDisposable, IAsyncDisposable
     private readonly MemoryPool<byte> _memoryPool = MemoryPool<byte>.Shared;
     private readonly NamedPipeServerStream _pipeServer;
 
-    public FilePipeStream()
+    public FilePipeStream(bool singleInstance)
     {
-#if DEBUG
-        if (Avalonia.Controls.Design.IsDesignMode)
+        if (singleInstance)
         {
-            _pipeServer = new(Guid.NewGuid().ToString(), PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.CurrentUserOnly);
+            _pipeServer = new(PipeName, PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.CurrentUserOnly);
             return;
         }
-#endif
-        _pipeServer = new(PipeName, PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.CurrentUserOnly);
+
+        _pipeServer = new($"caly_pdf_files_{Guid.NewGuid()}.pipe", PipeDirection.In, 1, PipeTransmissionMode.Byte,
+            PipeOptions.CurrentUserOnly);
     }
 
     public async IAsyncEnumerable<string?> ReceivePathAsync([EnumeratorCancellation] CancellationToken token)
