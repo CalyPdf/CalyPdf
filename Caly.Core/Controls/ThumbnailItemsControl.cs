@@ -122,7 +122,6 @@ public sealed class ThumbnailItemsControl : ListBox
     {
         if (_isUpdateThumbnailsVisibilityScheduled)
         {
-            System.Diagnostics.Debug.WriteLine("Update thumbnails visibility already scheduled, skipping.");
             return;
         }
 
@@ -136,7 +135,6 @@ public sealed class ThumbnailItemsControl : ListBox
 
     private bool UpdateThumbnailsVisibility()
     {
-        System.Diagnostics.Debug.WriteLine("Updating thumbnails visibility...");
         if (_scrollViewer is null)
         {
             return false;

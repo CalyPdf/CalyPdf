@@ -167,7 +167,7 @@ internal sealed class SearchValuesTextSearchService : ITextSearchService
 
             int lastSpanIndex = 0;
 
-            var pageResults = new List<TextSearchResult>();
+            var pageResults = new HashSet<TextSearchResult>(); // Ensure results are unique
 
             /*
              * TODO - If the page text start with the word but the word starts with a space.

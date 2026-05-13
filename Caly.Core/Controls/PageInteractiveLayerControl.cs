@@ -41,8 +41,8 @@ public sealed class PageInteractiveLayerControl : Control
     // https://github.com/AvaloniaUI/Avalonia/blob/master/src/Avalonia.Controls/Primitives/TextSelectionCanvas.cs#L62
     // Check caret handle
 
-    private static readonly Color SelectionColor = Color.FromArgb(0xa9, 0x33, 0x99, 0xFF);
-    private static readonly Color SearchColor = Color.FromArgb(0xa9, 255, 0, 0);
+    private static readonly Color SelectionColor = Color.FromArgb(169, 0x33, 0x99, 0xFF);
+    private static readonly Color SearchColor = Color.FromArgb(120, 255, 0, 0);
 
     private static readonly ImmutableSolidColorBrush SelectionBrush = new(SelectionColor);
     private static readonly ImmutableSolidColorBrush SearchBrush = new(SearchColor);
@@ -71,6 +71,9 @@ public sealed class PageInteractiveLayerControl : Control
     public static readonly StyledProperty<IReadOnlyList<PdfRectangle>?> SearchResultsProperty =
         AvaloniaProperty.Register<PageInteractiveLayerControl, IReadOnlyList<PdfRectangle>?>(nameof(SearchResults));
 
+    private StreamGeometry[]? _selectedWordsGeometry;
+    private StreamGeometry[]? _searchResultsGeometry;
+
     static PageInteractiveLayerControl()
     {
         AffectsRender<PageInteractiveLayerControl>(PdfTextLayerProperty, VisibleAreaProperty,
@@ -82,7 +85,7 @@ public sealed class PageInteractiveLayerControl : Control
         get => GetValue(SelectedWordsProperty);
         set => SetValue(SelectedWordsProperty, value);
     }
-    
+
     public IReadOnlyList<PdfRectangle>? SearchResults
     {
         get => GetValue(SearchResultsProperty);
@@ -106,7 +109,7 @@ public sealed class PageInteractiveLayerControl : Control
         get => GetValue(VisibleAreaProperty);
         set => SetValue(VisibleAreaProperty, value);
     }
-    
+
     internal Matrix GetLayoutTransformMatrix()
     {
         return this.FindAncestorOfType<PageItemsControl>()?
@@ -147,7 +150,7 @@ public sealed class PageInteractiveLayerControl : Control
         }
     }
 
-    public void HideAnnotation()
+    internal void HideAnnotation()
     {
         if (FlyoutBase.GetAttachedFlyout(this) is not Flyout attachedFlyout)
         {
@@ -158,7 +161,7 @@ public sealed class PageInteractiveLayerControl : Control
         attachedFlyout.Content = null;
     }
 
-    public void ShowAnnotation(PdfAnnotation annotation)
+    internal void ShowAnnotation(PdfAnnotation annotation)
     {
         if (FlyoutBase.GetAttachedFlyout(this) is not Flyout attachedFlyout)
         {
@@ -195,18 +198,16 @@ public sealed class PageInteractiveLayerControl : Control
         attachedFlyout.ShowAt(this);
     }
 
-    private StreamGeometry[]? _selectedWordsGeometry;
-    private StreamGeometry[]? _searchResultsGeometry;
-    
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
 
         if (change.Property == SelectedWordsProperty)
         {
-            if (change.NewValue is IReadOnlyCollection<PdfRectangle> rects)
+            _selectedWordsGeometry = null;
+            if (change.NewValue is IReadOnlyCollection<PdfRectangle> rects && rects.Count > 0)
             {
-                _selectedWordsGeometry = rects.Count != 0 ? rects.Select(r => PdfWordHelpers.GetGeometry(r, true)).ToArray() : null;
+                _selectedWordsGeometry = rects.Select(r => PdfWordHelpers.GetGeometry(r, true)).ToArray();
             }
             else
             {
@@ -215,17 +216,61 @@ public sealed class PageInteractiveLayerControl : Control
         }
         else if (change.Property == SearchResultsProperty)
         {
-            if (change.NewValue is IReadOnlyCollection<PdfRectangle> rects)
+            _searchResultsGeometry = null;
+            if (change.NewValue is IReadOnlyCollection<PdfRectangle> rects && rects.Count > 0)
             {
-                _searchResultsGeometry = rects.Count != 0 ? rects.Select(r => PdfWordHelpers.GetGeometry(r, true)).ToArray() : null;
+                _searchResultsGeometry = rects.Select(r => PdfWordHelpers.GetGeometry(r, true)).ToArray();
             }
             else
             {
                 _searchResultsGeometry = null;
             }
         }
+#if DEBUG
+        else if (change.Property == PdfTextLayerProperty)
+        {
+            _annotationsGeometry = null;
+            _textBlockGeometry = null;
+            _textLineGeometry = null;
+            _wordsGeometry = null;
+
+            if (change.NewValue is not PdfTextLayer textLayer)
+            {
+                return;
+            }
+
+            if (textLayer.Annotations?.Count > 0)
+            {
+                _annotationsGeometry = textLayer.Annotations
+                    .Select(a => PdfWordHelpers.GetGeometry(a.BoundingBox, true)).ToArray();
+            }
+
+            if (textLayer.TextBlocks?.Count > 0)
+            {
+                var blockGeometries = new List<StreamGeometry>();
+                var lineGeometries = new List<StreamGeometry>();
+                var wordGeometries = new List<StreamGeometry>();
+                foreach (var block in textLayer.TextBlocks)
+                {
+                    blockGeometries.Add(PdfWordHelpers.GetGeometry(block.BoundingBox, true));
+                    foreach (var line in block.TextLines)
+                    {
+                        lineGeometries.Add(PdfWordHelpers.GetGeometry(line.BoundingBox, true));
+                        foreach (var word in line.Words)
+                        {
+                            wordGeometries.Add(PdfWordHelpers.GetGeometry(word.BoundingBox, false));
+                        }
+                    }
+                }
+
+                _textBlockGeometry = blockGeometries.ToArray();
+                _textLineGeometry = lineGeometries.ToArray();
+                _wordsGeometry = wordGeometries.ToArray();
+            }
+        }
+#endif
     }
-    
+
     public override void Render(DrawingContext context)
     {
         if (Bounds.Width <= 0 || Bounds.Height <= 0)
@@ -246,11 +291,12 @@ public sealed class PageInteractiveLayerControl : Control
             return;
         }
 
-        DebugRender.RenderAnnotations(this, context, VisibleArea.Value);
-        DebugRender.RenderText(this, context, VisibleArea.Value);
+#if DEBUG
+        RenderDebug(context);
+#endif
 
         // Draw search results first
-        if (_searchResultsGeometry is not null && _searchResultsGeometry.Length > 0)
+        if (_searchResultsGeometry?.Length > 0)
         {
             foreach (var geometry in _searchResultsGeometry)
             {
@@ -264,7 +310,7 @@ public sealed class PageInteractiveLayerControl : Control
         }
 
         // Render Selection
-        if (_selectedWordsGeometry is not null && _selectedWordsGeometry.Length > 0)
+        if (_selectedWordsGeometry?.Length > 0)
         {
             foreach (var geometry in _selectedWordsGeometry)
             {
@@ -277,4 +323,82 @@ public sealed class PageInteractiveLayerControl : Control
             }
         }
     }
+
+#if DEBUG
+    private static readonly ImmutableSolidColorBrush AnnotationsBrush = new(Colors.Purple, 0.4);
+    private static readonly ImmutablePen AnnotationsPen = new(AnnotationsBrush, 0.5);
+    private static readonly ImmutableSolidColorBrush YellowBrush = new(Colors.Yellow, 0.4);
+    private static readonly ImmutableSolidColorBrush GreenBrush = new(Colors.Green, 0.4);
+    private static readonly ImmutableSolidColorBrush RedBrush = new(Colors.Red, 0.4);
+    private static readonly ImmutablePen RedPen = new(RedBrush, 0.5);
+
+    private StreamGeometry[]? _annotationsGeometry;
+    private StreamGeometry[]? _textBlockGeometry;
+    private StreamGeometry[]? _textLineGeometry;
+    private StreamGeometry[]? _wordsGeometry;
+
+    private void RenderDebug(DrawingContext context)
+    {
+        if (!VisibleArea.HasValue || VisibleArea.Value.IsEmpty())
+        {
+            return;
+        }
+
+        // Render Annotations
+        if (_annotationsGeometry?.Length > 0)
+        {
+            foreach (var geometry in _annotationsGeometry)
+            {
+                if (!geometry.Bounds.Intersects(VisibleArea.Value))
+                {
+                    continue;
+                }
+
+                context.DrawGeometry(AnnotationsBrush, AnnotationsPen, geometry);
+            }
+        }
+
+        // Render Text Blocks
+        if (_textBlockGeometry?.Length > 0)
+        {
+            foreach (var geometry in _textBlockGeometry)
+            {
+                if (!geometry.Bounds.Intersects(VisibleArea.Value))
+                {
+                    continue;
+                }
+
+                context.DrawGeometry(GreenBrush, null, geometry);
+            }
+        }
+
+        // Render Text Lines
+        if (_textLineGeometry?.Length > 0)
+        {
+            foreach (var geometry in _textLineGeometry)
+            {
+                if (!geometry.Bounds.Intersects(VisibleArea.Value))
+                {
+                    continue;
+                }
+
+                context.DrawGeometry(YellowBrush, null, geometry);
+            }
+        }
+
+        // Render Words
+        if (_wordsGeometry?.Length > 0)
+        {
+            foreach (var geometry in _wordsGeometry)
+            {
+                if (!geometry.Bounds.Intersects(VisibleArea.Value))
+                {
+                    continue;
+                }
+
+                context.DrawGeometry(RedBrush, RedPen, geometry);
+            }
+        }
+    }
+#endif
 }

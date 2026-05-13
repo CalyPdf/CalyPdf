@@ -131,7 +131,6 @@ namespace Caly.Core.Services
                     {
                         if (r.Token.IsCancellationRequested)
                         {
-                            System.Diagnostics.Debug.WriteLine($"[TBD] CANCELED (dequeued): Page {r.Page.PageNumber}, type {r.Type}.");
                             return;
                         }
 
@@ -158,9 +157,7 @@ namespace Caly.Core.Services
                         }
                     }
                     catch (OperationCanceledException)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[TBD] CANCELED: Page {r.Page.PageNumber}, type {r.Type}.");
-                    }
+                    { }
                     catch (Exception e)
                     {
                         // We just ignore for the moment

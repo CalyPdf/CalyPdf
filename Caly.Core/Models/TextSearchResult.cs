@@ -25,7 +25,7 @@ using System.Diagnostics;
 namespace Caly.Core.Models;
 
 [DebuggerDisplay("Page {PageNumber} Word index: {WordIndex} ({WordCount}), Children {Nodes?.Count}")]
-public sealed class TextSearchResult
+public sealed class TextSearchResult : IEquatable<TextSearchResult>
 {
     public required SearchResultItemType ItemType { get; init; }
 
@@ -35,9 +35,39 @@ public sealed class TextSearchResult
 
     public int? WordCount { get; init; }
 
-    public IReadOnlyList<TextSearchResult>? Nodes { get; init; }
+    public IReadOnlyCollection<TextSearchResult>? Nodes { get; init; }
 
     public Func<ReadOnlySpan<char>>? SampleText { get; init; }
+
+    public bool Equals(TextSearchResult? other)
+    {
+        if (other is null)
+        {
+            return false;
+        }
+
+        if (ReferenceEquals(this, other))
+        {
+            return true;
+        }
+
+        return ItemType == other.ItemType &&
+               PageNumber == other.PageNumber &&
+               WordIndex == other.WordIndex &&
+               WordCount == other.WordCount &&
+               Equals(Nodes, other.Nodes);
+    }
+
+    public override bool Equals(object? obj)
+    {
+        return ReferenceEquals(this, obj) ||
+               obj is TextSearchResult other && Equals(other);
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine((byte)ItemType, PageNumber, WordIndex, WordCount, Nodes);
+    }
 
     public override string ToString()
     {

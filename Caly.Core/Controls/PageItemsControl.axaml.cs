@@ -390,7 +390,6 @@ public sealed class PageItemsControl : ItemsControl
         base.PrepareContainerForItemOverride(container, item, index);
         if (container is not PageItem pageItem)
         {
-            System.Diagnostics.Debug.WriteLine($"Skipping LoadPage() for page {index + 1}");
             return;
         }
 
@@ -762,11 +761,7 @@ public sealed class PageItemsControl : ItemsControl
 
         if (!control.Bounds.Contains(loc))
         {
-            if (TrySwitchCapture(e))
-            {
-                System.Diagnostics.Debug.WriteLine($"TrySwitchCapture from {control.PageNumber}");
-            }
-
+            TrySwitchCapture(e);
             return;
         }
 
@@ -946,23 +941,17 @@ public sealed class PageItemsControl : ItemsControl
     /// <summary>
     /// Switch pointer capture to the page under the cursor if we are selecting text and the cursor is outside the current page.
     /// </summary>
-    private bool TrySwitchCapture(PointerEventArgs e)
+    private void TrySwitchCapture(PointerEventArgs e)
     {
         PageItem? endPage = GetPageItemOver(e);
-        if (endPage is null)
+        if (endPage?.InteractiveLayer is null)
         {
-            // Cursor is not over any page, do nothing
-            return false;
-        }
-
-        if (endPage.InteractiveLayer is null)
-        {
+            // Cursor is not over any page, do nothing or
             // Template not yet applied on the target page — do nothing.
-            return false;
+            return;
         }
 
         e.Pointer.Capture(endPage.InteractiveLayer); // Switch capture to new page
-        return true;
     }
 
     protected override void ClearContainerForItemOverride(Control container)
@@ -1033,7 +1022,6 @@ public sealed class PageItemsControl : ItemsControl
         // Quick reject
         if (!Presenter.Bounds.Contains(point))
         {
-            System.Diagnostics.Debug.WriteLine("GetPageItemOver Quick reject.");
             return null;
         }
 
@@ -1052,7 +1040,6 @@ public sealed class PageItemsControl : ItemsControl
         // Check selected current page
         if (ContainerFromIndex(startIndex) is PageItem presenter)
         {
-            System.Diagnostics.Debug.WriteLine($"GetPageItemOver page {startIndex + 1}.");
             if (presenter.Bounds.Contains(point))
             {
                 return presenter;
@@ -1066,7 +1053,6 @@ public sealed class PageItemsControl : ItemsControl
             // Start with checking forward
             for (int p = startIndex + 1; p < maxPageIndex; ++p)
             {
-                System.Diagnostics.Debug.WriteLine($"GetPageItemOver page {p + 1}.");
                 if (ContainerFromIndex(p) is not PageItem cp)
                 {
                     continue;
@@ -1088,7 +1074,6 @@ public sealed class PageItemsControl : ItemsControl
             // Continue with checking backward
             for (int p = startIndex - 1; p >= minPageIndex; --p)
             {
-                System.Diagnostics.Debug.WriteLine($"GetPageItemOver page {p + 1}.");
                 if (ContainerFromIndex(p) is not PageItem cp)
                 {
                     continue;
@@ -1282,7 +1267,6 @@ public sealed class PageItemsControl : ItemsControl
     {
         if (_isUpdatePagesVisibilityScheduled)
         {
-            System.Diagnostics.Debug.WriteLine("# Update pages visibility already scheduled, skipping.");
             return;
         }
 
