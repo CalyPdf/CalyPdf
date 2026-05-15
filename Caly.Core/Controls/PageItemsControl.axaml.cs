@@ -75,6 +75,7 @@ public sealed class PageItemsControl : ItemsControl
     private bool _isSettingPageVisibility;
     private bool _isZooming;
     private bool _pendingScrollToPage;
+    private bool _isApplyingPendingScroll;
     private bool _isUpdatePagesVisibilityScheduled;
 
     private readonly EventHandler<ScrollChangedEventArgs> _scrollChangedHandler;
@@ -1251,6 +1252,13 @@ public sealed class PageItemsControl : ItemsControl
         // is seen as 'not visible'.
         // To prevent that we listen to the first layout updates and check visibility.
 
+        // ScrollIntoView runs synchronous layout passes that re-raise LayoutUpdated,
+        // which would re-enter this handler and recurse until the stack overflows.
+        if (_isApplyingPendingScroll)
+        {
+            return;
+        }
+
         if (GetMaxPageIndex() > 0)
         {
             if (_pendingScrollToPage)
@@ -1268,9 +1276,17 @@ public sealed class PageItemsControl : ItemsControl
                     // at the DataContext change.
                     Vector savedOffset = ScrollOffset;
 
-                    ScrollIntoView(SelectedPageNumber.Value - 1);
-                    ApplyScrollOffsets(SelectedPageNumber.Value, savedOffset.Y, offsetPdfCoord: false, savedOffset.X);
-                    _pendingScrollToPage = false;
+                    _isApplyingPendingScroll = true;
+                    try
+                    {
+                        ScrollIntoView(SelectedPageNumber.Value - 1); // Can cause stack overflow without _isApplyingPendingScroll
+                        ApplyScrollOffsets(SelectedPageNumber.Value, savedOffset.Y, offsetPdfCoord: false, savedOffset.X);
+                    }
+                    finally
+                    {
+                        _pendingScrollToPage = false;
+                        _isApplyingPendingScroll = false;
+                    }
                     return; // Wait for the scroll to trigger another layout update.
                 }
                 _pendingScrollToPage = false;
@@ -1868,6 +1884,7 @@ public sealed class PageItemsControl : ItemsControl
         _isSettingPageVisibility = false;
         _isZooming = false;
         _pendingScrollToPage = false;
+        _isApplyingPendingScroll = false;
         _isPinching = false;
         _isUpdatePagesVisibilityScheduled = false;
     }
