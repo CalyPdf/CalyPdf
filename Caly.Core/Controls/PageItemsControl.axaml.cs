@@ -1291,9 +1291,11 @@ public sealed class PageItemsControl : ItemsControl
                         _pendingScrollToPage = false;
                         _isApplyingPendingScroll = false;
                     }
-                    return; // Wait for the scroll to trigger another layout update.
                 }
-                _pendingScrollToPage = false;
+                else
+                {
+                    _pendingScrollToPage = false;
+                }
             }
 
             if (UpdatePagesVisibility())
