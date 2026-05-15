@@ -355,7 +355,7 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
         {
             Bookmarks? bookmarks = await ExecuteWithLockAsync(_ =>
             {
-                if (_document!.TryGetBookmarks(out var b, true))
+                if (_document?.TryGetBookmarks(out var b, true) == true)
                 {
                     return b;
                 }
