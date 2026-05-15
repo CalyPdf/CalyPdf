@@ -19,6 +19,7 @@
 		<Setter Property="ItemsSource" Value="{Binding Pages}"/>
 		<Setter Property="PageCount" Value="{Binding PageCount}"/>
 		<Setter Property="ZoomLevel" Value="{Binding ZoomLevel, Mode=TwoWay}"/>
+        <Setter Property="ScrollOffset" Value="{Binding ScrollOffset, Mode=TwoWay}"/>
 		<Setter Property="SelectedBookmark" Value="{Binding SelectedBookmark, Mode=OneWay}"/>
 		<Setter Property="SelectedTextSearchResult" Value="{Binding SelectedTextSearchResult, Mode=OneWay}"/>
 		<Setter Property="UseLayoutRounding" Value="True"/>
@@ -53,6 +54,7 @@
                                                ClearSelection="{TemplateBinding ClearSelection}"
                                                RealisedPages="{TemplateBinding RealisedPages, Mode=TwoWay}"
                                                VisiblePages="{TemplateBinding VisiblePages, Mode=TwoWay}"
+                                               ScrollOffset="{TemplateBinding ScrollOffset, Mode=TwoWay}"
                                                RefreshPages="{TemplateBinding RefreshPages}"/>
 
                     <Grid IsVisible="{Binding !Pages.Count}">

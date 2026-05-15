@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using System;
+using Avalonia;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -43,6 +44,13 @@ public partial class DocumentViewModel
     [NotifyCanExecuteChangedFor(nameof(ZoomInCommand))]
     [NotifyCanExecuteChangedFor(nameof(ZoomOutCommand))]
     private double _zoomLevel = 1;
+
+    /// <summary>
+    /// Scroll offset to restore when this document's tab becomes active again. Y is
+    /// relative to the top of <see cref="SelectedPageNumber"/>. Stored in unscaled
+    /// document coordinates (independent of <see cref="ZoomLevel"/>).
+    /// </summary>
+    [ObservableProperty] private Vector _scrollOffset;
 
     [RelayCommand(CanExecute = nameof(CanZoomIn))]
     private void ZoomIn()

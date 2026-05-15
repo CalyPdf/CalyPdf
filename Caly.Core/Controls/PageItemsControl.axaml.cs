@@ -76,7 +76,7 @@ public sealed class PageItemsControl : ItemsControl
     private bool _isZooming;
     private bool _pendingScrollToPage;
     private bool _isUpdatePagesVisibilityScheduled;
-    
+
     private readonly EventHandler<ScrollChangedEventArgs> _scrollChangedHandler;
     private readonly EventHandler<SizeChangedEventArgs> _sizeChangedHandler;
 
@@ -130,6 +130,13 @@ public sealed class PageItemsControl : ItemsControl
     /// </summary>
     public static readonly StyledProperty<double> ZoomLevelProperty =
         AvaloniaProperty.Register<PageItemsControl, double>(nameof(ZoomLevel), 1, defaultBindingMode: BindingMode.TwoWay);
+
+    /// <summary>
+    /// Defines the <see cref="ScrollOffset"/> property.
+    /// </summary>
+    public static readonly StyledProperty<Vector> ScrollOffsetProperty =
+        AvaloniaProperty.Register<PageItemsControl, Vector>(nameof(ScrollOffset),
+            defaultBindingMode: BindingMode.TwoWay);
 
     /// <summary>
     /// Defines the <see cref="TextSelection"/> property.
@@ -250,6 +257,17 @@ public sealed class PageItemsControl : ItemsControl
     }
 
     /// <summary>
+    /// Scroll offset to persist across tab switches. Y is relative to
+    /// <see cref="SelectedPageNumber"/>'s top; both components are in unscaled
+    /// document coordinates.
+    /// </summary>
+    public Vector ScrollOffset
+    {
+        get => GetValue(ScrollOffsetProperty);
+        set => SetValue(ScrollOffsetProperty, value);
+    }
+
+    /// <summary>
     /// Starts at 1.
     /// </summary>
     public Range? RealisedPages
@@ -279,7 +297,7 @@ public sealed class PageItemsControl : ItemsControl
         {
             return presenter;
         }
-        
+
         return null;
     }
 
@@ -291,7 +309,7 @@ public sealed class PageItemsControl : ItemsControl
     public void GoToWord(int pageNumber, int wordIndex)
     {
         double yOffset = 0; // Top of page
-        
+
         var textLayer = GetPageItem(pageNumber)?.InteractiveLayer?.PdfTextLayer;
         if (textLayer is not null)
         {
@@ -303,7 +321,7 @@ public sealed class PageItemsControl : ItemsControl
         // We don't attempt to get the text layer if it's not available
         GoToPage(pageNumber, yOffset);
     }
-    
+
     /// <summary>
     /// Scrolls to the page number, optionally scrolling to a specific Y position within the page.
     /// </summary>
@@ -328,6 +346,21 @@ public sealed class PageItemsControl : ItemsControl
     }
 
     private void ApplyYOffset(int pageNumber, double yOffset, bool offsetPdfCoord)
+    {
+        ApplyScrollOffsets(pageNumber, yOffset, offsetPdfCoord, xOffsetUnscaled: null);
+    }
+
+    /// <summary>
+    /// Sets the scroll position to the given page, with an optional Y offset inside the page
+    /// and an optional horizontal offset.
+    /// </summary>
+    /// <param name="pageNumber">The page number. Starts at 1.</param>
+    /// <param name="yOffset">Y offset within the page.</param>
+    /// <param name="offsetPdfCoord"><c>true</c> if <paramref name="yOffset"/> is in PDF coordinates
+    /// (bottom = 0, increasing upward); <c>false</c> for Avalonia coordinates (top = 0, increasing downward, unscaled).</param>
+    /// <param name="xOffsetUnscaled">Horizontal scroll offset in unscaled document coordinates,
+    /// or <c>null</c> to keep the current horizontal offset.</param>
+    private void ApplyScrollOffsets(int pageNumber, double yOffset, bool offsetPdfCoord, double? xOffsetUnscaled)
     {
         if (Scroll is null || LayoutTransform is null)
         {
@@ -360,7 +393,10 @@ public sealed class PageItemsControl : ItemsControl
 
         double scale = LayoutTransform.LayoutTransform?.Value.M11 ?? 1.0;
         double newOffsetY = (pageItem.Bounds.Top + yOffset) * scale;
-        Scroll.SetCurrentValue(ScrollViewer.OffsetProperty, new Vector(Scroll.Offset.X, newOffsetY));
+        double newOffsetX = xOffsetUnscaled.HasValue
+            ? Math.Max(0, xOffsetUnscaled.Value * scale)
+            : Scroll.Offset.X;
+        Scroll.SetCurrentValue(ScrollViewer.OffsetProperty, new Vector(newOffsetX, newOffsetY));
     }
 
     /// <summary>
@@ -383,6 +419,41 @@ public sealed class PageItemsControl : ItemsControl
         double scale = LayoutTransform.LayoutTransform?.Value.M11 ?? 1.0;
         double relativeOffset = (Scroll.Offset.Y / scale) - pageItem.Bounds.Top;
         return Math.Max(0, relativeOffset);
+    }
+
+    /// <summary>
+    /// Persists the current scroll position to the <see cref="ScrollOffset"/> property
+    /// in unscaled coordinates so the values remain valid across zoom changes.
+    /// <para>
+    /// Call this only after <see cref="SelectedPageNumber"/> has been brought in sync with
+    /// the current viewport (i.e. from the end of <see cref="UpdatePagesVisibility"/>),
+    /// because the saved Y is relative to that page.
+    /// </para>
+    /// </summary>
+    private void SaveScrollState()
+    {
+        // Skip while a tab-switch restoration is pending or while we're mid-zoom,
+        // either state would otherwise overwrite the saved values with the
+        // in-flight scroll position from the transition.
+        if (_pendingScrollToPage || _isZooming || _isSettingPageVisibility)
+        {
+            return;
+        }
+
+        if (Scroll is null || LayoutTransform is null || !SelectedPageNumber.HasValue)
+        {
+            return;
+        }
+
+        if (ContainerFromIndex(SelectedPageNumber.Value - 1) is not PageItem pageItem)
+        {
+            return;
+        }
+
+        double scale = LayoutTransform.LayoutTransform?.Value.M11 ?? 1.0;
+        SetCurrentValue(ScrollOffsetProperty, new Vector(
+            Scroll.Offset.X / scale,
+            Math.Max(0, (Scroll.Offset.Y / scale) - pageItem.Bounds.Top)));
     }
 
     protected override void PrepareContainerForItemOverride(Control container, object? item, int index)
@@ -838,7 +909,7 @@ public sealed class PageItemsControl : ItemsControl
                 {
                     SetCurrentValue(InteractiveActionOverProperty, $"Open '{uriAction.Uri}'");
                 }
-                
+
                 return;
             }
         }
@@ -1121,7 +1192,7 @@ public sealed class PageItemsControl : ItemsControl
         LayoutTransform.AddHandler(PointerPressedEvent, OnPointerPressed);
         LayoutTransform.AddHandler(PointerMovedEvent, OnPointerMoved);
         LayoutTransform.AddHandler(PointerReleasedEvent, OnPointerReleased);
-        
+
         if (CalyExtensions.IsMobilePlatform())
         {
             LayoutTransform.GestureRecognizers.Add(new PinchGestureRecognizer());
@@ -1187,13 +1258,22 @@ public sealed class PageItemsControl : ItemsControl
                 // After a DataContext change (tab/document switch), items are now realized.
                 // Scroll to the correct page before running auto-selection to prevent
                 // UpdatePagesVisibility from selecting the wrong page based on a stale viewport.
-                _pendingScrollToPage = false;
                 if (SelectedPageNumber.HasValue && SelectedPageNumber.Value > 0 && SelectedPageNumber.Value <= PageCount)
                 {
+                    // Snapshot the saved scroll state BEFORE any scroll operation. The
+                    // ScrollChanged event fires synchronously from ScrollIntoView, and the
+                    // SaveScrollStateToDataContext handler would otherwise overwrite the
+                    // saved value with the in-flight scroll position. The two-way binding
+                    // has already pulled the new document's saved value into this property
+                    // at the DataContext change.
+                    Vector savedOffset = ScrollOffset;
+
                     ScrollIntoView(SelectedPageNumber.Value - 1);
-                    ApplyYOffset(SelectedPageNumber.Value, 0, false);
+                    ApplyScrollOffsets(SelectedPageNumber.Value, savedOffset.Y, offsetPdfCoord: false, savedOffset.X);
+                    _pendingScrollToPage = false;
                     return; // Wait for the scroll to trigger another layout update.
                 }
+                _pendingScrollToPage = false;
             }
 
             if (UpdatePagesVisibility())
@@ -1280,8 +1360,9 @@ public sealed class PageItemsControl : ItemsControl
 
     private bool UpdatePagesVisibility()
     {
-        // Exit early if the view is unstable (e.g., user interacting)
-        if (_isSettingPageVisibility || _isZooming)
+        // Exit early if the view is unstable (e.g., user interacting, or a tab-switch
+        // restoration is still in flight)
+        if (_isSettingPageVisibility || _isZooming || _pendingScrollToPage)
         {
             return false;
         }
@@ -1454,6 +1535,9 @@ public sealed class PageItemsControl : ItemsControl
             }
         }
 #endif
+
+        
+        SaveScrollState();
 
         return true;
     }

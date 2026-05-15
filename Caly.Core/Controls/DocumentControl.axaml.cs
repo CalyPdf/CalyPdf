@@ -61,6 +61,13 @@ public sealed class DocumentControl : CalyTemplatedControl
             defaultBindingMode: BindingMode.TwoWay);
 
     /// <summary>
+    /// Defines the <see cref="ScrollOffset"/> property.
+    /// </summary>
+    public static readonly StyledProperty<Vector> ScrollOffsetProperty =
+        AvaloniaProperty.Register<DocumentControl, Vector>(nameof(ScrollOffset),
+            defaultBindingMode: BindingMode.TwoWay);
+
+    /// <summary>
     /// Defines the <see cref="SelectedPageNumber"/> property. Starts at 1.
     /// </summary>
     public static readonly StyledProperty<int?> SelectedPageNumberProperty =
@@ -137,7 +144,7 @@ public sealed class DocumentControl : CalyTemplatedControl
         get => GetValue(RefreshPagesProperty);
         set => SetValue(RefreshPagesProperty, value);
     }
-    
+
     public TextSelection? TextSelection
     {
         get => GetValue(TextSelectionProperty);
@@ -149,7 +156,7 @@ public sealed class DocumentControl : CalyTemplatedControl
         get => GetValue(DocumentChangedProperty);
         set => SetValue(DocumentChangedProperty, value);
     }
-    
+
     public ICommand? ClearSelection
     {
         get => GetValue(ClearSelectionProperty);
@@ -166,6 +173,17 @@ public sealed class DocumentControl : CalyTemplatedControl
     {
         get => GetValue(ZoomLevelProperty);
         set => SetValue(ZoomLevelProperty, value);
+    }
+
+    /// <summary>
+    /// Scroll offset persisted across tab switches. Y is relative to
+    /// <see cref="SelectedPageNumber"/>'s top; both components are in unscaled
+    /// document coordinates.
+    /// </summary>
+    public Vector ScrollOffset
+    {
+        get => GetValue(ScrollOffsetProperty);
+        set => SetValue(ScrollOffsetProperty, value);
     }
 
     /// <summary>
@@ -273,7 +291,7 @@ public sealed class DocumentControl : CalyTemplatedControl
             {
                 return;
             }
-            
+
             var currentScale = _pageItemsControl.LayoutTransform.LayoutTransform?.Value.M11;
             if (currentScale.HasValue && Math.Abs(currentScale.Value - newZoom) < 1e-9)
             {
