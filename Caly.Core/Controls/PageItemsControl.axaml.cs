@@ -453,7 +453,7 @@ public sealed class PageItemsControl : ItemsControl
         double scale = LayoutTransform.LayoutTransform?.Value.M11 ?? 1.0;
         SetCurrentValue(ScrollOffsetProperty, new Vector(
             Scroll.Offset.X / scale,
-            Math.Max(0, (Scroll.Offset.Y / scale) - pageItem.Bounds.Top)));
+            Scroll.Offset.Y / scale - pageItem.Bounds.Top));
     }
 
     protected override void PrepareContainerForItemOverride(Control container, object? item, int index)
