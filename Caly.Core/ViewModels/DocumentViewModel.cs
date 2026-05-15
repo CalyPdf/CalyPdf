@@ -374,8 +374,6 @@ public sealed partial class DocumentViewModel : ViewModelBase
     {
         Debug.ThrowOnUiThread();
         
-        System.Diagnostics.Debug.Assert(TextSelection is not null);
-
         await Dispatcher.UIThread.InvokeAsync(() => IsPagesLoading = true);
 
         try
@@ -389,6 +387,8 @@ public sealed partial class DocumentViewModel : ViewModelBase
 
                 throw new Exception("Cannot load pages because document has 0 pages.");
             }
+
+            System.Diagnostics.Debug.Assert(TextSelection is not null);
 
             // Use 1st page size as default page size
             var firstPage = new PageViewModel(1, TextSelection, _pdfService.PpiScale);

@@ -34,7 +34,7 @@
 
             <!-- Settings Pane -->
             <SplitView.Pane>
-                <controls:SettingsControl/>
+                <controls:SettingsControl IsVisible="{Binding IsSettingsPaneOpen}"  />
 			</SplitView.Pane>
 
 			<SplitView.Content>

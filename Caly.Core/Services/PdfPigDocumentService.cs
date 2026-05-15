@@ -353,6 +353,11 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
         Debug.ThrowOnUiThread();
         return await GuardDispose(async ct =>
         {
+            if (_document is null)
+            {
+                return [];
+            }
+            
             Bookmarks? bookmarks = await ExecuteWithLockAsync(_ =>
             {
                 if (_document!.TryGetBookmarks(out var b, true))
