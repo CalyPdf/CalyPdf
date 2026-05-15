@@ -98,8 +98,14 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
                         {
                             // We want to clear any possible reference to the last PdfDocumentViewModel.
                             // The collection keeps a reference of the last document in e.OldItems
-                            // We trigger a NotifyCollectionChangedAction.Reset to flush
-                            PdfDocuments.Clear();
+                            // We trigger a NotifyCollectionChangedAction.Reset to flush.
+                            await Dispatcher.UIThread.InvokeAsync(() =>
+                            {
+                                if (PdfDocuments.Count == 0)
+                                {
+                                    PdfDocuments.Clear();
+                                }
+                            });
                         }
                     }
                 }

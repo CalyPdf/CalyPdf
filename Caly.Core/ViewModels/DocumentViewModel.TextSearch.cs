@@ -169,7 +169,7 @@ public partial class DocumentViewModel
         {
             ActivateSearchTextTab();
             SelectedTextSearchResult = null;
-            SearchResults.ClearSafely();
+            SearchResults.Clear();
 
             Task indexBuildTask = _buildSearchIndex.Value;
 
@@ -206,7 +206,7 @@ public partial class DocumentViewModel
                             continue;
                         }
 
-                        await Dispatcher.UIThread.InvokeAsync(() => SearchResults.AddSortedSafely(result));
+                        await Dispatcher.UIThread.InvokeAsync(() => SearchResults.AddSorted(result));
                         pagesDone.Add(result.PageNumber);
                     }
 

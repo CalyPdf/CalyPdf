@@ -107,66 +107,6 @@ internal static class CalyExtensions
         return hotkeys is not null && e.KeyModifiers.HasFlag(hotkeys.CommandModifiers);
     }
 
-    /// <summary>
-    /// Thread safe.
-    /// </summary>
-    public static void AddSafely<T>(this ObservableCollection<T> collection, T element)
-    {
-        IList list = collection;
-        lock (list.SyncRoot)
-        {
-            list.Add(element);
-        }
-    }
-
-    /// <summary>
-    /// Thread safe.
-    /// </summary>
-    public static void AddSortedSafely<T>(this SortedObservableCollection<T> collection, T element)
-    {
-        IList list = collection;
-        lock (list.SyncRoot)
-        {
-            collection.AddSorted(element);
-        }
-    }
-
-    /// <summary>
-    /// Thread safe.
-    /// </summary>
-    public static void ClearSafely<T>(this ObservableCollection<T> collection)
-    {
-        IList list = collection;
-        lock (list.SyncRoot)
-        {
-            list.Clear();
-        }
-    }
-
-    /// <summary>
-    /// Thread safe.
-    /// </summary>
-    public static void RemoveSafely<T>(this ObservableCollection<T> collection, T element)
-    {
-        IList list = collection;
-        lock (list.SyncRoot)
-        {
-            list.Remove(element);
-        }
-    }
-
-    /// <summary>
-    /// Thread safe.
-    /// </summary>
-    public static int IndexOfSafely<T>(this ObservableCollection<T> collection, T element)
-    {
-        IList list = collection;
-        lock (list.SyncRoot)
-        {
-            return list.IndexOf(element);
-        }
-    }
-
     internal static Task OpenFile(string? path)
     {
         return Task.Run(async () =>
