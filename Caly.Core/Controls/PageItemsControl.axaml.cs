@@ -190,7 +190,11 @@ public sealed class PageItemsControl : ItemsControl
 
     public PageItemsControl()
     {
-        _scrollChangedHandler = (_, _) => PostUpdatePagesVisibility();
+        _scrollChangedHandler = (_, e) =>
+        {
+            AdjustXOffsetOnExtentChanged(e);
+            PostUpdatePagesVisibility();
+        };
         _sizeChangedHandler = (_, _) => PostUpdatePagesVisibility();
 
         // Use a Tunnel handler to ensure zoom checks run before bubble-phase handlers
@@ -433,10 +437,10 @@ public sealed class PageItemsControl : ItemsControl
     /// </summary>
     private void SaveScrollState()
     {
-        // Skip while a tab-switch restoration is pending or while we're mid-zoom,
+        // Skip while a tab-switch restoration is pending or setting visibility,
         // either state would otherwise overwrite the saved values with the
         // in-flight scroll position from the transition.
-        if (_pendingScrollToPage || _isZooming || _isSettingPageVisibility)
+        if (_pendingScrollToPage || _isSettingPageVisibility)
         {
             return;
         }
@@ -1359,6 +1363,71 @@ public sealed class PageItemsControl : ItemsControl
         return false;
     }
 
+    private bool _suppressScrollAdjustment;
+
+    private void AdjustXOffsetOnExtentChanged(ScrollChangedEventArgs e)
+    {
+        if (Scroll is null || _suppressScrollAdjustment || _isZooming || _isPinching || _pendingScrollToPage)
+        {
+            return;
+        }
+
+        // Ignore ordinary user scrolling; only react to geometry changes.
+        bool extentChanged = Math.Abs(e.ExtentDelta.X) > 0.01;
+        bool viewportChanged = Math.Abs(e.ViewportDelta.X) > 0.01;
+        if (!extentChanged && !viewportChanged)
+        {
+            return;
+        }
+
+        double newExtent = Scroll.Extent.Width;
+        double newViewport = Scroll.Viewport.Width;
+        double newOffsetX = Scroll.Offset.X;
+
+        double oldExtent = newExtent - e.ExtentDelta.X;
+        double oldViewport = newViewport - e.ViewportDelta.X;
+        double oldOffsetX = newOffsetX - e.OffsetDelta.X;
+
+        if (oldExtent < 1.0 || newViewport < 1.0)
+        {
+            return;
+        }
+
+        double delta = newExtent - oldExtent;
+        if (Math.Abs(delta) < 0.01)
+        {
+            return;
+        }
+
+        // Keep the content visually anchored during width changes.
+        double prevContentX = oldExtent > oldViewport
+            ? -oldOffsetX
+            : (oldViewport - oldExtent) / 2.0;
+
+        double targetContentX = prevContentX - delta / 2.0;
+
+        double targetOffsetX = newExtent > newViewport
+            ? -targetContentX
+            : 0.0;
+
+        targetOffsetX = Math.Clamp(targetOffsetX, 0.0, Math.Max(0.0, newExtent - newViewport));
+
+        if (Math.Abs(targetOffsetX - newOffsetX) < 0.01)
+        {
+            return;
+        }
+
+        _suppressScrollAdjustment = true;
+        try
+        {
+            Scroll.SetCurrentValue(ScrollViewer.OffsetProperty, Scroll.Offset.WithX(targetOffsetX));
+        }
+        finally
+        {
+            _suppressScrollAdjustment = false;
+        }
+    }
+
     private void PostUpdatePagesVisibility()
     {
         if (_isUpdatePagesVisibilityScheduled)
@@ -1378,7 +1447,7 @@ public sealed class PageItemsControl : ItemsControl
     {
         // Exit early if the view is unstable (e.g., user interacting, or a tab-switch
         // restoration is still in flight)
-        if (_isSettingPageVisibility || _isZooming || _pendingScrollToPage)
+        if (_isSettingPageVisibility || _pendingScrollToPage)
         {
             return false;
         }
@@ -1552,7 +1621,7 @@ public sealed class PageItemsControl : ItemsControl
         }
 #endif
 
-        
+
         SaveScrollState();
 
         return true;
@@ -1695,7 +1764,7 @@ public sealed class PageItemsControl : ItemsControl
         }
         finally
         {
-            _isZooming = false;
+            SetZoomFinished();
         }
     }
     #endregion
@@ -1795,7 +1864,7 @@ public sealed class PageItemsControl : ItemsControl
         }
         finally
         {
-            _isZooming = false;
+            SetZoomFinished();
         }
     }
 
@@ -1818,8 +1887,22 @@ public sealed class PageItemsControl : ItemsControl
         }
         finally
         {
-            _isZooming = false;
+            SetZoomFinished();
         }
+    }
+
+    private void SetZoomFinished()
+    {
+        // ZoomToInternal positions the offset around the zoom origin itself, so
+        // suppress the auto-anchor in AdjustXOffsetOnExtentChanged for the layout/
+        // scroll events this transform change is about to produce. Setting to 'false'
+        // is posted at Loaded priority so it runs after the layout pass that
+        // updates Scroll.Extent.
+        //_isZooming = false;
+        Dispatcher.UIThread.Post(() =>
+        {
+            _isZooming = false;
+        }, DispatcherPriority.Loaded);
     }
 
     private void ZoomToInternal(double dZoom, Point point)
@@ -1887,5 +1970,6 @@ public sealed class PageItemsControl : ItemsControl
         _isApplyingPendingScroll = false;
         _isPinching = false;
         _isUpdatePagesVisibilityScheduled = false;
+        _suppressScrollAdjustment = false;
     }
 }
