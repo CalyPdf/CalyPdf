@@ -183,7 +183,11 @@ internal sealed partial class PdfDocumentsManagerService : IPdfDocumentsManagerS
             throw new Exception($"Invalid {nameof(document.LocalPath)} value for view model.");
         }
 
-        _mainViewModel.PdfDocuments.RemoveSafely(document);
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            _mainViewModel.PdfDocuments.Remove(document);
+        });
+        
 
         if (_openedFiles.TryRemove(document.LocalPath, out var docRecord))
         {
@@ -216,13 +220,14 @@ internal sealed partial class PdfDocumentsManagerService : IPdfDocumentsManagerS
         // Check if file is already open
         if (_openedFiles.TryGetValue(storageFile.Path.LocalPath, out var doc))
         {
-            // Already open - Activate tab
-            // We need a lock to avoid issues with tabs when opening documents in parallel (this might not be needed here though).
-            int index = _mainViewModel.PdfDocuments.IndexOfSafely(doc.Document);
-            if (index != -1 && _mainViewModel.SelectedDocumentIndex != index)
+            await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                _mainViewModel.SelectedDocumentIndex = index;
-            }
+                int index = _mainViewModel.PdfDocuments.IndexOf(doc.Document);
+                if (index != -1 && _mainViewModel.SelectedDocumentIndex != index)
+                {
+                    _mainViewModel.SelectedDocumentIndex = index;
+                }
+            });
 
             return;
         }
@@ -253,10 +258,11 @@ internal sealed partial class PdfDocumentsManagerService : IPdfDocumentsManagerS
                 // want to add the document to PdfDocuments before opening it.
                 Task<int> openDocTask = documentViewModel.OpenDocument(storageFile, password, cancellationToken);
 
-                // We need a lock to avoid issues with tabs when opening documents in parallel
-                _mainViewModel.PdfDocuments.AddSafely(documentViewModel);
-
-                _mainViewModel.SelectedDocumentIndex = Math.Max(0, _mainViewModel.PdfDocuments.Count - 1);
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    _mainViewModel.PdfDocuments.Add(documentViewModel);
+                    _mainViewModel.SelectedDocumentIndex = Math.Max(0, _mainViewModel.PdfDocuments.Count - 1);
+                });
 
                 int pageCount = 0;
                 try
@@ -266,7 +272,7 @@ internal sealed partial class PdfDocumentsManagerService : IPdfDocumentsManagerS
                 catch (Exception ex)
                 {
                     Debug.WriteExceptionToFile(ex);
-                    Dispatcher.UIThread.Post(() => _mainViewModel.PdfDocuments.RemoveSafely(documentViewModel));
+                    Dispatcher.UIThread.Post(() => _mainViewModel.PdfDocuments.Remove(documentViewModel));
                     _openedFiles.TryRemove(storageFile.Path.LocalPath, out _);
                 }
 
@@ -277,7 +283,7 @@ internal sealed partial class PdfDocumentsManagerService : IPdfDocumentsManagerS
                 }
 
                 // Document is not valid
-                Dispatcher.UIThread.Post(() => _mainViewModel.PdfDocuments.RemoveSafely(documentViewModel));
+                Dispatcher.UIThread.Post(() => _mainViewModel.PdfDocuments.Remove(documentViewModel));
                 _openedFiles.TryRemove(storageFile.Path.LocalPath, out _);
             }
 
