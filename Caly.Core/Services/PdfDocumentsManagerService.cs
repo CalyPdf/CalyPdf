@@ -22,7 +22,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -30,7 +29,6 @@ using Avalonia;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Caly.Core.Services.Interfaces;
-using Caly.Core.Utilities;
 using Caly.Core.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -232,70 +230,54 @@ internal sealed partial class PdfDocumentsManagerService : IPdfDocumentsManagerS
             return;
         }
 
-        // We use a named mutex to ensure a single file with the same path is only opened once
-        using (new Mutex(true, GetMutexName(storageFile.Path.LocalPath), out bool created))
+        var scope = App.Current!.Services!.CreateAsyncScope();
+
+        var documentViewModel = scope.ServiceProvider.GetRequiredService<DocumentViewModel>();
+        documentViewModel.FileName = $"Opening '{Path.GetFileNameWithoutExtension(storageFile.Path.LocalPath)}'...";
+
+        var docRecord = new PdfDocumentRecord()
         {
-            if (!created)
+            Scope = scope,
+            Document = documentViewModel
+        };
+
+        if (_openedFiles.TryAdd(storageFile.Path.LocalPath, docRecord))
+        {
+            // Do not await just yet - We need the WaitOpenAsync() to be created but we also
+            // want to add the document to PdfDocuments before opening it.
+            Task<int> openDocTask = documentViewModel.OpenDocument(storageFile, password, cancellationToken);
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                // Already processing
-                return;
+                _mainViewModel.PdfDocuments.Add(documentViewModel);
+                _mainViewModel.SelectedDocumentIndex = Math.Max(0, _mainViewModel.PdfDocuments.Count - 1);
+            });
+
+            int pageCount = 0;
+            try
+            {
+                pageCount = await openDocTask;
             }
-
-            var scope = App.Current!.Services!.CreateAsyncScope();
-
-            var documentViewModel = scope.ServiceProvider.GetRequiredService<DocumentViewModel>();
-            documentViewModel.FileName = $"Opening '{Path.GetFileNameWithoutExtension(storageFile.Path.LocalPath)}'...";
-
-            var docRecord = new PdfDocumentRecord()
+            catch (Exception ex)
             {
-                Scope = scope,
-                Document = documentViewModel
-            };
-
-            if (_openedFiles.TryAdd(storageFile.Path.LocalPath, docRecord))
-            {
-                // Do not await just yet - We need the WaitOpenAsync() to be created but we also
-                // want to add the document to PdfDocuments before opening it.
-                Task<int> openDocTask = documentViewModel.OpenDocument(storageFile, password, cancellationToken);
-
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    _mainViewModel.PdfDocuments.Add(documentViewModel);
-                    _mainViewModel.SelectedDocumentIndex = Math.Max(0, _mainViewModel.PdfDocuments.Count - 1);
-                });
-
-                int pageCount = 0;
-                try
-                {
-                    pageCount = await openDocTask;
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteExceptionToFile(ex);
-                    Dispatcher.UIThread.Post(() => _mainViewModel.PdfDocuments.Remove(documentViewModel));
-                    _openedFiles.TryRemove(storageFile.Path.LocalPath, out _);
-                }
-
-                if (pageCount > 0)
-                {
-                    // Document opened successfully
-                    return;
-                }
-
-                // Document is not valid
+                Debug.WriteExceptionToFile(ex);
                 Dispatcher.UIThread.Post(() => _mainViewModel.PdfDocuments.Remove(documentViewModel));
                 _openedFiles.TryRemove(storageFile.Path.LocalPath, out _);
             }
 
-            // TODO - Log error
-            await scope.DisposeAsync();
-        }
-    }
+            if (pageCount > 0)
+            {
+                // Document opened successfully
+                return;
+            }
 
-    private static string GetMutexName(string path)
-    {
-        // The backslash character (\) is reserved for mutex names
-        return Convert.ToBase64String(Encoding.UTF8.GetBytes(path)).Replace('\\', '#');
+            // Document is not valid
+            Dispatcher.UIThread.Post(() => _mainViewModel.PdfDocuments.Remove(documentViewModel));
+            _openedFiles.TryRemove(storageFile.Path.LocalPath, out _);
+        }
+
+        // TODO - Log error
+        await scope.DisposeAsync();
     }
 
     public void Dispose()
