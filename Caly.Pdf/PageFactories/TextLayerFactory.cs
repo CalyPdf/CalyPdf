@@ -38,7 +38,15 @@ namespace Caly.Pdf.PageFactories
     {
         private readonly double _ppiScale = 1;
         private readonly TransformationMatrix _scale;
-        
+
+        private static readonly AsyncLocal<CancellationToken> _currentToken = new();
+
+        internal static CancellationToken CurrentToken
+        {
+            get => _currentToken.Value;
+            set => _currentToken.Value = value;
+        }
+
         public TextLayerFactory(IPdfTokenScanner pdfScanner,
             IResourceStore resourceStore,
             ILookupFilterProvider filterProvider,
@@ -85,7 +93,7 @@ namespace Caly.Pdf.PageFactories
             var context = new TextLayerStreamProcessor(pageNumber, ResourceStore, PdfScanner, PageContentParser,
                 FilterProvider, cropBox, userSpaceUnit, rotation, initialMatrix,
                 effectiveCropBox.Width, effectiveCropBox.Height, _ppiScale,
-                ParsingOptions, annotationProvider);
+                ParsingOptions, annotationProvider, CurrentToken);
 
             return context.Process(pageNumber, operations);
         }

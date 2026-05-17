@@ -34,6 +34,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Controls.Notifications;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Exceptions;
 using UglyToad.PdfPig.Outline;
@@ -213,19 +214,36 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
     {
         Debug.ThrowOnUiThread();
 
-        return await GuardDispose(async ct =>
+        return await GuardDispose(async guardCt =>
         {
-            var pageTextLayer = await ExecuteWithLockAsync(
-                    _ => _document?.GetPage<PageTextLayerContent>(pageNumber),
-                    ct)
-                .ConfigureAwait(false);
+            var pageTextLayer = await ExecuteWithLockAsync(lockCt =>
+                    {
+                        try
+                        {
+                            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(lockCt);
+                            linkedCts.CancelAfter(PageTimeOut);
+                            return _document?.GetPageTextLayerContent(pageNumber, linkedCts.Token);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            if (!lockCt.IsCancellationRequested)
+                            {
+                                App.Messenger.Send(new ShowNotificationMessage(NotificationType.Error,
+                                    $"Error in page {pageNumber}",
+                                    $"Could not get text after {PageTimeOut.TotalSeconds} seconds."));
+                            }
+                            
+                            return null;
+                        }
+                    }, guardCt)
+                    .ConfigureAwait(false);
 
             if (pageTextLayer is null)
             {
                 return null;
             }
 
-            return PdfTextLayerHelper.GetTextLayer(pageTextLayer, ct);
+            return PdfTextLayerHelper.GetTextLayer(pageTextLayer, guardCt);
         }, token);
     }
 

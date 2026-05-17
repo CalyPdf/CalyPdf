@@ -21,7 +21,9 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Controls.Notifications;
 using Caly.Core.Utilities;
+using CommunityToolkit.Mvvm.Messaging;
 using SkiaSharp;
 using SkiaSharp.HarfBuzz;
 using UglyToad.PdfPig.Rendering.Skia;
@@ -30,31 +32,57 @@ namespace Caly.Core.Services;
 
 internal sealed partial class PdfPigDocumentService
 {
+    private static readonly TimeSpan PageTimeOut = TimeSpan.FromSeconds(30); // TODO - Make that a setting
+    
     public async Task<IRef<SKPicture>?> GetRenderPageAsync(int pageNumber, CancellationToken token)
     {
         Debug.ThrowOnUiThread();
 
-        SKPicture? pic = await GuardDispose(async ct =>
+        SKPicture? pic = await GuardDispose(async guardCt =>
         {
-            return await ExecuteWithLockAsync(lct =>
-            {
-                try
+            return await ExecuteWithLockAsync(lockCt =>
                 {
-                    return _document?.GetPage<SKPicture>(pageNumber);
-                }
-                catch (Exception e)
-                {
-                    Debug.WriteExceptionToFile(e);
-                    return GetErrorPicture(pageNumber, e, lct);
-                }
-            }, ct)
+                    try
+                    {
+                        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(lockCt);
+                        linkedCts.CancelAfter(PageTimeOut);
+                        return _document?.GetPageAsSKPicture(pageNumber, linkedCts.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        if (!lockCt.IsCancellationRequested)
+                        {
+                            App.Messenger.Send(new ShowNotificationMessage(NotificationType.Error,
+                                $"Error in page {pageNumber}",
+                                $"Could not display page after {PageTimeOut.TotalSeconds} seconds."));
+                            return GetTimeOutPicture(pageNumber, lockCt);
+                        }
+
+                        return null;
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.WriteExceptionToFile(e);
+                        return GetErrorPicture(pageNumber, e, lockCt);
+                    }
+                }, guardCt)
                 .ConfigureAwait(false);
         }, token);
 
         return pic is null ? null : RefCountable.Create(pic);
     }
 
+    private SKPicture? GetTimeOutPicture(int pageNumber, CancellationToken token)
+    {
+        return GetCalyStatusPicture(pageNumber, $"Could not display page after {PageTimeOut.TotalSeconds:0.##} seconds.", token);
+    }
+
     private SKPicture? GetErrorPicture(int pageNumber, Exception ex, CancellationToken token)
+    {
+        return GetCalyStatusPicture(pageNumber, ex.ToString(), token);
+    }
+    
+    private SKPicture? GetCalyStatusPicture(int pageNumber, string text, CancellationToken token)
     {
         if (token.IsCancellationRequested)
         {
@@ -98,7 +126,7 @@ internal sealed partial class PdfPigDocumentService
                     paint.IsAntialias = true;
 
                     float lineY = size + 1;
-                    foreach (var textLine in ex.ToString().Split('\n'))
+                    foreach (var textLine in text.Split('\n'))
                     {
                         canvas.DrawShapedText(textLine, new SKPoint(0, lineY), skFont, paint);
                         lineY += size;

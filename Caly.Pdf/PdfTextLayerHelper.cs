@@ -21,6 +21,8 @@
 using System.Buffers;
 using Caly.Pdf.Layout;
 using Caly.Pdf.Models;
+using Caly.Pdf.PageFactories;
+using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
 using UglyToad.PdfPig.Core;
 
@@ -28,6 +30,20 @@ namespace Caly.Pdf
 {
     public static class PdfTextLayerHelper
     {
+        public static PageTextLayerContent GetPageTextLayerContent(this PdfDocument document, int pageNumber, CancellationToken cancellationToken)
+        {
+            CancellationToken previous = TextLayerFactory.CurrentToken;
+            TextLayerFactory.CurrentToken = cancellationToken;
+            try
+            {
+                return document.GetPage<PageTextLayerContent>(pageNumber);
+            }
+            finally
+            {
+                TextLayerFactory.CurrentToken = previous;
+            }
+        }
+
         public static bool IsInteractive(PdfTextLine textLine)
         {
             var words = textLine.Words;

@@ -43,6 +43,8 @@ namespace Caly.Pdf.TextLayer
         /// </summary>
         private readonly List<PdfLetter> _letters = new();
 
+        private readonly CancellationToken _token;
+
         private readonly double _pageWidth;
         private readonly double _pageHeight;
         private readonly double _ppiScale;
@@ -62,10 +64,13 @@ namespace Caly.Pdf.TextLayer
             double pageHeight,
             double ppiScale,
             ParsingOptions parsingOptions,
-            AnnotationProvider annotationProvider)
+            AnnotationProvider annotationProvider,
+            CancellationToken token)
             : base(pageNumber, resourceStore, pdfScanner, pageContentParser, filterProvider, cropBox, userSpaceUnit,
                 rotation, initialMatrix, parsingOptions)
         {
+            _token = token;
+
             _pageWidth = pageWidth;
             _pageHeight = pageHeight;
             _ppiScale = ppiScale;
@@ -99,6 +104,25 @@ namespace Caly.Pdf.TextLayer
                 Letters = _letters,
                 Annotations = _pdfAnnotations
             };
+        }
+
+        protected override void ProcessOperations(IReadOnlyList<IGraphicsStateOperation> operations)
+        {
+            if (!_token.CanBeCanceled)
+            {
+                base.ProcessOperations(operations);
+                return;
+            }
+
+            for (var i = 0; i < operations.Count; ++i)
+            {
+                if (i % 100 == 0)
+                {
+                    _token.ThrowIfCancellationRequested();
+                }
+
+                operations[i].Run(this);
+            }
         }
 
         private static PdfRectangle InverseYAxis(PdfRectangle rectangle, double height)
