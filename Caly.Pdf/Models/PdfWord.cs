@@ -128,23 +128,15 @@ public sealed class PdfWord : IPdfTextElement
         {
             // Only keep positions
             _letterPositions = new float[letters.Count - 1];
-            double position = firstLetter.BoundingBox.Width;
-            _letterPositions[0] = (float)position;
 
-            for (int i = 1; i < letters.Count - 1; ++i)
+            for (int i = 0; i < letters.Count - 1; ++i)
             {
-                var letter = letters[i];
-
-                //var dist = Distances.Euclidean(previousLetter.EndBaseLine, letter.EndBaseLine);
-                //position += dist;
-
-                // Assumption here is that letters are not overlapping and not too spaced
-                position += letter.BoundingBox.Width;
-                _letterPositions[i] = (float)position;
-                charsCount += letter.Value.Length;
+                var nextStart = letters[i + 1].BoundingBox.BottomLeft;
+                float dx = (float)(nextStart.X - BoundingBox.BottomLeft.X);
+                float dy = (float)(nextStart.Y - BoundingBox.BottomLeft.Y);
+                _letterPositions[i] = MathF.Sqrt(dx * dx + dy * dy);
+                charsCount += letters[i + 1].Value.Length;
             }
-
-            charsCount += letters[^1].Value.Length;
         }
 
         Span<char> chars = charsCount <= 512 ? stackalloc char[charsCount] : new char[charsCount];
