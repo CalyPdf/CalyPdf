@@ -3,7 +3,8 @@
                     xmlns:controls="using:Caly.Core.Controls"
                     xmlns:vm="clr-namespace:Caly.Core.ViewModels"
                     xmlns:progRing="clr-namespace:AvaloniaProgressRing;assembly=AvaloniaProgressRing"
-                    xmlns:utilities="clr-namespace:Caly.Core.Utilities">
+                    xmlns:utilities="clr-namespace:Caly.Core.Utilities"
+                    xmlns:rendering="clr-namespace:Caly.Core.Controls.Rendering">
 
     <Design.PreviewWith>
 		<StackPanel Width="400" Height="400">
@@ -85,12 +86,16 @@
 													   VerticalAlignment="Center"
 													   Foreground="{DynamicResource SystemAccentColor}"/>
 
-								<controls:SkiaPdfPageControl Picture="{Binding PdfPicture}"
-								                             PpiScale="{Binding PpiScale}"
-                                                             VisibleArea="{Binding VisibleArea}"
-															 IsPageVisible="{Binding IsPageVisible}"
-															 HorizontalAlignment="Stretch"
-															 VerticalAlignment="Stretch"/>
+								<rendering:TiledPdfPageControl TileRenderService="{Binding TileRenderService}"
+                                                               Picture="{Binding PdfPicture}"
+                                                               PpiScale="{Binding PpiScale}"
+                                                               VisibleArea="{Binding VisibleArea}"
+                                                               IsPageVisible="{Binding IsPageVisible}"
+                                                               PageNumber="{Binding PageNumber}"
+                                                               PageDisplaySize="{Binding Size}"
+                                                               ZoomLevel="{Binding $parent[controls:PageItemsControl].ZoomLevel}"
+                                                               HorizontalAlignment="Stretch"
+                                                               VerticalAlignment="Stretch"/>
 
 								<controls:PageInteractiveLayerControl Name="PART_PageInteractiveLayerControl"
                                                                       VisibleArea="{Binding VisibleArea}"
