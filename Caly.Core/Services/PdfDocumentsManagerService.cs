@@ -183,7 +183,9 @@ internal sealed partial class PdfDocumentsManagerService : IPdfDocumentsManagerS
 
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
+            int currentIndex = _mainViewModel.PdfDocuments.IndexOf(document);
             _mainViewModel.PdfDocuments.Remove(document);
+            _mainViewModel.SelectedDocumentIndex = Math.Min(Math.Max(0, currentIndex), _mainViewModel.PdfDocuments.Count - 1);
         });
         
 
