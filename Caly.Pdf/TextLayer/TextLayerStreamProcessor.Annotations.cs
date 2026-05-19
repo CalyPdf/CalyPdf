@@ -73,7 +73,8 @@ namespace Caly.Pdf.TextLayer
 
                     // https://github.com/apache/pdfbox/blob/47867f7eee275e9e54a87222b66ab14a8a3a062a/pdfbox/src/main/java/org/apache/pdfbox/contentstream/PDFStreamEngine.java#L310
                     // transformed appearance box  fixme: may be an arbitrary shape
-                    PdfRectangle transformedBox = InverseYAxis(matrix.Transform(bbox).Normalise(), _pageHeight);
+                    PdfRectangle transformedBox = InverseYAxis(matrix.Transform(bbox)
+                        .NormaliseCaly(), _pageHeight);
 
                     if (transformedBox.Width <= double.MinValue || transformedBox.Height <= double.MinValue)
                     {

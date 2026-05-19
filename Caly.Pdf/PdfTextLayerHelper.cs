@@ -273,5 +273,43 @@ namespace Caly.Pdf
             }
             return tempTextOrientation;
         }
+
+        /// <summary>
+        /// Returns the axis-aligned rectangle that completely contains
+        /// <paramref name="rectangle"/>, with no rotation, while preserving the
+        /// input's Y orientation.
+        /// </summary>
+        /// <remarks>
+        /// PdfPig's <c>Normalise</c> always emits a PDF-style Y-up rectangle
+        /// (TopLeft has the larger Y). That mislabels the corners when the
+        /// caller is already working in Y-down screen space — e.g. after
+        /// <c>InverseYAxis</c> — leaving TopLeft below BottomLeft on screen.
+        /// This version inspects the original TopLeft vs BottomLeft Y to keep
+        /// the labels consistent with the input convention.
+        /// </remarks>
+        public static PdfRectangle NormaliseCaly(this PdfRectangle rectangle)
+        {
+            PdfPoint tl = rectangle.TopLeft;
+            PdfPoint tr = rectangle.TopRight;
+            PdfPoint bl = rectangle.BottomLeft;
+            PdfPoint br = rectangle.BottomRight;
+
+            double minX = Math.Min(Math.Min(tl.X, tr.X), Math.Min(bl.X, br.X));
+            double maxX = Math.Max(Math.Max(tl.X, tr.X), Math.Max(bl.X, br.X));
+            double minY = Math.Min(Math.Min(tl.Y, tr.Y), Math.Min(bl.Y, br.Y));
+            double maxY = Math.Max(Math.Max(tl.Y, tr.Y), Math.Max(bl.Y, br.Y));
+
+            // tl.Y == bl.Y happens for exactly-90° rotations and degenerate
+            // zero-height rects; defaulting to Y-up matches PDF convention.
+            bool yUp = tl.Y >= bl.Y;
+            double topY = yUp ? maxY : minY;
+            double bottomY = yUp ? minY : maxY;
+
+            return new PdfRectangle(
+                new PdfPoint(minX, topY),
+                new PdfPoint(maxX, topY),
+                new PdfPoint(minX, bottomY),
+                new PdfPoint(maxX, bottomY));
+        }
     }
 }
