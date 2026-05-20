@@ -22,6 +22,7 @@ using Avalonia.Controls.Notifications;
 using Caly.Core.Models;
 using Caly.Core.ViewModels;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Caly.Core.Services.Interfaces
@@ -62,5 +63,14 @@ namespace Caly.Core.Services.Interfaces
         /// Show an exception in a popup window.
         /// </summary>
         void ShowExceptionWindow(ExceptionViewModel exception);
+
+        /// <summary>
+        /// Open the print dialog for the given document, pre-selecting
+        /// <paramref name="currentPage"/> as the "current page" option.
+        /// </summary>
+        Task ShowPrintDialogAsync(
+            IPdfDocumentService documentService,
+            int currentPage,
+            CancellationToken token);
     }
 }

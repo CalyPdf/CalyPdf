@@ -1,0 +1,15 @@
+EnumPrinters
+CreateDC
+DeleteDC
+GetDeviceCaps
+StartDoc
+StartPage
+EndPage
+EndDoc
+StretchDIBits
+OpenPrinter
+ClosePrinter
+DocumentProperties
+ResetDC
+DeviceCapabilities
+DEVMODEW

@@ -196,7 +196,7 @@ namespace Caly.Desktop
             try
             {
                 // GPU rendering disabled for now
-                return AppBuilder.Configure<App>()
+                return AppBuilder.Configure<DesktopApp>()
                     .UsePlatformDetect()
                     .WithInterFont()
                     .UseSkia()

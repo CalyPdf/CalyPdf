@@ -21,6 +21,7 @@
 		<KeyBinding Gesture="{x:Static utilities:CalyHotkeyConfiguration.DocumentSearchGesture}" Command="{Binding ActivateSearchTextTabCommand}" />
 		<KeyBinding Gesture="{x:Static utilities:CalyHotkeyConfiguration.DocumentNextGesture}" Command="{Binding ActivateNextDocumentCommand}"/>
 		<KeyBinding Gesture="{x:Static utilities:CalyHotkeyConfiguration.DocumentPreviousGesture}" Command="{Binding ActivatePreviousDocumentCommand}"/>
+        <KeyBinding Gesture="{x:Static utilities:CalyHotkeyConfiguration.DocumentPrintGesture}" Command="{Binding PrintDocumentCommand}"/>
 	</UserControl.KeyBindings>
 
 	<Grid RowDefinitions="*,22">
