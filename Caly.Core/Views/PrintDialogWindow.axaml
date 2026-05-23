@@ -10,7 +10,7 @@
         CanResize="False"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
-        WindowDecorations="None"
+        WindowDecorations="BorderOnly"
         ExtendClientAreaToDecorationsHint="True"
         ShowActivated="True"
         Title="Print">
