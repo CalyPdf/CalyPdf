@@ -460,6 +460,7 @@ $RECYCLE.BIN/
 /caly_settings
 /Caly.Core/caly_settings
 *.lib
+*.a
 */.avalonia-build-tasks
 /dotnet-install.sh
 /Caly.Desktop/.claude/settings.local.json

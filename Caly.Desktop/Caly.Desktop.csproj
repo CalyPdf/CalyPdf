@@ -44,13 +44,26 @@
 	</PropertyGroup>
 
 	<!-- Begin Link Static libs -->
-	<ItemGroup Condition="'$(Configuration)'=='AOT' And $(RuntimeIdentifier.StartsWith('win'))">
+	<ItemGroup Condition="'$(Configuration)'=='AOT' And $(RuntimeIdentifier) == 'win-x64'">
 		<DirectPInvoke Include="libSkiaSharp" />
 		<NativeLibrary Include="..\native\skia.lib" />
 		<NativeLibrary Include="..\native\SkiaSharp.lib" />
 
 		<DirectPInvoke Include="libHarfBuzzSharp" />
 		<NativeLibrary Include="..\native\libHarfBuzzSharp.lib" />
+	</ItemGroup>
+
+	<ItemGroup Condition="'$(Configuration)'=='AOT' And $(RuntimeIdentifier) == 'linux-x64'">
+		<DirectPInvoke Include="libSkiaSharp" />
+		<NativeLibrary Include="..\native\libskia.a" />
+		<NativeLibrary Include="..\native\libSkiaSharp.a" />
+
+		<DirectPInvoke Include="libHarfBuzzSharp" />
+		<NativeLibrary Include="..\native\libHarfBuzzSharp.a" />
+
+		<LinkerArg Include="-lstdc++" />
+		<LinkerArg Include="-lfontconfig" />
+		<LinkerArg Include="-lfreetype" />
 	</ItemGroup>
 
 	<Target Condition="'$(Configuration)'=='AOT' And $(RuntimeIdentifier.StartsWith('win'))" Name="DeleteLinkedLibAfterPublish" AfterTargets="Publish">
@@ -60,6 +73,15 @@
 		<Delete Files="@(FilesToDelete)" />
 		<Message Text="Deleted Linked dlls" Importance="high" />
 	</Target>
+
+	<Target Condition="'$(Configuration)'=='AOT' And $(RuntimeIdentifier.StartsWith('linux'))" Name="DeleteLinkedLibAfterPublishLinux" AfterTargets="Publish">
+		<ItemGroup>
+			<FilesToDelete Include="$(PublishDir)libHarfBuzzSharp.so;$(PublishDir)libSkiaSharp.so;" />
+		</ItemGroup>
+		<Delete Files="@(FilesToDelete)" />
+		<Message Text="Deleted Linked dlls" Importance="high" />
+	</Target>
+
 	<!-- End Link Static libs -->
 	<!-- End AOT publish -->
 
