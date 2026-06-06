@@ -241,6 +241,7 @@ namespace Caly.Core.Controls.Rendering;
             var picture = Picture?.Clone();
             if (picture?.IsAlive != true || picture.Item.CullRect.IsEmpty)
             {
+                picture?.Dispose();
                 base.Render(context);
                 return;
             }

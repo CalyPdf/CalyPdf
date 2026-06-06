@@ -381,7 +381,7 @@ namespace Caly.Core.Services
                 return;
             }
 
-            var picture = await GetPicture(renderRequest.Page.PageNumber, renderRequest.Token)
+            using var picture = await GetPicture(renderRequest.Page.PageNumber, renderRequest.Token)
                 .ConfigureAwait(false);
 
             if (!renderRequest.Page.IsSizeSet())
@@ -399,13 +399,10 @@ namespace Caly.Core.Services
                 }
             }
 
-            using (picture)
+            if (picture is not null)
             {
-                if (picture is not null)
-                {
-                    await SetThumbnail(renderRequest.Page, picture.Item, renderRequest.Token)
-                        .ConfigureAwait(false);
-                }
+                await SetThumbnail(renderRequest.Page, picture.Item, renderRequest.Token)
+                    .ConfigureAwait(false);
             }
         }
 
@@ -785,8 +782,20 @@ namespace Caly.Core.Services
                             }
                             catch (Exception)
                             { /* No Op */ }
-                            
-                            await Dispatcher.UIThread.InvokeAsync(() => page.PdfPicture = clone);
+
+                            if (clone is not null)
+                            {
+                                var cloneToAssign = clone;
+                                try
+                                {
+                                    await Dispatcher.UIThread.InvokeAsync(() => page.PdfPicture = cloneToAssign);
+                                    clone = null;
+                                }
+                                finally
+                                {
+                                    clone?.Dispose();
+                                }
+                            }
                         }
                         else
                         {
