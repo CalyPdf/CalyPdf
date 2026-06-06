@@ -73,13 +73,19 @@ internal partial class PdfDocumentsManagerService
 
     private void HandleSelectedDocumentChangedMessage(object r, SelectedDocumentChangedMessage m)
     {
+        var selected = _mainViewModel.SelectedDocument;
+        if (selected is null || !selected.Equals(m.Value))
+        {
+            return;
+        }
+
         foreach (var openedFile in _openedFiles)
         {
             if (openedFile.Value.Document.Equals(m.Value))
             {
                 if (openedFile.Value.Document.IsActive)
                 {
-                    break;
+                    continue;
                 }
 
                 openedFile.Value.Document.SetActive();
