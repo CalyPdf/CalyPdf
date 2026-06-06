@@ -4,14 +4,14 @@
     <BuildType Name="Debug" />
     <BuildType Name="Release" />
   </Configurations>
-  <Folder Name="/Printing/">
-    <Project Path="Printing/Caly.Printing.Core/Caly.Printing.Core.csproj">
+  <Folder Name="/Caly.Printing/">
+    <Project Path="Caly.Printing/Caly.Printing.Core/Caly.Printing.Core.csproj">
       <BuildType Solution="AOT|*" Project="Release" />
     </Project>
-    <Project Path="Printing/Caly.Printing.Unix/Caly.Printing.Unix.csproj">
+    <Project Path="Caly.Printing/Caly.Printing.Unix/Caly.Printing.Unix.csproj">
       <BuildType Solution="AOT|*" Project="Release" />
     </Project>
-    <Project Path="Printing/Caly.Printing.Windows/Caly.Printing.Windows.csproj">
+    <Project Path="Caly.Printing/Caly.Printing.Windows/Caly.Printing.Windows.csproj">
       <BuildType Solution="AOT|*" Project="Release" />
     </Project>
   </Folder>

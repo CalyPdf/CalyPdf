@@ -22,8 +22,8 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\Caly.Core\Caly.Core.csproj" />
-		<ProjectReference Include="..\Printing\Caly.Printing.Core\Caly.Printing.Core.csproj" />
-		<ProjectReference Include="..\Printing\Caly.Printing.Unix\Caly.Printing.Unix.csproj" />
+		<ProjectReference Include="..\Caly.Printing\Caly.Printing.Core\Caly.Printing.Core.csproj" />
+		<ProjectReference Include="..\Caly.Printing\Caly.Printing.Unix\Caly.Printing.Unix.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

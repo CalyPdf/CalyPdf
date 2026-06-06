@@ -27,7 +27,6 @@ using Caly.Core;
 using Caly.Core.Services.Interfaces;
 using Caly.Printing.Core;
 using SharpIpp;
-using SkiaSharp;
 using SharpIpp.Models.Requests;
 using SharpIpp.Protocol.Models;
 
@@ -117,11 +116,9 @@ public sealed class UnixPrintService : IPrintService, IDisposable
                 continue;
             }
 
-            var uriStr = p.PrinterUriSupported?.FirstOrDefault(u => !string.IsNullOrWhiteSpace(u));
-            if (uriStr is null || !Uri.TryCreate(uriStr, UriKind.Absolute, out var uri))
-            {
-                uri = BuildCupsUri(name);
-            }
+            var uri = p.PrinterUriSupported?
+                          .FirstOrDefault(u => !string.IsNullOrWhiteSpace(u.AbsolutePath)) ??
+                      BuildCupsUri(name);
 
             result.Add(new PrinterInfo(name, uri));
         }
