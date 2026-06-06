@@ -61,6 +61,21 @@ namespace Caly.Pdf.TextLayer
         /// </summary>
         private readonly Dictionary<(IType3Font Font, int Code), PdfRectangle?> _type3GlyphBoxCache = new();
 
+        /// <summary>
+        /// The replacement text (/ActualText) of the marked-content sequence currently being
+        /// processed, or <see langword="null"/> when none is active. See the PDF specification,
+        /// 14.9.4 "Replacement text".
+        /// </summary>
+        private string? _actualText;
+
+        /// <summary>
+        /// Whether the next glyph rendered is the first one within the active <see cref="_actualText"/>
+        /// sequence. The replacement text applies to the whole sequence, so it is assigned to the first
+        /// glyph and the remaining glyphs in the sequence receive an empty value.
+        /// </summary>
+        private bool _isFirstActualTextGlyph;
+
+
         public TextLayerStreamProcessor(int pageNumber,
             IResourceStore resourceStore,
             IPdfTokenScanner pdfScanner,
@@ -156,6 +171,15 @@ namespace Caly.Pdf.TextLayer
             in TransformationMatrix transformationMatrix,
             CharacterBoundingBox characterBoundingBox)
         {
+            if (_actualText is not null)
+            {
+                // The active marked-content sequence specifies replacement text (/ActualText) for
+                // extraction. It applies to the whole sequence, so assign it to the first glyph and
+                // give the remaining glyphs an empty value to avoid duplicating the replaced text.
+                unicode = _isFirstActualTextGlyph ? _actualText : string.Empty;
+                _isFirstActualTextGlyph = false;
+            }
+
             if (currentOffset > 0 && _letters.Count > 0 && Diacritics.IsInCombiningDiacriticRange(unicode))
             {
                 // GHOSTSCRIPT-698363-0.pdf
@@ -377,12 +401,25 @@ namespace Caly.Pdf.TextLayer
         public override void BeginMarkedContent(NameToken name, NameToken? propertyDictionaryName,
             DictionaryToken? properties)
         {
-            // No op
+            // A marked-content sequence may provide replacement text for extraction via /ActualText
+            // (PDF spec, 14.9.4 "Replacement text"). When opted in via ParsingOptions.UseActualText,
+            // honour it so that content with no usable mapping in the font.
+            
+            if (properties is not null
+                && properties.TryGet(NameToken.ActualText, PdfScanner, out IDataToken<string>? actualTextToken))
+            {
+                _actualText = actualTextToken.Data?.Replace("\u00ad", string.Empty); // remove soft hyphens
+                _isFirstActualTextGlyph = true;
+            }
+            else
+            {
+                _actualText = null;
+            }
         }
 
         public override void EndMarkedContent()
         {
-            // No op
+            _actualText = null;
         }
 
         public override void ModifyClippingIntersect(FillingRule clippingRule)

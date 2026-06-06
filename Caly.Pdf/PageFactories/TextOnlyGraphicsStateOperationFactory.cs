@@ -2,6 +2,7 @@
 using UglyToad.PdfPig.Graphics;
 using UglyToad.PdfPig.Graphics.Operations;
 using UglyToad.PdfPig.Graphics.Operations.Compatibility;
+using UglyToad.PdfPig.Graphics.Operations.MarkedContent;
 using UglyToad.PdfPig.Graphics.Operations.SpecialGraphicsState;
 using UglyToad.PdfPig.Graphics.Operations.TextObjects;
 using UglyToad.PdfPig.Graphics.Operations.TextPositioning;
@@ -204,6 +205,48 @@ namespace Caly.Pdf.PageFactories
                     }
 
                     return new ShowTextsWithPositioning(operands);
+                case BeginMarkedContent.Symbol:
+                    return new BeginMarkedContent((NameToken)operands[0]);
+                case BeginMarkedContentWithProperties.Symbol:
+                {
+                    var bdcName = (NameToken)operands[0];
+                    var operand = operands[1];
+                    
+                    if (operand is DictionaryToken contentSequenceDictionary)
+                    {
+                        return new BeginMarkedContentWithProperties(bdcName, contentSequenceDictionary);
+                    }
+
+                    if (operand is NameToken contentSequenceName)
+                    {
+                        return new BeginMarkedContentWithProperties(bdcName, contentSequenceName);
+                    }
+
+                    var errorMessageBdc = string.Join(", ", operands.Select(x => x.ToString()));
+                    throw new PdfDocumentFormatException($"Attempted to set a marked-content sequence with invalid parameters: [{errorMessageBdc}]");
+                }
+                case DesignateMarkedContentPoint.Symbol:
+                    return new DesignateMarkedContentPoint((NameToken)operands[0]);
+                case DesignateMarkedContentPointWithProperties.Symbol:
+                {
+                    var dpName = (NameToken)operands[0];
+                    var operand = operands[1];
+                    
+                    if (operand is DictionaryToken contentPointDictionary)
+                    {
+                        return new DesignateMarkedContentPointWithProperties(dpName, contentPointDictionary);
+                    }
+
+                    if (operand is NameToken contentPointName)
+                    {
+                        return new DesignateMarkedContentPointWithProperties(dpName, contentPointName);
+                    }
+
+                    var errorMessageDp = string.Join(", ", operands.Select(x => x.ToString()));
+                    throw new PdfDocumentFormatException($"Attempted to set a marked-content point with invalid parameters: [{errorMessageDp}]");
+                }
+                case EndMarkedContent.Symbol:
+                    return EndMarkedContent.Value;
             }
 
             return NoOpGraphicsStateOperation.Instance;
