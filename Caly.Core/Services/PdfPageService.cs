@@ -330,11 +330,15 @@ namespace Caly.Core.Services
                 return;
             }
 
+            IRef<SKPicture>? picture = null;
             try
             {
-                renderRequest.Page.IsPageRendering = true;
+                Dispatcher.UIThread.Invoke(() =>
+                {
+                    renderRequest.Page.IsPageRendering = true;
+                });
 
-                var picture = await GetPicture(renderRequest.Page.PageNumber, renderRequest.Token)
+                picture = await GetPicture(renderRequest.Page.PageNumber, renderRequest.Token)
                     .ConfigureAwait(false);
 
                 Size? pageSize = null;
@@ -343,23 +347,30 @@ namespace Caly.Core.Services
                     pageSize = await GetPageSize(renderRequest.Page.PageNumber, renderRequest.Token)
                         .ConfigureAwait(false);
                 }
-                
+
                 if (picture is not null)
                 {
-                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    var pictureToAssign = picture;
+                    Dispatcher.UIThread.Invoke(() =>
                     {
-                        renderRequest.Page.PdfPicture = picture;
+                        renderRequest.Page.PdfPicture = pictureToAssign;
 
                         if (pageSize.HasValue)
                         {
                             renderRequest.Page.SetSize(pageSize.Value);
                         }
                     });
+                    picture = null;
                 }
             }
             finally
             {
-                renderRequest.Page.IsPageRendering = false;
+                picture?.Dispose();
+
+                Dispatcher.UIThread.Invoke(() =>
+                {
+                    renderRequest.Page.IsPageRendering = false;
+                });
             }
         }
 
