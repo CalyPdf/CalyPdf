@@ -201,6 +201,8 @@ public sealed class PageItemsControl : ItemsControl
         // and avoid unwanted event scrolls by 50px before we can reject them.
         // No need to RemoveHandler() as it is on 'this', so it's GC'd with the control.
         AddHandler(PointerWheelChangedEvent, OnPointerWheelChangedHandler, RoutingStrategies.Tunnel);
+        AddHandler(KeyDownEvent, OnKeyDownHandler, RoutingStrategies.Tunnel, handledEventsToo: true);
+        AddHandler(KeyUpEvent, OnKeyUpHandler, RoutingStrategies.Tunnel, handledEventsToo: true);
 
         ResetState();
     }
@@ -1189,8 +1191,6 @@ public sealed class PageItemsControl : ItemsControl
         Scroll = e.NameScope.FindFromNameScope<ScrollViewer>("PART_ScrollViewer");
         Scroll.AddHandler(ScrollViewer.ScrollChangedEvent, _scrollChangedHandler);
         Scroll.AddHandler(SizeChangedEvent, _sizeChangedHandler, RoutingStrategies.Direct);
-        Scroll.AddHandler(KeyDownEvent, OnKeyDownHandler);
-        Scroll.AddHandler(KeyUpEvent, OnKeyUpHandler);
         Scroll.Focus(); // Make sure the Scroll has focus
 
         LayoutTransform = e.NameScope.FindFromNameScope<LayoutTransformControl>("PART_LayoutTransformControl");
@@ -1215,8 +1215,6 @@ public sealed class PageItemsControl : ItemsControl
         {
             Scroll.RemoveHandler(ScrollViewer.ScrollChangedEvent, _scrollChangedHandler);
             Scroll.RemoveHandler(SizeChangedEvent, _sizeChangedHandler);
-            Scroll.RemoveHandler(KeyDownEvent, OnKeyDownHandler);
-            Scroll.RemoveHandler(KeyUpEvent, OnKeyUpHandler);
         }
 
         if (LayoutTransform is not null)
@@ -1665,14 +1663,6 @@ public sealed class PageItemsControl : ItemsControl
 
     private void OnKeyUpHandler(object? sender, KeyEventArgs e)
     {
-        if (Scroll is not null)
-        {
-            // We re-subscribe to key down events, even if no
-            // unsubscribe happened.
-            Scroll.RemoveHandler(KeyDownEvent, OnKeyDownHandler);
-            Scroll.AddHandler(KeyDownEvent, OnKeyDownHandler);
-        }
-
         if (e.IsPanningOrZooming())
         {
             ResetPanTo();
@@ -1681,29 +1671,77 @@ public sealed class PageItemsControl : ItemsControl
 
     private void OnKeyDownHandler(object? sender, KeyEventArgs e)
     {
+        if (Scroll is null)
+        {
+            return;
+        }
+
         if (e.IsPanningOrZooming())
         {
-            // We stop listening to key down events when panning / zooming.
-            // Keeping the 'ctrl' key down involves continuously firing 
-            // key down events.
-            Scroll?.RemoveHandler(KeyDownEvent, OnKeyDownHandler);
             ResetPanTo();
+            return;
         }
 
         switch (e.Key)
         {
+            case Key.Home:
+            {
+                Scroll.ScrollToHome();
+                e.Handled = true;
+                break;
+            }
+            case Key.End:
+            {
+                Scroll.ScrollToEnd();
+                e.Handled = true;
+                break;
+            }
+            case Key.PageUp:
+            {
+                int? pageNumber = SelectedPageNumber;
+                if (pageNumber.HasValue)
+                {
+                    GoToPage(pageNumber.Value - 1, 0);
+                    e.Handled = true;
+                }
+
+                break;
+            }
+            case Key.PageDown:
+            {
+                int? pageNumber = SelectedPageNumber;
+                if (pageNumber.HasValue)
+                {
+                    GoToPage(pageNumber.Value + 1, 0);
+                    e.Handled = true;
+                }
+
+                break;
+            }
             case Key.Right:
-                Scroll!.PageDown();
+            {
+                Scroll.PageDown();
+                e.Handled = true;
                 break;
+            }
             case Key.Down:
-                Scroll!.LineDown();
+            {
+                Scroll.LineDown();
+                e.Handled = true;
                 break;
+            }
             case Key.Left:
-                Scroll!.PageUp();
+            {
+                Scroll.PageUp();
+                e.Handled = true;
                 break;
+            }
             case Key.Up:
-                Scroll!.LineUp();
+            {
+                Scroll.LineUp();
+                e.Handled = true;
                 break;
+            }
         }
     }
 
