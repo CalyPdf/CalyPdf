@@ -140,29 +140,10 @@
 								   HorizontalAlignment="Left"
 								   TextWrapping="WrapWithOverflow" />
 					</DockPanel>
-
-					<DockPanel DockPanel.Dock="Top">
-						<TextBlock Text="Page Size:"
-								   Width="{TemplateBinding FirstColumnWidth}"
-								   HorizontalAlignment="Left" />
-						<TextBlock Text="TODO"
-								   MinWidth="120"
-								   HorizontalAlignment="Left"
-								   TextWrapping="WrapWithOverflow" />
-					</DockPanel>
-
+					
 					<Separator DockPanel.Dock="Top"/>
-
-					<DockPanel DockPanel.Dock="Top">
-						<TextBlock Text="Fast Web View:"
-								   Width="{TemplateBinding FirstColumnWidth}"
-								   HorizontalAlignment="Left" />
-						<TextBlock Text="TODO"
-								   MinWidth="120"
-								   HorizontalAlignment="Left"
-								   TextWrapping="WrapWithOverflow" />
-					</DockPanel>
-
+                    
+                    <Grid/>
 
 				</DockPanel>
 			</ControlTemplate>
