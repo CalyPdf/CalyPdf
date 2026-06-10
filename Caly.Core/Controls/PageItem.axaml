@@ -77,14 +77,18 @@
 								  Width="{Binding Size.Width}"
 								  Height="{Binding Size.Height}">
 
-								<progRing:ProgressRing Width="50"
-													   Height="50"
-													   IsActive="{Binding IsPageRendering}"
-													   IsEnabled="{Binding IsPageRendering}"
-													   IsVisible="{Binding IsPageRendering}"
-													   HorizontalAlignment="Center"
-													   VerticalAlignment="Center"
-													   Foreground="{DynamicResource SystemAccentColor}"/>
+								<Viewbox Width="{Binding ProgressRingSize}"
+										 Height="{Binding ProgressRingSize}"
+										 Margin="{Binding ProgressRingMargin}"
+										 IsVisible="{Binding IsPageRendering}"
+										 IsEnabled="{Binding IsPageRendering}"
+										 HorizontalAlignment="Left"
+										 VerticalAlignment="Top">
+									<progRing:ProgressRing Width="50"
+														   Height="50"
+														   IsActive="{Binding IsPageRendering}"
+														   Foreground="{DynamicResource SystemAccentColor}"/>
+								</Viewbox>
 
 								<rendering:TiledPdfPageControl TileRenderService="{Binding TileRenderService}"
                                                                Picture="{Binding PdfPicture}"

@@ -61,6 +61,8 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
     [NotifyPropertyChangedFor(nameof(ThumbnailSize))]
     [NotifyPropertyChangedFor(nameof(DisplayWidth))]
     [NotifyPropertyChangedFor(nameof(DisplayHeight))]
+    [NotifyPropertyChangedFor(nameof(ProgressRingSize))]
+    [NotifyPropertyChangedFor(nameof(ProgressRingMargin))]
     private Size _size;
 
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(IsThumbnailRendering))]
@@ -70,7 +72,10 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty] private bool _isRotating;
 
-    [ObservableProperty] [NotifyPropertyChangedFor(nameof(IsPageVisible))]
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsPageVisible))]
+    [NotifyPropertyChangedFor(nameof(ProgressRingSize))]
+    [NotifyPropertyChangedFor(nameof(ProgressRingMargin))]
     private Rect? _visibleArea;
 
     [ObservableProperty]
@@ -100,7 +105,33 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
     public double DisplayWidth => IsPortrait ? Size.Width : Size.Height;
 
     public double DisplayHeight => IsPortrait ? Size.Height : Size.Width;
-    
+
+    /// <summary>
+    /// Diameter of the loading progress ring, scaled to the visible area of the page.
+    /// </summary>
+    public double ProgressRingSize
+    {
+        get
+        {
+            Rect area = VisibleArea ?? new Rect(default, Size);
+            double size = 0.10 * Math.Min(area.Width, area.Height);
+            return size < 5 ? 5 : size;
+        }
+    }
+
+    /// <summary>
+    /// Margin that positions the loading progress ring at the center of the visible area of the page.
+    /// </summary>
+    public Thickness ProgressRingMargin
+    {
+        get
+        {
+            Point center = (VisibleArea ?? new Rect(default, Size)).Center;
+            double half = ProgressRingSize / 2.0;
+            return new Thickness(center.X - half, center.Y - half, 0, 0);
+        }
+    }
+
     public bool IsThumbnailRendering => Thumbnail is null;
 
     public bool IsPortrait => Rotation == 0 || Rotation == 180;
