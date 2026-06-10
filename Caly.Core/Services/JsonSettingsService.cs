@@ -25,6 +25,7 @@ using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Threading;
 using Caly.Core.Models;
 using Caly.Core.Services.Interfaces;
 using Caly.Core.Utilities;
@@ -134,6 +135,8 @@ internal sealed class JsonSettingsService : ISettingsService
 
     private void _window_Opened(object? sender, EventArgs e)
     {
+        Debug.ThrowNotOnUiThread();
+        
         if (_target is Window w)
         {
             w.Opened -= _window_Opened;
@@ -169,14 +172,8 @@ internal sealed class JsonSettingsService : ISettingsService
                     mw.RendererDiagnostics.DebugOverlays |= Avalonia.Rendering.RendererDebugOverlays.DirtyRects;
                 }
             }
-            
-            // Set window size and location
-            if (_current.IsMaximised)
-            {
-                mw.WindowState = WindowState.Maximized;
-                return;
-            }
 
+            // Set window size and location
             try
             {
                 var screen = mw.Screens.ScreenFromWindow(mw) ?? mw.Screens.Primary;
@@ -207,22 +204,32 @@ internal sealed class JsonSettingsService : ISettingsService
                 {
                     // Adjust window position as it looks like the top left corner is at
                     // screen center, not the center of window
-                    if (!area.HasValue)
+                    if (area.HasValue)
+                    {
+                        // Center window
+                        double x = area.Value.X + (area.Value.Width - mw.Width) / 2.0;
+                        double y = area.Value.Y + (area.Value.Height - mw.Height) / 2.0;
+                        mw.Position = PixelPoint.FromPoint(new Point(x, y), screen!.Scaling);
+                    }
+                    else
                     {
                         // Could not find screen
                         mw.Position = PixelPoint.FromPoint(new Point(0, 0), screen?.Scaling ?? 1);
-                        return;
                     }
-
-                    // Center window
-                    double x = area.Value.X + (area.Value.Width - mw.Width) / 2.0;
-                    double y = area.Value.Y + (area.Value.Height - mw.Height) / 2.0;
-                    mw.Position = PixelPoint.FromPoint(new Point(x, y), screen!.Scaling);
                 }
             }
             catch (Exception ex)
             {
                 Debug.WriteExceptionToFile(ex);
+            }
+
+            if (_current.IsMaximised)
+            {
+                // We need to post to let Avalonia 'save' the un-maximised height and width
+                Dispatcher.UIThread.Post(() =>
+                {
+                    mw.WindowState = WindowState.Maximized;
+                });
             }
         }
         else
