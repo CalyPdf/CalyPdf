@@ -33,6 +33,7 @@ using static Caly.Core.Models.CalySettings;
 
 namespace Caly.Core.Services;
 
+[JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault)]
 [JsonSerializable(typeof(CalySettings), GenerationMode = JsonSourceGenerationMode.Metadata)]
 internal partial class SourceGenerationContext : JsonSerializerContext;
 
@@ -148,22 +149,22 @@ internal sealed class JsonSettingsService : ISettingsService
             if (_current.Debug is not null)
             {
                 // Set debug UI elements
-                if (_current.Debug.Render == true)
+                if (_current.Debug.Render)
                 {
                     mw.RendererDiagnostics.DebugOverlays |= Avalonia.Rendering.RendererDebugOverlays.RenderTimeGraph;
                 }
 
-                if (_current.Debug.Layout == true)
+                if (_current.Debug.Layout)
                 {
                     mw.RendererDiagnostics.DebugOverlays |= Avalonia.Rendering.RendererDebugOverlays.LayoutTimeGraph;
                 }
 
-                if (_current.Debug.Fps == true)
+                if (_current.Debug.Fps)
                 {
                     mw.RendererDiagnostics.DebugOverlays |= Avalonia.Rendering.RendererDebugOverlays.Fps;
                 }
 
-                if (_current.Debug.DirtyRects == true)
+                if (_current.Debug.DirtyRects)
                 {
                     mw.RendererDiagnostics.DebugOverlays |= Avalonia.Rendering.RendererDebugOverlays.DirtyRects;
                 }

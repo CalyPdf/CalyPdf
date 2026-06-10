@@ -51,6 +51,8 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
     private const string PdfVersionFormat = "0.0";
     private const string DateTimeFormat = "yyyy-MM-dd HH:mm:ss zzz";
 
+    private readonly ISettingsService _settingsService;
+
     private IStorageFile? _storageFile;
     private Stream? _fileStream;
     private PdfDocument? _document;
@@ -81,6 +83,12 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
     /// The application PPI is currently set to 144. We should make that configurable.
     /// </remarks>
     public double PpiScale => 144.0 / 72.0; // 72 should be document dependant, i.e. use PdfPig's UserSpaceUnit.
+
+    public PdfPigDocumentService(ISettingsService settingsService)
+    {
+        _mainToken = _mainCts.Token;
+        _settingsService = settingsService;
+    }
 
     public async Task<int> OpenDocument(IStorageFile? storageFile, string? password, CancellationToken token)
     {
@@ -123,9 +131,13 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
                     var pdfParsingOptions = new ParsingOptions()
                     {
                         SkipMissingFonts = true,
-                        FilterProvider = SkiaRenderingFilterProvider.Instance,
-                        Logger = CalyPdfPigLogger.Instance
+                        FilterProvider = SkiaRenderingFilterProvider.Instance
                     };
+
+                    if (_settingsService.GetSettings().ShowPdfLogs)
+                    {
+                        pdfParsingOptions.Logger = CalyPdfPigLogger.Instance;
+                    }
 
                     if (!string.IsNullOrEmpty(password))
                     {

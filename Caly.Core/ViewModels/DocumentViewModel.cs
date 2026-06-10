@@ -187,8 +187,8 @@ public sealed partial class DocumentViewModel : ViewModelBase
         _buildSearchIndex = null!;
         _searchResultsSource = null!;
 
-        _pdfService = new PdfPigDocumentService();
         _settingsService = new JsonSettingsService(null!);
+        _pdfService = new PdfPigDocumentService(_settingsService);
         _paneSize = 50;
 
         IsPasswordProtected = _pdfService.IsPasswordProtected;

@@ -34,12 +34,7 @@ internal partial class PdfPigDocumentService
     private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(0, 1);
     private readonly CancellationTokenSource _mainCts = new();
     private readonly CancellationToken _mainToken;
-
-    public PdfPigDocumentService()
-    {
-        _mainToken = _mainCts.Token;
-    }
-
+    
     private async Task<T?> ExecuteWithLockAsync<T>(Func<CancellationToken, T> action, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();

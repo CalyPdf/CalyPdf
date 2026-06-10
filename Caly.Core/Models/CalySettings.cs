@@ -40,15 +40,17 @@ public sealed class CalySettings
 
     public int PaneSize { get; set; }
 
+    public bool ShowPdfLogs { get; set; }
+
     public CalySettingsDebug? Debug { get; set; }
 
 
     public sealed class CalySettingsDebug
     {
-        public bool? Render { get; set; }
-        public bool? Layout { get; set; }
-        public bool? Fps { get; set; }
-        public bool? DirtyRects { get; set; }
+        public bool Render { get; set; }
+        public bool Layout { get; set; }
+        public bool Fps { get; set; }
+        public bool DirtyRects { get; set; }
     }
     
     public enum CalySettingsProperty
