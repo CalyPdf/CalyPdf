@@ -311,5 +311,47 @@ namespace Caly.Pdf
                 new PdfPoint(minX, bottomY),
                 new PdfPoint(maxX, bottomY));
         }
+
+        /// <summary>
+        /// Whether the rectangle is mirrored (reflected) rather than a pure rotation of an
+        /// upright rectangle, i.e. "flipped on the X axis", with its top edge below its bottom edge.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Coordinates are assumed to be in the text layer's top-left origin (inverse-Y) space, where a
+        /// correctly-oriented box has its <see cref="PdfRectangle.TopLeft"/> / <see cref="PdfRectangle.TopRight"/>
+        /// visually <em>above</em> (smaller Y than) its <see cref="PdfRectangle.BottomLeft"/> /
+        /// <see cref="PdfRectangle.BottomRight"/>.
+        /// </para>
+        /// </remarks>
+        public static bool IsMirrored(this PdfRectangle rectangle)
+        {
+            double baseX = rectangle.BottomRight.X - rectangle.BottomLeft.X;
+            double baseY = rectangle.BottomRight.Y - rectangle.BottomLeft.Y;
+            double leftX = rectangle.TopLeft.X - rectangle.BottomLeft.X;
+            double leftY = rectangle.TopLeft.Y - rectangle.BottomLeft.Y;
+
+            return baseX * leftY - baseY * leftX > 0;
+        }
+
+        /// <summary>
+        /// Returns an equivalent rectangle that is not <see cref="IsMirrored">mirrored</see>: it covers the
+        /// exact same four corner points, but the top and bottom corners are swapped so the labels are
+        /// upright again. If the rectangle is already upright it is returned unchanged.
+        /// </summary>
+        public static PdfRectangle UnMirror(this PdfRectangle rectangle)
+        {
+            if (!rectangle.IsMirrored())
+            {
+                return rectangle;
+            }
+
+            // Swap top <-> bottom corners (mirror back across the baseline).
+            return new PdfRectangle(
+                rectangle.BottomLeft,   // -> TopLeft
+                rectangle.BottomRight,  // -> TopRight
+                rectangle.TopLeft,      // -> BottomLeft
+                rectangle.TopRight);    // -> BottomRight
+        }
     }
 }

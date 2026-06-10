@@ -51,16 +51,7 @@ namespace Caly.Pdf.TextLayer
         private readonly double _ppiScale;
 
         private readonly AnnotationProvider _annotationProvider;
-
-        /// <summary>
-        /// Cache of Type 3 glyph bounding boxes (from the CharProc's d1 operator),
-        /// keyed by font instance + character code. A <c>null</c> value means the
-        /// CharProc was parsed and either had no d1 or could not be retrieved, so
-        /// the fallback rect should be used. Avoids re-decoding and re-parsing the
-        /// same CharProc stream once per occurrence of the glyph.
-        /// </summary>
-        private readonly Dictionary<(IType3Font Font, int Code), PdfRectangle?> _type3GlyphBoxCache = new();
-
+        
         /// <summary>
         /// The replacement text (/ActualText) of the marked-content sequence currently being
         /// processed, or <see langword="null"/> when none is active. See the PDF specification,
@@ -201,64 +192,51 @@ namespace Caly.Pdf.TextLayer
              * unit in user space, or 1 ⁄ 72 inch. Starting with PDF 1.6, the size of this unit may be specified as greater than
              * 1 ⁄ 72 inch by means of the UserUnit entry of the page dictionary.
              */
-            
-            PdfRectangle? bbox = null;
-            if (font is IType3Font type3Font)
-            {
-                bbox = GetOrComputeType3GlyphBoundingBox(type3Font, code);
-            }
-            
-            bbox ??= new PdfRectangle(0, 0, characterBoundingBox.Width, Math.Max(font.GetAscent(), UserSpaceUnit.PointMultiples));
 
-            var transformedPdfBounds = InverseYAxis(PerformantRectangleTransformer
-                    .Transform(renderingMatrix,
-                        textMatrix,
-                        transformationMatrix,
-                        bbox.Value),
-                _pageHeight);
+            PdfRectangle boundingBox;
+
+            if (font is IType3Font)
+            {
+                // NB: Type 3 fonts are a mess
+                double width = characterBoundingBox.GlyphBounds.BottomRight.X -
+                               characterBoundingBox.GlyphBounds.BottomLeft.X;
+                var baselineBounds = InverseYAxis(PerformantRectangleTransformer
+                        .Transform(renderingMatrix,
+                            textMatrix,
+                            transformationMatrix,
+                            new PdfRectangle(0, 0, width, UserSpaceUnit.PointMultiples)),
+                    _pageHeight);
+
+                boundingBox = InverseYAxis(PerformantRectangleTransformer
+                        .Transform(renderingMatrix,
+                            textMatrix,
+                            transformationMatrix,
+                            characterBoundingBox.GlyphBounds),
+                    _pageHeight)
+                    .UnMirror(); // We make sure the bbox is not mirrored, happens a lot for type 3 fonts
+
+                boundingBox = new PdfRectangle(boundingBox.TopLeft, boundingBox.TopRight,
+                    baselineBounds.BottomLeft, baselineBounds.BottomRight);
+            }
+            else
+            {
+                var bbox = new PdfRectangle(0, 0, characterBoundingBox.Width,
+                    Math.Max(font.GetAscent(), UserSpaceUnit.PointMultiples));
+
+                boundingBox = InverseYAxis(PerformantRectangleTransformer
+                        .Transform(renderingMatrix,
+                            textMatrix,
+                            transformationMatrix,
+                            bbox),
+                    _pageHeight);
+            }
 
             var letter = new PdfLetter(unicode,
-                transformedPdfBounds,
+                boundingBox,
                 (float)pointSize,
                 TextSequence);
 
             _letters.Add(letter);
-        }
-
-        private PdfRectangle? GetOrComputeType3GlyphBoundingBox(IType3Font type3Font, int code)
-        {
-            var key = (type3Font, code);
-            if (_type3GlyphBoxCache.TryGetValue(key, out var cached))
-            {
-                return cached;
-            }
-
-            PdfRectangle? result = null;
-            if (type3Font.TryGetCharProc(code, out var charProcStream))
-            {
-                var contentBytes = charProcStream.Decode(FilterProvider, PdfScanner);
-                var operations = PageContentParser.Parse(PageNumber,
-                    new MemoryInputBytes(contentBytes),
-                    ParsingOptions.Logger);
-
-                for (int i = 0; i < operations.Count; ++i)
-                {
-                    if (operations[i] is Type3SetGlyphWidthAndBoundingBox d1)
-                    {
-                        double left = Math.Min(d1.LowerLeftX, d1.UpperRightX);
-                        double right = Math.Max(d1.LowerLeftX, d1.UpperRightX);
-                        double top = Math.Max(d1.LowerLeftY, d1.UpperRightY);
-                        double bottom = Math.Min(d1.LowerLeftY, d1.UpperRightY);
-                        result = type3Font.GetFontMatrix()
-                            .Transform(new PdfRectangle(left, top, right, bottom))
-                            .NormaliseCaly();
-                        break;
-                    }
-                }
-            }
-
-            _type3GlyphBoxCache[key] = result;
-            return result;
         }
 
         #region BaseStreamProcessor overrides

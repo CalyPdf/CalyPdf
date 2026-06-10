@@ -254,76 +254,44 @@ public sealed class PdfTextLine : IPdfTextElement
 
     private static PdfRectangle GetBoundingBox90(IReadOnlyList<PdfWord> words)
     {
-        var t = double.MinValue;
-        var b = double.MaxValue;
+        GetCornerBounds(words, out double minX, out double maxX, out double minY, out double maxY);
 
-        var r = double.MaxValue;
-        var l = double.MinValue;
-
-        for (var i = 0; i < words.Count; ++i)
-        {
-            var word = words[i];
-
-            if (word.BoundingBox.BottomLeft.X < b)
-            {
-                b = word.BoundingBox.BottomLeft.X;
-            }
-
-            if (word.BoundingBox.BottomRight.Y < r)
-            {
-                r = word.BoundingBox.BottomRight.Y;
-            }
-
-            var right = word.BoundingBox.BottomLeft.X - word.BoundingBox.Height;
-            if (right > t)
-            {
-                t = right;
-            }
-
-            if (word.BoundingBox.BottomLeft.Y > l)
-            {
-                l = word.BoundingBox.BottomLeft.Y;
-            }
-        }
-
-        return new PdfRectangle(new PdfPoint(t, l), new PdfPoint(t, r),
-            new PdfPoint(b, l), new PdfPoint(b, r));
+        return new PdfRectangle(new PdfPoint(minX, maxY), new PdfPoint(minX, minY),
+            new PdfPoint(maxX, maxY), new PdfPoint(maxX, minY));
     }
 
     private static PdfRectangle GetBoundingBox270(IReadOnlyList<PdfWord> words)
     {
-        var t = double.MaxValue;
-        var b = double.MinValue;
-        var l = double.MaxValue;
-        var r = double.MinValue;
+        GetCornerBounds(words, out double minX, out double maxX, out double minY, out double maxY);
 
-        for (var i = 0; i < words.Count; i++)
+        return new PdfRectangle(new PdfPoint(maxX, minY), new PdfPoint(maxX, maxY),
+            new PdfPoint(minX, minY), new PdfPoint(minX, maxY));
+    }
+
+    private static void GetCornerBounds(IReadOnlyList<PdfWord> words,
+        out double minX, out double maxX, out double minY, out double maxY)
+    {
+        minX = double.MaxValue;
+        maxX = double.MinValue;
+        minY = double.MaxValue;
+        maxY = double.MinValue;
+
+        for (var i = 0; i < words.Count; ++i)
         {
-            var word = words[i];
-            if (word.BoundingBox.BottomLeft.X > b)
-            {
-                b = word.BoundingBox.BottomLeft.X;
-            }
-
-            if (word.BoundingBox.BottomLeft.Y < l)
-            {
-                l = word.BoundingBox.BottomLeft.Y;
-            }
-
-            var right = word.BoundingBox.BottomLeft.X + word.BoundingBox.Height;
-            if (right < t)
-            {
-                t = right;
-            }
-
-            if (word.BoundingBox.BottomRight.Y > r)
-            {
-                r = word.BoundingBox.BottomRight.Y;
-            }
+            var bb = words[i].BoundingBox;
+            Expand(bb.BottomLeft, ref minX, ref maxX, ref minY, ref maxY);
+            Expand(bb.BottomRight, ref minX, ref maxX, ref minY, ref maxY);
+            Expand(bb.TopLeft, ref minX, ref maxX, ref minY, ref maxY);
+            Expand(bb.TopRight, ref minX, ref maxX, ref minY, ref maxY);
         }
 
-        return new PdfRectangle(new PdfPoint(t, l), new PdfPoint(t, r),
-            new PdfPoint(b, l), new PdfPoint(b, r));
+        static void Expand(PdfPoint p, ref double minX, ref double maxX, ref double minY, ref double maxY)
+        {
+            if (p.X < minX) minX = p.X;
+            if (p.X > maxX) maxX = p.X;
+            if (p.Y < minY) minY = p.Y;
+            if (p.Y > maxY) maxY = p.Y;
+        }
     }
 
     private static PdfRectangle GetBoundingBoxOther(IReadOnlyList<PdfWord> words)

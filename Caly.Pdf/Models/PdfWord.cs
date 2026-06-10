@@ -473,77 +473,44 @@ public sealed class PdfWord : IPdfTextElement
 
     private static PdfRectangle GetBoundingBox90(IReadOnlyList<PdfLetter> letters)
     {
-        var t = double.MinValue;
-        var b = double.MaxValue;
+        GetCornerBounds(letters, out double minX, out double maxX, out double minY, out double maxY);
 
-        var r = double.MaxValue;
-        var l = double.MinValue;
-
-        for (var i = 0; i < letters.Count; ++i)
-        {
-            var letter = letters[i];
-
-            if (letter.StartBaseLine.X < b)
-            {
-                b = letter.StartBaseLine.X;
-            }
-
-            if (letter.EndBaseLine.Y < r)
-            {
-                r = letter.EndBaseLine.Y;
-            }
-
-            var right = letter.StartBaseLine.X - letter.BoundingBox.Height;
-            if (right > t)
-            {
-                t = right;
-            }
-
-            if (letter.BoundingBox.BottomLeft.Y > l)
-            {
-                l = letter.BoundingBox.BottomLeft.Y;
-            }
-        }
-
-        return new PdfRectangle(new PdfPoint(t, l), new PdfPoint(t, r),
-            new PdfPoint(b, l), new PdfPoint(b, r));
+        return new PdfRectangle(new PdfPoint(minX, maxY), new PdfPoint(minX, minY),
+            new PdfPoint(maxX, maxY), new PdfPoint(maxX, minY));
     }
 
     private static PdfRectangle GetBoundingBox270(IReadOnlyList<PdfLetter> letters)
     {
-        var t = double.MaxValue;
-        var b = double.MinValue;
-        var l = double.MaxValue;
-        var r = double.MinValue;
+        GetCornerBounds(letters, out double minX, out double maxX, out double minY, out double maxY);
 
-        for (var i = 0; i < letters.Count; i++)
+        return new PdfRectangle(new PdfPoint(maxX, minY), new PdfPoint(maxX, maxY),
+            new PdfPoint(minX, minY), new PdfPoint(minX, maxY));
+    }
+
+    private static void GetCornerBounds(IReadOnlyList<PdfLetter> letters,
+        out double minX, out double maxX, out double minY, out double maxY)
+    {
+        minX = double.MaxValue;
+        maxX = double.MinValue;
+        minY = double.MaxValue;
+        maxY = double.MinValue;
+
+        for (var i = 0; i < letters.Count; ++i)
         {
-            var letter = letters[i];
-
-            if (letter.StartBaseLine.X > b)
-            {
-                b = letter.StartBaseLine.X;
-            }
-
-            if (letter.StartBaseLine.Y < l)
-            {
-                l = letter.StartBaseLine.Y;
-            }
-
-            var right = letter.StartBaseLine.X + letter.BoundingBox.Height;
-            if (right < t)
-            {
-                t = right;
-            }
-
-            if (letter.BoundingBox.BottomRight.Y > r)
-            {
-                r = letter.BoundingBox.BottomRight.Y;
-            }
+            var bb = letters[i].BoundingBox;
+            Expand(bb.BottomLeft, ref minX, ref maxX, ref minY, ref maxY);
+            Expand(bb.BottomRight, ref minX, ref maxX, ref minY, ref maxY);
+            Expand(bb.TopLeft, ref minX, ref maxX, ref minY, ref maxY);
+            Expand(bb.TopRight, ref minX, ref maxX, ref minY, ref maxY);
         }
 
-        return new PdfRectangle(new PdfPoint(t, l), new PdfPoint(t, r),
-            new PdfPoint(b, l), new PdfPoint(b, r));
+        static void Expand(PdfPoint p, ref double minX, ref double maxX, ref double minY, ref double maxY)
+        {
+            if (p.X < minX) minX = p.X;
+            if (p.X > maxX) maxX = p.X;
+            if (p.Y < minY) minY = p.Y;
+            if (p.Y > maxY) maxY = p.Y;
+        }
     }
 
     private static PdfRectangle GetBoundingBoxOther(IReadOnlyList<PdfLetter> letters)

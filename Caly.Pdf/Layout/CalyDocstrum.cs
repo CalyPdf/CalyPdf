@@ -55,7 +55,7 @@ public sealed class CalyDocstrum
             return Array.Empty<PdfTextBlock>();
         }
 
-        PdfWord[]? array = words?.Where(w => !w.Value.AsSpan().IsEmpty && !w.Value.AsSpan().IsWhiteSpace()).ToArray();
+        PdfWord[]? array = words?.Where(w => !w.Value.AsSpan().IsEmpty).ToArray();
 
         if (array is null || array.Length == 0)
         {
