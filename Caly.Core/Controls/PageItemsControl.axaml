@@ -43,7 +43,6 @@
 
 							<ScrollViewer.KeyBindings>
 								<KeyBinding Gesture="{x:Static utilities:CalyHotkeyConfiguration.CopyGesture}" Command="{Binding CopyTextCommand}" />
-								<KeyBinding Gesture="{x:Static utilities:CalyHotkeyConfiguration.DocumentSearchGesture}" Command="{Binding ActivateSearchTextTabCommand}" />
 							</ScrollViewer.KeyBindings>
 
 							<LayoutTransformControl Name="PART_LayoutTransformControl"

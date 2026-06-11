@@ -26,7 +26,6 @@ using Avalonia.Threading;
 using Caly.Core.Models;
 using Caly.Core.Services;
 using Caly.Core.Services.Interfaces;
-using Caly.Core.Utilities;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
@@ -57,7 +56,6 @@ public sealed partial class DocumentViewModel : ViewModelBase
 
     private readonly IPdfDocumentService _pdfService;
     private readonly PdfPageService _pdfPageService;
-    private readonly ISettingsService _settingsService;
 
     private readonly CancellationTokenSource _mainCts = new();
     private readonly CancellationToken _mainToken;
@@ -67,10 +65,6 @@ public sealed partial class DocumentViewModel : ViewModelBase
     public bool IsActive => _pdfService.IsActive;
 
     [ObservableProperty] private ObservableCollection<PageViewModel> _pages = [];
-
-    [ObservableProperty] private bool _isDocumentPaneOpen = !CalyExtensions.IsMobilePlatform();
-
-    [ObservableProperty] private double _paneSize;
 
     [ObservableProperty] private int _selectedTabIndex;
 
@@ -162,11 +156,6 @@ public sealed partial class DocumentViewModel : ViewModelBase
     /// </summary>
     public Task<int>? WaitOpenAsync { get; private set; }
 
-    partial void OnPaneSizeChanged(double oldValue, double newValue)
-    {
-        _settingsService.SetProperty(CalySettings.CalySettingsProperty.PaneSize, newValue);
-    }
-
     private readonly IDisposable _searchResultsDisposable;
 
     private readonly ITextSearchService _textSearchService;
@@ -187,9 +176,7 @@ public sealed partial class DocumentViewModel : ViewModelBase
         _buildSearchIndex = null!;
         _searchResultsSource = null!;
 
-        _settingsService = new JsonSettingsService(null!);
-        _pdfService = new PdfPigDocumentService(_settingsService);
-        _paneSize = 50;
+        _pdfService = new PdfPigDocumentService(new JsonSettingsService(null!));
 
         IsPasswordProtected = _pdfService.IsPasswordProtected;
         FileName = _pdfService.FileName;
@@ -199,20 +186,16 @@ public sealed partial class DocumentViewModel : ViewModelBase
     }
 #endif
 
-    public DocumentViewModel(IPdfDocumentService pdfService, PdfPageService pdfPageService, ITextSearchService textSearchService, ISettingsService settingsService)
+    public DocumentViewModel(IPdfDocumentService pdfService, PdfPageService pdfPageService, ITextSearchService textSearchService)
     {
         ArgumentNullException.ThrowIfNull(pdfService, nameof(pdfService));
-        ArgumentNullException.ThrowIfNull(settingsService, nameof(settingsService));
 
         System.Diagnostics.Debug.Assert(pdfService.NumberOfPages == 0);
 
         _mainToken = _mainCts.Token;
         _pdfService = pdfService;
         _pdfPageService = pdfPageService;
-        _settingsService = settingsService;
         _textSearchService = textSearchService;
-
-        _paneSize = _settingsService.GetSettings().PaneSize;
 
         _loadPagesTask = new Lazy<Task>(LoadPages);
         

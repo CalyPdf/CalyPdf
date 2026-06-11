@@ -60,14 +60,6 @@ public partial class DocumentViewModel
     {
         SearchTextCommand.Execute(null);
     }
-
-    [RelayCommand]
-    private void ActivateSearchTextTab()
-    {
-        IsDocumentPaneOpen = true;
-        SelectedTabIndex = 2;
-    }
-
     private async Task BuildSearchIndex()
     {
         _mainToken.ThrowIfCancellationRequested();
@@ -167,7 +159,6 @@ public partial class DocumentViewModel
 
         try
         {
-            ActivateSearchTextTab();
             SelectedTextSearchResult = null;
             SearchResults.Clear();
 

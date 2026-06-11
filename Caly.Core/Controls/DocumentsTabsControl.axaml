@@ -42,7 +42,7 @@
 						<ToggleButton DockPanel.Dock="Left"
                                       VerticalAlignment="Stretch"
                                       Background="Transparent"
-                                      IsChecked="{Binding IsDocumentPaneOpen}">
+                                      IsChecked="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).IsDocumentPaneOpen}">
 							<ToggleButton.Styles>
 								<Style Selector="PathIcon.closed">
 									<Setter Property="Data" Value="{StaticResource pane_close_regular}" />
@@ -54,8 +54,8 @@
 
 							<PathIcon Width="17"
                                       Height="17"
-                                      Classes.opened="{Binding IsDocumentPaneOpen}"
-									  Classes.closed="{Binding !IsDocumentPaneOpen}">
+                                      Classes.opened="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).IsDocumentPaneOpen}"
+									  Classes.closed="{Binding !$parent[UserControl].((vm:MainViewModel)DataContext).IsDocumentPaneOpen}">
 								<ToolTip.Tip>Toggle Sidebar Menu</ToolTip.Tip>
 							</PathIcon>
 						</ToggleButton>
@@ -199,8 +199,8 @@
 
 					<SplitView Grid.Row="1"
 							   Name="PART_SplitView"
-							   IsPaneOpen="{Binding IsDocumentPaneOpen, Mode=TwoWay}"
-							   OpenPaneLength="{Binding PaneSize, Mode=TwoWay}"
+							   IsPaneOpen="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).IsDocumentPaneOpen, Mode=TwoWay}"
+							   OpenPaneLength="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).PaneSize, Mode=TwoWay}"
 							   CompactPaneLength="0"
 							   DisplayMode="CompactInline">
 
@@ -213,7 +213,7 @@
 						<SplitView.Pane>
 
 							<Grid ColumnDefinitions="*,5"
-                                  IsVisible="{Binding IsDocumentPaneOpen}">
+                                  IsVisible="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).IsDocumentPaneOpen}">
 
                                 <Border Grid.Column="0"
                                         BorderThickness="1">
@@ -238,7 +238,7 @@
 											</TabItem.Header>
 											<Grid>
                                                 <controls:ThumbnailItemsControl
-                                                    IsVisible="{Binding IsDocumentPaneOpen}"
+                                                    IsVisible="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).IsDocumentPaneOpen}"
                                                     RefreshThumbnails="{Binding RefreshThumbnailsCommand}"
 													RealisedThumbnails="{Binding RealisedThumbnails}"
 													VisibleThumbnails="{Binding VisibleThumbnails}"

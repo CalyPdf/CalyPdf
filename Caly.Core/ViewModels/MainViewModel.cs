@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using Avalonia.Collections;
+using Caly.Core.Models;
 using Caly.Core.Services.Interfaces;
 using Caly.Core.Utilities;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -49,6 +50,19 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty] private bool _isSettingsPaneOpen;
 
+    /// <summary>
+    /// Whether the document side pane is open. App-level value shared across all documents:
+    /// closing the pane on one document keeps it closed for every document.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool IsDocumentPaneOpen { get; set; } = !CalyExtensions.IsMobilePlatform();
+
+    /// <summary>
+    /// Width of the document side pane. App-level value (shared across all documents) persisted to settings.
+    /// </summary>
+    [ObservableProperty]
+    public partial double PaneSize { get; set; }
+
     public DocumentViewModel? SelectedDocument
     {
         get
@@ -66,7 +80,13 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
     }
 
     public string Version => CalyExtensions.CalyVersion;
-    
+
+    partial void OnPaneSizeChanged(double oldValue, double newValue)
+    {
+        App.Current?.Services?.GetService<ISettingsService>()?
+            .SetProperty(CalySettings.CalySettingsProperty.PaneSize, newValue);
+    }
+
     public MainViewModel()
     {
         _documentCollectionDisposable = PdfDocuments
@@ -193,7 +213,8 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void ActivateSearchTextTab()
     {
-        SelectedDocument?.ActivateSearchTextTabCommand.Execute(null);
+        IsDocumentPaneOpen = true;
+        SelectedDocument?.SelectedTabIndex = 2;
     }
 
     [RelayCommand]

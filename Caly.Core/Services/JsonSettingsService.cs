@@ -29,6 +29,7 @@ using Avalonia.Threading;
 using Caly.Core.Models;
 using Caly.Core.Services.Interfaces;
 using Caly.Core.Utilities;
+using Caly.Core.ViewModels;
 using Caly.Core.Views;
 using static Caly.Core.Models.CalySettings;
 
@@ -171,6 +172,11 @@ internal sealed class JsonSettingsService : ISettingsService
                 {
                     mw.RendererDiagnostics.DebugOverlays |= Avalonia.Rendering.RendererDebugOverlays.DirtyRects;
                 }
+            }
+
+            if (mw.DataContext is MainViewModel vm)
+            {
+                vm.PaneSize = _current.PaneSize;
             }
 
             // Set window size and location
