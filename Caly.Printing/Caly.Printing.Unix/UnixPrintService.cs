@@ -29,6 +29,7 @@ using Caly.Printing.Core;
 using SharpIpp;
 using SharpIpp.Models.Requests;
 using SharpIpp.Protocol.Models;
+using PrintColorMode = SharpIpp.Protocol.Models.PrintColorMode;
 
 namespace Caly.Printing.Unix;
 
@@ -292,10 +293,11 @@ public sealed class UnixPrintService : IPrintService, IDisposable
                 _ => PrintScaling.Fit,
             };
 
+            string? colorMode = IppAttributeMapping.MapColorMode(settings, caps);
             var jobTemplate = new JobTemplateAttributes
             {
-                OrientationRequested = MapToSharpIppOrientation(IppAttributeMapping.MapOrientation(settings, caps)),
-                PrintColorMode = MapToSharpIppColorMode(IppAttributeMapping.MapColorMode(settings, caps)),
+                OrientationRequested = (Orientation?)IppAttributeMapping.MapOrientation(settings, caps),
+                PrintColorMode = colorMode == null ? null : (PrintColorMode?)colorMode, // Careful with PrintColorMode implicit string operator
                 NumberUp = IppAttributeMapping.MapNumberUp(settings, caps),
                 PrintScaling = ippScaling,
             };
@@ -421,25 +423,7 @@ public sealed class UnixPrintService : IPrintService, IDisposable
             }
         }
     }
-
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
-
-    private static Orientation? MapToSharpIppOrientation(int? value) => value switch
-    {
-        3 => Orientation.Portrait,
-        4 => Orientation.Landscape,
-        _ => null,
-    };
-
-    private static SharpIpp.Protocol.Models.PrintColorMode? MapToSharpIppColorMode(string? value) => value switch
-    {
-        "monochrome" => SharpIpp.Protocol.Models.PrintColorMode.Monochrome,
-        "color"      => SharpIpp.Protocol.Models.PrintColorMode.Color,
-        _ => null,
-    };
-
+    
     private static async Task<string> RunProcessAsync(string command, string[] args, CancellationToken token)
     {
         var psi = new System.Diagnostics.ProcessStartInfo(command)
