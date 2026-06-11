@@ -12,7 +12,9 @@ namespace Caly.Core.Services;
 
 internal sealed class SearchValuesTextSearchService : ITextSearchService
 {
-    private const char WordSeparator = ' ';
+    internal const char WordSeparator = '\u2060';
+    internal const char WhiteSpaceProxy = '\u00A0';
+    internal static readonly string SpaceInText = $"{WordSeparator}{WhiteSpaceProxy}{WordSeparator}";
 
     private string?[]? _index;
 
@@ -61,7 +63,21 @@ internal sealed class SearchValuesTextSearchService : ITextSearchService
                 throw new NullReferenceException("Cannot index search on a null PdfTextLayer.");
             }
 
-            _index[p] = string.Join(WordSeparator, textLayer.Select(w => w.Value));
+            _index[p] = string.Join(WordSeparator, textLayer.Select(w =>
+            {
+                string text = w.Value;
+                if (text.Contains(WordSeparator))
+                {
+                    text = text.Replace(WordSeparator, WhiteSpaceProxy);
+                }
+
+                if (text.Contains(' '))
+                {
+                    text = text.Replace(' ', WhiteSpaceProxy);
+                }
+
+                return text; //.Normalize(NormalizationForm.FormKD);
+            }));
             progress.Report(Interlocked.Add(ref done, 1));
         });
     }
@@ -120,7 +136,12 @@ internal sealed class SearchValuesTextSearchService : ITextSearchService
             count--;
         }
 
-        return text;
+        if (text.Contains(' '))
+        {
+            text = text.Replace(' ', WhiteSpaceProxy);
+        }
+
+        return text; //.Normalize(NormalizationForm.FormKD);
     }
 
     private static ReadOnlySpan<char> GetSampleText(string pageText, int startIndex, int length)
@@ -148,7 +169,19 @@ internal sealed class SearchValuesTextSearchService : ITextSearchService
         text = CleanText(text, out int count);
         // END TODO
 
-        var searchValue = SearchValues.Create([text], StringComparison.OrdinalIgnoreCase);
+        int indexAdj = text.StartsWith(WhiteSpaceProxy) ? 1 : 0;
+
+        string[] searchValues;
+        if (text.Contains(WhiteSpaceProxy))
+        {
+            searchValues = [text, text.Replace(WhiteSpaceProxy.ToString(), SpaceInText)];
+        }
+        else
+        {
+            searchValues = [text];
+        }
+        
+        var searchValue = SearchValues.Create(searchValues, StringComparison.OrdinalIgnoreCase);
 
         for (int i = 0; i < _index.Length; ++i)
         {
@@ -184,10 +217,12 @@ internal sealed class SearchValuesTextSearchService : ITextSearchService
                     break;
                 }
 
+                currentSpanIndex += indexAdj;
+
                 lastSpanIndex += currentSpanIndex;
 
                 var wordIndex = pageText.AsSpan(0, lastSpanIndex).Count(WordSeparator);
-
+                
                 int k = lastSpanIndex;
                 pageResults.Add(new TextSearchResult()
                 {

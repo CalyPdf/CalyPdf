@@ -21,6 +21,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using Caly.Core.Services;
 
 namespace Caly.Core.Models;
 
@@ -74,7 +75,18 @@ public sealed class TextSearchResult : IEquatable<TextSearchResult>
         var text = SampleText is null ? ReadOnlySpan<char>.Empty : SampleText();
         if (!text.IsEmpty)
         {
-            return $"...{text}...";
+            string str = $"...{text}...";
+            if (str.Contains(SearchValuesTextSearchService.SpaceInText))
+            {
+                str = str.Replace(SearchValuesTextSearchService.SpaceInText, " ");
+            }
+
+            if (str.Contains(SearchValuesTextSearchService.WordSeparator))
+            {
+                str = str.Replace(SearchValuesTextSearchService.WordSeparator, ' ');
+            }
+
+            return str;
         }
 
         if (Nodes is null)

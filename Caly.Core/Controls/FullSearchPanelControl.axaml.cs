@@ -33,9 +33,11 @@ namespace Caly.Core.Controls;
 /// Control that represents the full search panel for searching text within a PDF document.
 /// </summary>
 [TemplatePart("PART_TextBoxSearch", typeof(TextBox))]
+[TemplatePart("PART_TreeDataGrid", typeof(TreeDataGrid))]
 public sealed class FullSearchPanelControl : TemplatedControl
 {
     private TextBox? _textBoxSearch;
+    private TreeDataGrid? _resultsDataGrid;
 
     public FullSearchPanelControl()
     {
@@ -51,6 +53,7 @@ public sealed class FullSearchPanelControl : TemplatedControl
     {
         base.OnApplyTemplate(e);
 
+        _resultsDataGrid = e.NameScope.FindFromNameScope<TreeDataGrid>("PART_TreeDataGrid");
         _textBoxSearch = e.NameScope.FindFromNameScope<TextBox>("PART_TextBoxSearch");
         _textBoxSearch.KeyDown += TextBoxSearch_OnKeyDown;
         _textBoxSearch.Loaded += TextBox_Loaded;
@@ -90,11 +93,27 @@ public sealed class FullSearchPanelControl : TemplatedControl
         }
     }
 
-    private static void TextBoxSearch_OnKeyDown(object? sender, KeyEventArgs e)
+    private void TextBoxSearch_OnKeyDown(object? sender, KeyEventArgs e)
     {
-        if (sender is TextBox textBox && e.Key == Key.Escape)
+        if (sender is not TextBox textBox)
         {
-            textBox.Clear();
+            return;
+        }
+        
+        switch (e.Key)
+        {
+            case Key.Escape:
+                textBox.Clear();
+                break;
+
+            case Key.Enter:
+            case Key.Down:
+                if (_resultsDataGrid is not null && _resultsDataGrid.IsVisible)
+                {
+                    _ = _resultsDataGrid.Focus(NavigationMethod.Pointer);
+                    _resultsDataGrid.RowSelection?.SelectedIndex = 0;
+                }
+                break;
         }
     }
 }

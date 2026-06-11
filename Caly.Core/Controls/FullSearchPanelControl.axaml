@@ -42,6 +42,8 @@
                                Text="{Binding SearchStatus}" />
 
                     <TreeDataGrid DockPanel.Dock="Bottom"
+                                  Name="PART_TreeDataGrid"
+                                  Focusable="True"
                                   IsVisible="{Binding !!SearchResults.Count}"
                                   Source="{Binding SearchResultsSource}"
                                   ShowColumnHeaders="False"
