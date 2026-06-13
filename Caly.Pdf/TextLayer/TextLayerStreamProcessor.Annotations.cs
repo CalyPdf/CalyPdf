@@ -20,6 +20,7 @@
 
 using Caly.Pdf.Models;
 using UglyToad.PdfPig;
+using UglyToad.PdfPig.Actions;
 using UglyToad.PdfPig.Annotations;
 using UglyToad.PdfPig.Core;
 using UglyToad.PdfPig.Geometry;
@@ -41,7 +42,8 @@ namespace Caly.Pdf.TextLayer
 
         private static bool IsInteractive(Annotation annotation)
         {
-            return annotation.Type == AnnotationType.Link;
+            return annotation.Type == AnnotationType.Link ||
+                   annotation.Type == AnnotationType.Screen;
         }
 
         private static bool IsNoZoom(Annotation annotation)
@@ -76,7 +78,7 @@ namespace Caly.Pdf.TextLayer
                     PdfRectangle transformedBox = InverseYAxis(matrix.Transform(bbox)
                         .NormaliseCaly(), _pageHeight);
 
-                    if (transformedBox.Width <= double.MinValue || transformedBox.Height <= double.MinValue)
+                    if (transformedBox.Width <= 0 || transformedBox.Height <= 0)
                     {
                         continue;
                     }
@@ -90,11 +92,19 @@ namespace Caly.Pdf.TextLayer
                         continue;
                     }
 
+                    // A rendition action (PDF 2.0, 12.6.4.13) on a screen annotation may embed audio to
+                    // play when the annotation is activated. Extract it eagerly here while the scanner
+                    // and filter provider are available; playback happens later in the UI layer.
+                    PdfRenditionMedia? rendition = annotation.Action is RenditionAction renditionAction
+                        ? TryGetRenditionMedia(renditionAction)
+                        : null;
+
                     _pdfAnnotations.Add(new PdfAnnotation()
                     {
                         PpiScale = _ppiScale,
                         BoundingBox = transformedBox,
                         Action = annotation.Action,
+                        Rendition = rendition,
                         Content = annotation.Content,
                         Date = annotation.ModifiedDate,
                         IsInteractive = isInteractive && hasAction

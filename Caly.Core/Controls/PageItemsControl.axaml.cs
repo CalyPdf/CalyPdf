@@ -29,13 +29,16 @@ using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
 using Avalonia.Media.Transformation;
 using Caly.Core.Models;
+using Caly.Core.Services.Interfaces;
 using Caly.Core.Utilities;
 using Caly.Pdf;
 using Caly.Pdf.Models;
 using System;
+using System.IO;
 using System.Linq;
 using System.Windows.Input;
 using Avalonia.Threading;
+using Microsoft.Extensions.DependencyInjection;
 using UglyToad.PdfPig.Actions;
 using UglyToad.PdfPig.Core;
 
@@ -738,6 +741,13 @@ public sealed class PageItemsControl : ItemsControl
                             // Log error
                         }
                         break;
+                    case ActionType.Rendition:
+                        if (annotation.Rendition is { } rendition)
+                        {
+                            HandleRenditionAction(rendition);
+                            return;
+                        }
+                        break;
                 }
             }
 
@@ -764,6 +774,64 @@ public sealed class PageItemsControl : ItemsControl
 
         e.Handled = true;
         e.PreventGestureRecognition();
+    }
+
+    /// <summary>
+    /// Handles a rendition action (PDF 2.0, 12.6.4.13) carrying embedded audio: plays, stops, or
+    /// pauses the clip through the application's <see cref="IAudioPlaybackService"/>.
+    /// </summary>
+    private static void HandleRenditionAction(PdfRenditionMedia rendition)
+    {
+        var audioService = (Application.Current as App)?.Services?.GetService<IAudioPlaybackService>();
+        if (audioService is null)
+        {
+            return;
+        }
+
+        switch (rendition.Operation)
+        {
+            case RenditionOperation.PlayAndAssociate:
+            case RenditionOperation.Play:
+            case RenditionOperation.Resume:
+                // Resume restarts from the beginning: the simple "one clip, restart on click" model
+                // does not retain a paused position. Acceptable - the renditions seen in practice all
+                // use PlayAndAssociate.
+                audioService.Play(rendition.Data, GetMediaExtension(rendition));
+                break;
+
+            case RenditionOperation.Stop:
+            case RenditionOperation.Pause:
+                // Pause is treated as Stop for the same reason. On Windows this could be refined with
+                // MCI "pause"/"resume" if a real pause/resume is ever required.
+                audioService.Stop();
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Derives a file extension (e.g. <c>.mp3</c>) for the embedded media, preferring the embedded file
+    /// name and falling back to the media clip content type.
+    /// </summary>
+    private static string GetMediaExtension(PdfRenditionMedia rendition)
+    {
+        if (!string.IsNullOrEmpty(rendition.FileName))
+        {
+            string ext = Path.GetExtension(rendition.FileName);
+            if (!string.IsNullOrEmpty(ext))
+            {
+                return ext;
+            }
+        }
+
+        return rendition.ContentType switch
+        {
+            "audio/mpeg" or "audio/mp3" => ".mp3",
+            "audio/wav" or "audio/x-wav" or "audio/wave" => ".wav",
+            "audio/mp4" or "audio/m4a" or "audio/x-m4a" => ".m4a",
+            "audio/aac" => ".aac",
+            "audio/aiff" or "audio/x-aiff" => ".aiff",
+            _ => ".mp3" // Reasonable default for an embedded audio rendition.
+        };
     }
 
     private void InteractiveLayerPointerExited(object? sender, PointerEventArgs e)
@@ -916,9 +984,14 @@ public sealed class PageItemsControl : ItemsControl
             if (annotation.IsInteractive)
             {
                 control.SetHandCursor();
-                if (annotation.Action is UriAction uriAction)
+                switch (annotation.Action)
                 {
-                    SetCurrentValue(InteractiveActionOverProperty, $"Open '{uriAction.Uri}'");
+                    case UriAction uriAction:
+                        SetCurrentValue(InteractiveActionOverProperty, $"Open '{uriAction.Uri}'");
+                        break;
+                    case RenditionAction renditionAction:
+                        SetCurrentValue(InteractiveActionOverProperty, $"'{renditionAction.Operation}'");
+                        break;
                 }
 
                 return;

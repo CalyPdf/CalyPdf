@@ -37,6 +37,9 @@
 		<None Update="Documents\Document-PublisherError-1.pdf">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
+		<None Update="Documents\GuitarLovers-LicksRiffs-5v0-en-demo.pdf">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
 	</ItemGroup>
 
 </Project>

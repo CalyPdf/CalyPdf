@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2025 BobLd
+// Copyright (c) 2025 BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,32 +18,29 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-using UglyToad.PdfPig.Actions;
-using UglyToad.PdfPig.Core;
+using System;
 
-namespace Caly.Pdf.Models;
+namespace Caly.Core.Services.Interfaces;
 
-public sealed class PdfAnnotation
+/// <summary>
+/// Plays short audio clips, such as the embedded sounds of a PDF rendition action.
+/// Only one clip plays at a time; starting a new clip stops the previous one.
+/// </summary>
+public interface IAudioPlaybackService : IDisposable
 {
-    public required double PpiScale { get; init; }
+    /// <summary>
+    /// Plays the given encoded audio bytes (e.g. the contents of an <c>.mp3</c> file). Any clip
+    /// currently playing is stopped first. Playback is asynchronous; this method returns immediately.
+    /// </summary>
+    /// <param name="data">The encoded audio file bytes.</param>
+    /// <param name="fileExtension">
+    /// The file extension including the leading dot (e.g. <c>.mp3</c>), used to hint the OS audio
+    /// facility at the format. May be empty.
+    /// </param>
+    void Play(ReadOnlyMemory<byte> data, string fileExtension);
 
     /// <summary>
-    /// The rectangle completely containing the block.
+    /// Stops the clip currently playing, if any.
     /// </summary>
-    public required PdfRectangle BoundingBox { get; init; }
-
-    public PdfAction? Action { get; init; }
-
-    /// <summary>
-    /// The embedded media of a Rendition action, when <see cref="Action"/> is a
-    /// <see cref="UglyToad.PdfPig.Actions.RenditionAction"/> carrying self-contained audio.
-    /// <see langword="null"/> otherwise.
-    /// </summary>
-    public PdfRenditionMedia? Rendition { get; init; }
-
-    public bool IsInteractive { get; init; }
-
-    public string? Content { get; init; }
-
-    public string? Date { get; init; }
+    void Stop();
 }

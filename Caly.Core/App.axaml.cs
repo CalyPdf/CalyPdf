@@ -147,6 +147,7 @@ public partial class App : Application
         services.AddSingleton<IFilesService, FilesService>();
         services.AddSingleton<IDialogService, DialogService>();
         services.AddSingleton<IClipboardService, ClipboardService>();
+        services.AddSingleton<IAudioPlaybackService, AudioPlaybackService>();
         services.AddSingleton<IPdfDocumentsManagerService, PdfDocumentsManagerService>();
 
         services.AddScoped<IPdfDocumentService, PdfPigDocumentService>();
@@ -242,6 +243,9 @@ public partial class App : Application
         {
             disposable.Dispose();
         }
+
+        // Stop any in-flight audio playback and clean up its temp files.
+        (Services?.GetService<IAudioPlaybackService>() as IDisposable)?.Dispose();
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {

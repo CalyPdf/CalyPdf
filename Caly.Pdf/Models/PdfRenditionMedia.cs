@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2025 BobLd
+// Copyright (c) 2025 BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -19,31 +19,34 @@
 // SOFTWARE.
 
 using UglyToad.PdfPig.Actions;
-using UglyToad.PdfPig.Core;
 
 namespace Caly.Pdf.Models;
 
-public sealed class PdfAnnotation
+/// <summary>
+/// The embedded media of a Rendition action (PDF 2.0, 12.6.4.13 "Rendition actions" and 13.2 "Multimedia"),
+/// extracted from a media rendition's media clip. Only self-contained embedded audio is currently supported.
+/// </summary>
+public sealed class PdfRenditionMedia
 {
-    public required double PpiScale { get; init; }
+    /// <summary>
+    /// The decoded media bytes (e.g. the raw contents of the embedded <c>.mp3</c> file).
+    /// </summary>
+    public required byte[] Data { get; init; }
 
     /// <summary>
-    /// The rectangle completely containing the block.
+    /// The media clip content type (the media clip data <c>/CT</c> entry), e.g. <c>audio/mpeg</c>,
+    /// or <see langword="null"/> when absent.
     /// </summary>
-    public required PdfRectangle BoundingBox { get; init; }
-
-    public PdfAction? Action { get; init; }
+    public string? ContentType { get; init; }
 
     /// <summary>
-    /// The embedded media of a Rendition action, when <see cref="Action"/> is a
-    /// <see cref="UglyToad.PdfPig.Actions.RenditionAction"/> carrying self-contained audio.
-    /// <see langword="null"/> otherwise.
+    /// The embedded file name (the file specification <c>/UF</c> or <c>/F</c> entry), e.g.
+    /// <c>lick1p.mp3</c>, or <see langword="null"/> when absent. Useful to derive a file extension.
     /// </summary>
-    public PdfRenditionMedia? Rendition { get; init; }
+    public string? FileName { get; init; }
 
-    public bool IsInteractive { get; init; }
-
-    public string? Content { get; init; }
-
-    public string? Date { get; init; }
+    /// <summary>
+    /// The operation the rendition action requests (the rendition action <c>/OP</c> entry).
+    /// </summary>
+    public required RenditionOperation Operation { get; init; }
 }
