@@ -303,7 +303,8 @@
                                                           ShowColumnHeaders="False"
                                                           CanUserSortColumns="False"
                                                           HorizontalAlignment="Stretch"
-                                                          AutoScrollHorizontally="False"/>
+                                                          AutoScrollHorizontally="False"
+                                                          AutoScrollSelectionIntoView="True"/>
 										</TabItem>
 
 										<!-- Search tab -->
