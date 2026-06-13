@@ -386,15 +386,19 @@ public sealed class PageItemsControl : ItemsControl
 
         if (offsetPdfCoord)
         {
-            if (pageItem.Rotation == 0)
+            switch (pageItem.Rotation)
             {
-                yOffset = pageItem.Bounds.Height - yOffset;
-            }
-            else
-            {
-                // Page wa rotated by user.
-                // Pdf coordinates are not relevant anymore, we just scroll to the top of the page.
-                yOffset = 0;
+                case 0:
+                    // Upright: distance from the top edge.
+                    yOffset = pageItem.Bounds.Height - yOffset;
+                    break;
+                case 180:
+                    // The PDF bottom is now at the page top, so the offset is already the distance from the top.
+                    break;
+                default:
+                    // 90 / 270: the offset maps to the horizontal axis, which we cannot honour. Scroll to the top.
+                    yOffset = 0;
+                    break;
             }
         }
 
