@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2025 BobLd
+﻿// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,6 +20,7 @@
 
 using UglyToad.PdfPig.Actions;
 using UglyToad.PdfPig.Core;
+using UglyToad.PdfPig.Graphics.Colors;
 
 namespace Caly.Pdf.Models;
 
@@ -39,4 +40,14 @@ public sealed class PdfAnnotation
     public string? Content { get; init; }
 
     public string? Date { get; init; }
+
+    /// <summary>
+    /// Represents a colour used for the following purposes:
+    /// <list type="bullet">
+    /// <item>The background of the annotation’s icon when closed.</item>
+    /// <item>The title bar of the annotation’s popup window.</item>
+    /// <item>The border of a link annotation.</item>
+    /// </list>
+    /// </summary>
+    public IColor? Colour { get; init; }
 }

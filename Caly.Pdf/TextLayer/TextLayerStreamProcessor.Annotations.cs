@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2025 BobLd
+﻿// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -22,7 +22,7 @@ using Caly.Pdf.Models;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Annotations;
 using UglyToad.PdfPig.Core;
-using UglyToad.PdfPig.Geometry;
+using UglyToad.PdfPig.Graphics.Colors;
 using UglyToad.PdfPig.Tokens;
 
 namespace Caly.Pdf.TextLayer
@@ -76,7 +76,7 @@ namespace Caly.Pdf.TextLayer
                     PdfRectangle transformedBox = InverseYAxis(matrix.Transform(bbox)
                         .NormaliseCaly(), _pageHeight);
 
-                    if (transformedBox.Width <= double.MinValue || transformedBox.Height <= double.MinValue)
+                    if (transformedBox.Area <= double.Epsilon)
                     {
                         continue;
                     }
@@ -90,6 +90,34 @@ namespace Caly.Pdf.TextLayer
                         continue;
                     }
 
+                    IColor? background = null;
+                    if (annotation.AnnotationDictionary.TryGet<ArrayToken>(NameToken.C, PdfScanner, out var color))
+                    {
+                        var rgb = color.Data.OfType<NumericToken>()
+                            .Select(x => x.Double)
+                            .ToArray();
+                        /*
+                         * The number of array elements determines the colour space in which the colour shall be defined:
+                         * - 0 No colour; transparent
+                         * - 1 DeviceGray
+                         * - 3 DeviceRGB
+                         * - 4 DeviceCMYK 
+                         */
+
+                        switch (rgb.Length)
+                        {
+                            case 1:
+                                background = new GrayColor(rgb[0]);
+                                break;
+                            case 3:
+                                background = new RGBColor(rgb[0], rgb[1], rgb[2]);
+                                break;
+                            case 4:
+                                background = new CMYKColor(rgb[0], rgb[1], rgb[2], rgb[3]);
+                                break;
+                        }
+                    }
+
                     _pdfAnnotations.Add(new PdfAnnotation()
                     {
                         PpiScale = _ppiScale,
@@ -97,7 +125,8 @@ namespace Caly.Pdf.TextLayer
                         Action = annotation.Action,
                         Content = annotation.Content,
                         Date = annotation.ModifiedDate,
-                        IsInteractive = isInteractive && hasAction
+                        IsInteractive = isInteractive && hasAction,
+                        Colour = background
                     });
                 }
             }

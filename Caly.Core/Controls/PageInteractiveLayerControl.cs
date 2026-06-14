@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2025 BobLd
+﻿// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -29,6 +30,8 @@ using Caly.Core.Utilities;
 using Caly.Pdf.Models;
 using System.Collections.Generic;
 using System.Linq;
+using Avalonia.Markup.Xaml.MarkupExtensions;
+using Avalonia.Styling;
 using UglyToad.PdfPig.Core;
 
 namespace Caly.Core.Controls;
@@ -46,6 +49,10 @@ public sealed class PageInteractiveLayerControl : Control
 
     private static readonly ImmutableSolidColorBrush SelectionBrush = new(SelectionColor);
     private static readonly ImmutableSolidColorBrush SearchBrush = new(SearchColor);
+
+    private const string AnnotationFlyoutClass = "calyAnnotationFlyout";
+
+    private const string AnnotationFlyoutBackgroundKey = "CalyAnnotationFlyoutBackground";
 
     public static readonly StyledProperty<PdfTextLayer?> PdfTextLayerProperty =
         AvaloniaProperty.Register<PageInteractiveLayerControl, PdfTextLayer?>(nameof(PdfTextLayer));
@@ -78,6 +85,17 @@ public sealed class PageInteractiveLayerControl : Control
     {
         AffectsRender<PageInteractiveLayerControl>(PdfTextLayerProperty, VisibleAreaProperty,
             SelectedWordsProperty, SearchResultsProperty);
+    }
+
+    public PageInteractiveLayerControl()
+    {
+        Styles.Add(new Style(x => x.OfType<FlyoutPresenter>().Class(AnnotationFlyoutClass))
+        {
+            Setters =
+            {
+                new Setter(TemplatedControl.BackgroundProperty, new DynamicResourceExtension(AnnotationFlyoutBackgroundKey))
+            }
+        });
     }
 
     public IReadOnlyList<PdfRectangle>? SelectedWords
@@ -157,6 +175,7 @@ public sealed class PageInteractiveLayerControl : Control
             return;
         }
 
+        attachedFlyout.FlyoutPresenterClasses.Remove(AnnotationFlyoutClass);
         attachedFlyout.Hide();
         attachedFlyout.Content = null;
     }
@@ -167,13 +186,33 @@ public sealed class PageInteractiveLayerControl : Control
         {
             return;
         }
-
+        
         var contentText = new TextBlock()
         {
             MaxWidth = 200,
             TextWrapping = TextWrapping.Wrap,
             Text = annotation.Content
         };
+
+        if (annotation.Colour is not null)
+        {
+            var rgb = annotation.Colour.ToRGBValues();
+            byte r = Convert.ToByte(rgb.r * 0.5 * 255);
+            byte g = Convert.ToByte(rgb.g * 0.5 * 255);
+            byte b = Convert.ToByte(rgb.b * 0.5 * 255);
+
+            var color = new Color(byte.MaxValue, r, g, b);
+
+            Resources[AnnotationFlyoutBackgroundKey] = new ImmutableSolidColorBrush(color);
+            if (!attachedFlyout.FlyoutPresenterClasses.Contains(AnnotationFlyoutClass))
+            {
+                attachedFlyout.FlyoutPresenterClasses.Add(AnnotationFlyoutClass);
+            }
+        }
+        else
+        {
+            attachedFlyout.FlyoutPresenterClasses.Remove(AnnotationFlyoutClass);
+        }
 
         if (!string.IsNullOrEmpty(annotation.Date))
         {
