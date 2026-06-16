@@ -1,0 +1,24 @@
+[submodule "external/PdfPig"]
+	path = external/PdfPig
+	url = https://github.com/BobLd/PdfPig.git
+	branch = master
+[submodule "external/Tabalonia"]
+	path = external/Tabalonia
+	url = https://github.com/BobLd/Tabalonia.git
+	branch = develop-caly
+[submodule "external/PdfPig.Rendering.Skia"]
+	path = external/PdfPig.Rendering.Skia
+	url = https://github.com/BobLd/PdfPig.Rendering.Skia.git
+	branch = develop-caly
+[submodule "external/UglyToad.PdfPig.Filters.Jbig2.PdfboxJbig2"]
+	path = external/UglyToad.PdfPig.Filters.Jbig2.PdfboxJbig2
+	url = https://github.com/BobLd/UglyToad.PdfPig.Filters.Jbig2.PdfboxJbig2.git
+	branch = develop-caly
+[submodule "external/UglyToad.PdfPig.Filters.Dct.JpegLibrary"]
+	path = external/UglyToad.PdfPig.Filters.Dct.JpegLibrary
+	url = https://github.com/BobLd/UglyToad.PdfPig.Filters.Dct.JpegLibrary.git
+	branch = develop-caly
+[submodule "external/UglyToad.PdfPig.Filters.Jpx.OpenJpeg"]
+	path = external/UglyToad.PdfPig.Filters.Jpx.OpenJpeg
+	url = https://github.com/BobLd/UglyToad.PdfPig.Filters.Jpx.OpenJpeg.git
+	branch = develop-caly
