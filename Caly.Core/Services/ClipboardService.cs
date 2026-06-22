@@ -40,7 +40,8 @@ internal sealed class ClipboardService : IClipboardService
             UnicodeCategory.OpenPunctuation,        // ( [ {
             UnicodeCategory.InitialQuotePunctuation,// “ ‘
             UnicodeCategory.DashPunctuation,        // -
-            UnicodeCategory.ConnectorPunctuation    // _
+            UnicodeCategory.ConnectorPunctuation,   // _
+            UnicodeCategory.SpaceSeparator
         }.ToFrozenSet();
 
     private static readonly FrozenSet<UnicodeCategory> _noSpaceBefore = new HashSet<UnicodeCategory>
@@ -50,7 +51,8 @@ internal sealed class ClipboardService : IClipboardService
             UnicodeCategory.OtherPunctuation,       // , . ! ?
             UnicodeCategory.DashPunctuation,        // -
             UnicodeCategory.MathSymbol,             // + = 
-            UnicodeCategory.CurrencySymbol          // $
+            UnicodeCategory.CurrencySymbol,         // $
+            UnicodeCategory.SpaceSeparator
         }.ToFrozenSet();
 
     private readonly IClipboard _clipboard;
