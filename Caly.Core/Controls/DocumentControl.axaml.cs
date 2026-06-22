@@ -68,6 +68,13 @@ public sealed class DocumentControl : CalyTemplatedControl
             defaultBindingMode: BindingMode.TwoWay);
 
     /// <summary>
+    /// Defines the <see cref="ViewportWidth"/> property.
+    /// </summary>
+    public static readonly StyledProperty<double> ViewportWidthProperty =
+        AvaloniaProperty.Register<DocumentControl, double>(nameof(ViewportWidth),
+            defaultBindingMode: BindingMode.TwoWay);
+
+    /// <summary>
     /// Defines the <see cref="SelectedPageNumber"/> property. Starts at 1.
     /// </summary>
     public static readonly StyledProperty<int?> SelectedPageNumberProperty =
@@ -184,6 +191,16 @@ public sealed class DocumentControl : CalyTemplatedControl
     {
         get => GetValue(ScrollOffsetProperty);
         set => SetValue(ScrollOffsetProperty, value);
+    }
+
+    /// <summary>
+    /// Width of the page viewport in display pixels, surfaced from the page items control
+    /// so the view model can compute a fit-to-width zoom. Independent of <see cref="ZoomLevel"/>.
+    /// </summary>
+    public double ViewportWidth
+    {
+        get => GetValue(ViewportWidthProperty);
+        set => SetValue(ViewportWidthProperty, value);
     }
 
     /// <summary>

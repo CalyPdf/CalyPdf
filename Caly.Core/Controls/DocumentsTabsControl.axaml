@@ -146,6 +146,19 @@
 
 						<controls:VerticalSeparator/>
 
+                        <!-- Fit to Page -->
+                        <Button DockPanel.Dock="Left"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Stretch"
+                                Background="Transparent"
+                                Command="{Binding FitToPageCommand}">
+                            <PathIcon Width="17"
+                                      Height="17"
+                                      Data="{StaticResource arrow_fit_width_regular}">
+                                <ToolTip.Tip>Fit to Page</ToolTip.Tip>
+                            </PathIcon>
+                        </Button>
+
 						<!-- Zoom in / out -->
 						<Button DockPanel.Dock="Left"
 								HorizontalAlignment="Center"
@@ -176,7 +189,7 @@
 								   Text="{Binding ZoomLevel, StringFormat={}{0:0.#%}}"
 								   VerticalAlignment="Center"
 								   HorizontalAlignment="Center"/>
-
+						
 						<controls:VerticalSeparator/>
 
 						<!-- Print -->
