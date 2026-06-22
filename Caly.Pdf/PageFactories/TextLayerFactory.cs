@@ -77,11 +77,8 @@ namespace Caly.Pdf.PageFactories
             TransformationMatrix initialMatrix,
             IReadOnlyList<IGraphicsStateOperation> operations)
         {
-            // Special case where cropbox is outside mediabox: use cropbox instead of intersection
-            var effectiveCropBox = mediaBox.Bounds.Intersect(cropBox.Bounds) ?? cropBox.Bounds;
-
             // Scale to desired PPI
-            effectiveCropBox = _scale.Transform(effectiveCropBox);
+            var effectiveCropBox = _scale.Transform(cropBox.GetVisibleBounds(rotation));
             initialMatrix = initialMatrix.Multiply(in _scale);
 
             var annotationProvider = new AnnotationProvider(PdfScanner,
