@@ -1,6 +1,7 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:controls="using:Caly.Core.Controls"
+                    xmlns:doc="clr-namespace:Caly.Avalonia.Pdf.Document;assembly=Caly.Avalonia.Pdf.Document"
                     xmlns:text="clr-namespace:Caly.Avalonia.Pdf.Text;assembly=Caly.Avalonia.Pdf.Text"
                     xmlns:vm="clr-namespace:Caly.Core.ViewModels"
                     xmlns:progRing="clr-namespace:AvaloniaProgressRing;assembly=AvaloniaProgressRing"
@@ -9,14 +10,14 @@
 
     <Design.PreviewWith>
 		<StackPanel Width="400" Height="400">
-			<controls:PageItem x:DataType="vm:PageViewModel"
+			<doc:PdfPageView x:DataType="vm:PageViewModel"
                                Picture="{Binding PdfPicture}"
                                IsPageRendering="{Binding IsPageRendering}"/>
 		</StackPanel>
 	</Design.PreviewWith>
 
-	<ControlTheme x:Key="{x:Type controls:PageItem}"
-                  TargetType="controls:PageItem"
+	<ControlTheme x:Key="{x:Type doc:PdfPageView}"
+                  TargetType="doc:PdfPageView"
                   x:DataType="vm:PageViewModel">
 
         <Setter Property="Margin" Value="0,0,0,5"/>
@@ -34,7 +35,7 @@
 		<Setter Property="ContextFlyout">
 			<MenuFlyout>
 				<MenuItem Header="{DynamicResource StringTextFlyoutCopyText}"
-                          Command="{Binding $parent[controls:PageItemsControl].((vm:DocumentViewModel)DataContext).CopyTextCommand}"
+                          Command="{Binding $parent[doc:PdfDocumentView].((vm:DocumentViewModel)DataContext).CopyTextCommand}"
                           InputGesture="{x:Static utilities:CalyHotkeyConfiguration.CopyGesture}"/>
 
 				<Separator/>
@@ -98,7 +99,7 @@
                                                                IsPageVisible="{Binding IsPageVisible}"
                                                                PageNumber="{Binding PageNumber}"
                                                                PageDisplaySize="{Binding Size}"
-                                                               ZoomLevel="{Binding $parent[controls:PageItemsControl].ZoomLevel}"
+                                                               ZoomLevel="{Binding $parent[doc:PdfDocumentView].ZoomLevel}"
                                                                HorizontalAlignment="Stretch"
                                                                VerticalAlignment="Stretch"/>
 

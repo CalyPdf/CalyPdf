@@ -1,6 +1,7 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="using:Caly.Core.Controls"
+                    xmlns:doc="clr-namespace:Caly.Avalonia.Pdf.Document;assembly=Caly.Avalonia.Pdf.Document"
         xmlns:vm="clr-namespace:Caly.Core.ViewModels"
         xmlns:progRing="clr-namespace:AvaloniaProgressRing;assembly=AvaloniaProgressRing"
         xmlns:utilities="clr-namespace:Caly.Core.Utilities">
@@ -44,7 +45,7 @@
                     </Grid.KeyBindings>
 
                     <!-- The pages control -->
-                    <controls:PageItemsControl Name="PART_PageItemsControl"
+                    <doc:PdfDocumentView Name="PART_PageItemsControl"
                                                HorizontalAlignment="Stretch"
                                                ItemsSource="{TemplateBinding ItemsSource}"
                                                PageCount="{TemplateBinding PageCount}"

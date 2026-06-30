@@ -28,6 +28,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.VisualTree;
+using Caly.Avalonia.Pdf.Document;
 using Caly.Core.Models;
 using Caly.Core.Utilities;
 
@@ -38,10 +39,10 @@ namespace Caly.Core.Controls;
 /// <summary>
 /// Control that represents a PDF document.
 /// </summary>
-[TemplatePart("PART_PageItemsControl", typeof(PageItemsControl))]
+[TemplatePart("PART_PageItemsControl", typeof(PdfDocumentView))]
 public sealed class DocumentControl : CalyTemplatedControl
 {
-    private PageItemsControl? _pageItemsControl;
+    private PdfDocumentView? _pageItemsControl;
 
     /// <summary>
     /// Defines the <see cref="ItemsSource"/> property.
@@ -321,7 +322,21 @@ public sealed class DocumentControl : CalyTemplatedControl
     protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
     {
         base.OnApplyTemplate(e);
-        _pageItemsControl = e.NameScope.FindFromNameScope<PageItemsControl>("PART_PageItemsControl");
+        _pageItemsControl = e.NameScope.FindFromNameScope<PdfDocumentView>("PART_PageItemsControl");
+        _pageItemsControl.LinkActivated -= OnLinkActivated;
+        _pageItemsControl.LinkActivated += OnLinkActivated;
+    }
+
+    private void OnLinkActivated(object? sender, PdfLinkActivatedEventArgs e)
+    {
+        if (e.Uri is not null)
+        {
+            CalyExtensions.OpenUriAsync(e.Uri.ToString());
+        }
+        else if (e.DestinationPage.HasValue)
+        {
+            GoToPage(e.DestinationPage.Value, e.DestinationTop ?? 0, e.DestinationTop.HasValue);
+        }
     }
 
     /// <summary>
@@ -342,12 +357,12 @@ public sealed class DocumentControl : CalyTemplatedControl
     /// </summary>
     /// <param name="pageNumber">The page number. Starts at 1.</param>
     /// <returns>The page control, or <c>null</c> if not found.</returns>
-    public PageItem? GetPageItem(int pageNumber)
+    public PdfPageView? GetPageItem(int pageNumber)
     {
         return _pageItemsControl?.GetPageItem(pageNumber);
     }
 
-    public PageItem? GetPageItemOver(PointerEventArgs e)
+    public PdfPageView? GetPageItemOver(PointerEventArgs e)
     {
         return _pageItemsControl?.GetPageItemOver(e);
     }

@@ -1959,7 +1959,7 @@ public sealed class PdfDocumentView : ItemsControl
         }
     }
 
-    internal void ZoomTo(double dZoom, Point point)
+    public void ZoomTo(double dZoom, Point point)
     {
         if (LayoutTransform is null || Scroll is null)
         {
