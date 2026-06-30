@@ -22,6 +22,7 @@ using System;
 using System.Threading;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Metadata;
 using Avalonia.Platform;
@@ -203,9 +204,19 @@ namespace Caly.Avalonia.Pdf.Rendering;
             AvaloniaProperty.Register<SkiaPdfPageControl, bool>(nameof(ShowDiagnosticsOverlay));
 
         /// <summary>
+        /// Defines the <see cref="RenderFailed"/> routed event.
+        /// </summary>
+        public static readonly RoutedEvent<PdfRenderErrorEventArgs> RenderFailedEvent =
+            RoutedEvent.Register<SkiaPdfPageControl, PdfRenderErrorEventArgs>(nameof(RenderFailed), RoutingStrategies.Direct);
+
+        /// <summary>
         /// Raised when an exception occurs while rendering on the render thread.
         /// </summary>
-        public event EventHandler<PdfRenderErrorEventArgs>? RenderFailed;
+        public event EventHandler<PdfRenderErrorEventArgs>? RenderFailed
+        {
+            add => AddHandler(RenderFailedEvent, value);
+            remove => RemoveHandler(RenderFailedEvent, value);
+        }
 
         /// <summary>
         /// Gets or sets the <see cref="SKPicture"/> picture.
@@ -282,6 +293,6 @@ namespace Caly.Avalonia.Pdf.Rendering;
             }
 
             context.Custom(new SkiaDrawOperation(viewPort, PpiScale, picture, ShowDiagnosticsOverlay,
-                ex => Dispatcher.UIThread.Post(() => RenderFailed?.Invoke(this, new PdfRenderErrorEventArgs(ex)))));
+                ex => Dispatcher.UIThread.Post(() => RaiseEvent(new PdfRenderErrorEventArgs(RenderFailedEvent, ex)))));
         }
     }

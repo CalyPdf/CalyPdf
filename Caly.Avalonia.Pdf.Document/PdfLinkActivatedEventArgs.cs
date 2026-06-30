@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using System;
+using Avalonia.Interactivity;
 
 namespace Caly.Avalonia.Pdf.Document;
 
@@ -27,13 +28,14 @@ namespace Caly.Avalonia.Pdf.Document;
 /// Carries either an external <see cref="Uri"/> or an in-document GoTo destination.
 /// The host decides how to act on it (open the URI, navigate to the page, etc.).
 /// </summary>
-public sealed class PdfLinkActivatedEventArgs : EventArgs
+public sealed class PdfLinkActivatedEventArgs : RoutedEventArgs
 {
     /// <summary>External link target.</summary>
-    public PdfLinkActivatedEventArgs(Uri uri) => Uri = uri;
+    public PdfLinkActivatedEventArgs(RoutedEvent routedEvent, Uri uri) : base(routedEvent) => Uri = uri;
 
     /// <summary>In-document GoTo destination (1-based page, optional Y in PDF coordinates).</summary>
-    public PdfLinkActivatedEventArgs(int destinationPage, double? destinationTop)
+    public PdfLinkActivatedEventArgs(RoutedEvent routedEvent, int destinationPage, double? destinationTop)
+        : base(routedEvent)
     {
         DestinationPage = destinationPage;
         DestinationTop = destinationTop;

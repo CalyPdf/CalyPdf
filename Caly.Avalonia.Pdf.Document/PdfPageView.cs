@@ -25,6 +25,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Metadata;
 using Avalonia.Controls.Primitives;
 using Avalonia.Data;
+using Avalonia.Interactivity;
 using Caly.Avalonia.Pdf.Document.Internal;
 using Caly.Avalonia.Pdf.Rendering;
 using Caly.Avalonia.Pdf.Rendering.Tiling;
@@ -108,11 +109,19 @@ public sealed class PdfPageView : ContentControl
             WidthProperty, HeightProperty);
     }
 
+    /// <summary>Defines the <see cref="BeforeRotation"/> routed event.</summary>
+    public static readonly RoutedEvent<RoutedEventArgs> BeforeRotationEvent =
+        RoutedEvent.Register<PdfPageView, RoutedEventArgs>(nameof(BeforeRotation), RoutingStrategies.Bubble);
+
     /// <summary>
     /// Raised synchronously just before a page rotation action executes, so the host
     /// can capture its scroll state before the layout changes.
     /// </summary>
-    public event EventHandler? BeforeRotation;
+    public event EventHandler<RoutedEventArgs>? BeforeRotation
+    {
+        add => AddHandler(BeforeRotationEvent, value);
+        remove => RemoveHandler(BeforeRotationEvent, value);
+    }
 
     public int Rotation
     {
@@ -230,7 +239,7 @@ public sealed class PdfPageView : ContentControl
         {
             if (!change.GetOldValue<bool>() && change.GetNewValue<bool>())
             {
-                BeforeRotation?.Invoke(this, EventArgs.Empty);
+                RaiseEvent(new RoutedEventArgs(BeforeRotationEvent));
             }
         }
     }

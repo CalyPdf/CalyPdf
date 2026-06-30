@@ -1192,17 +1192,25 @@ public sealed class PdfDocumentView : ItemsControl
     public Cursor? IbeamCursor { get => GetValue(IbeamCursorProperty); set => SetValue(IbeamCursorProperty, value); }
     public Cursor? HandCursor { get => GetValue(HandCursorProperty); set => SetValue(HandCursorProperty, value); }
 
+    /// <summary>Defines the <see cref="LinkActivated"/> routed event.</summary>
+    public static readonly RoutedEvent<PdfLinkActivatedEventArgs> LinkActivatedEvent =
+        RoutedEvent.Register<PdfDocumentView, PdfLinkActivatedEventArgs>(nameof(LinkActivated), RoutingStrategies.Bubble);
+
     /// <summary>
     /// Raised when the user activates an external link in the document. In-document GoTo
     /// destinations are navigated internally and do not raise this event.
     /// </summary>
-    public event EventHandler<PdfLinkActivatedEventArgs>? LinkActivated;
+    public event EventHandler<PdfLinkActivatedEventArgs>? LinkActivated
+    {
+        add => AddHandler(LinkActivatedEvent, value);
+        remove => RemoveHandler(LinkActivatedEvent, value);
+    }
 
     private void RaiseLinkActivated(string uriString)
     {
         if (Uri.TryCreate(uriString, UriKind.Absolute, out var uri))
         {
-            LinkActivated?.Invoke(this, new PdfLinkActivatedEventArgs(uri));
+            RaiseEvent(new PdfLinkActivatedEventArgs(LinkActivatedEvent, uri));
         }
     }
 

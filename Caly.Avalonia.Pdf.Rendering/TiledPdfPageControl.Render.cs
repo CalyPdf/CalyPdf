@@ -263,7 +263,7 @@ public partial class TiledPdfPageControl
             : IdleSamplingOptions;
         context.Custom(new TiledDrawOperation(viewPort, cullRect, tileBuffer, entryCount, samplingOptions,
             ShowDiagnosticsOverlay,
-            ex => Dispatcher.UIThread.Post(() => RenderFailed?.Invoke(this, new PdfRenderErrorEventArgs(ex)))));
+            ex => Dispatcher.UIThread.Post(() => RaiseEvent(new PdfRenderErrorEventArgs(RenderFailedEvent, ex)))));
     }
 
     /// <summary>

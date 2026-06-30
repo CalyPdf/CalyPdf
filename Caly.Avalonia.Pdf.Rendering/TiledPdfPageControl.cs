@@ -24,6 +24,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Caly.Avalonia.Pdf.Rendering.Internal;
@@ -102,16 +103,32 @@ public sealed partial class TiledPdfPageControl : Control
     public static readonly StyledProperty<bool> ShowDiagnosticsOverlayProperty =
         AvaloniaProperty.Register<TiledPdfPageControl, bool>(nameof(ShowDiagnosticsOverlay));
 
+    /// <summary>Defines the <see cref="TilesRendered"/> routed event.</summary>
+    public static readonly RoutedEvent<RoutedEventArgs> TilesRenderedEvent =
+        RoutedEvent.Register<TiledPdfPageControl, RoutedEventArgs>(nameof(TilesRendered), RoutingStrategies.Direct);
+
+    /// <summary>Defines the <see cref="RenderFailed"/> routed event.</summary>
+    public static readonly RoutedEvent<PdfRenderErrorEventArgs> RenderFailedEvent =
+        RoutedEvent.Register<TiledPdfPageControl, PdfRenderErrorEventArgs>(nameof(RenderFailed), RoutingStrategies.Direct);
+
     /// <summary>
     /// Raised (coalesced) when newly rendered tiles for this page have become available and the
     /// control has been invalidated to draw them.
     /// </summary>
-    public event EventHandler? TilesRendered;
+    public event EventHandler<RoutedEventArgs>? TilesRendered
+    {
+        add => AddHandler(TilesRenderedEvent, value);
+        remove => RemoveHandler(TilesRenderedEvent, value);
+    }
 
     /// <summary>
     /// Raised when an exception occurs while rendering on the render thread.
     /// </summary>
-    public event EventHandler<PdfRenderErrorEventArgs>? RenderFailed;
+    public event EventHandler<PdfRenderErrorEventArgs>? RenderFailed
+    {
+        add => AddHandler(RenderFailedEvent, value);
+        remove => RemoveHandler(RenderFailedEvent, value);
+    }
 
     public double PpiScale
     {
@@ -530,7 +547,7 @@ public sealed partial class TiledPdfPageControl : Control
             {
                 Interlocked.Exchange(ref _invalidateScheduled, 0);
                 InvalidateVisual();
-                TilesRendered?.Invoke(this, EventArgs.Empty);
+                RaiseEvent(new RoutedEventArgs(TilesRenderedEvent));
             }, DispatcherPriority.Render);
         }
     }

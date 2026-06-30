@@ -19,13 +19,18 @@
 // SOFTWARE.
 
 using System;
+using Avalonia.Interactivity;
 
 namespace Caly.Avalonia.Pdf.Rendering;
 
 /// <summary>Carries an exception raised while rendering a PDF page.</summary>
-public sealed class PdfRenderErrorEventArgs : EventArgs
+public sealed class PdfRenderErrorEventArgs : RoutedEventArgs
 {
-    public PdfRenderErrorEventArgs(Exception exception) => Exception = exception;
+    public PdfRenderErrorEventArgs(RoutedEvent routedEvent, Exception exception)
+        : base(routedEvent)
+    {
+        Exception = exception;
+    }
 
     public Exception Exception { get; }
 }
