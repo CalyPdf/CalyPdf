@@ -23,10 +23,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
-using Caly.Core.Services;
+using System.Threading.Tasks;
 using Caly.Pdf.Models;
 
-namespace Caly.Core.Models;
+namespace Caly.Avalonia.Pdf.Text;
 
 public partial class TextSelection
 {
@@ -88,7 +88,7 @@ public partial class TextSelection
     /// <param name="pdfPageService">The pdf page service.</param>
     /// <param name="token"></param>
     private async IAsyncEnumerable<T> GetPageSelectionAsAsync<T>(int pageNumber, Func<PdfWord, T> processFull,
-        Func<PdfWord, int, int, T> processPartial, PdfPageService pdfPageService, [EnumeratorCancellation] CancellationToken token)
+        Func<PdfWord, int, int, T> processPartial, Func<int, CancellationToken, Task<PdfTextLayer?>> getTextLayerAsync, [EnumeratorCancellation] CancellationToken token)
     {
         System.Diagnostics.Debug.Assert(IsValid);
 
@@ -96,7 +96,7 @@ public partial class TextSelection
         System.Diagnostics.Debug.Assert(pageNumber >= 1 && pageNumber <= NumberOfPages);
 #endif
 
-        var textLayer = await pdfPageService.GetTextLayer(pageNumber, token);
+        var textLayer = await getTextLayerAsync(pageNumber, token);
         ArgumentNullException.ThrowIfNull(textLayer, nameof(textLayer));
         
         var selectedWords = GetSelectedWords(pageNumber, textLayer).ToArray();
@@ -217,15 +217,14 @@ public partial class TextSelection
     /// <param name="pdfPageService">The pdf page service.</param>
     /// <param name="token"></param>
     public async IAsyncEnumerable<T> GetDocumentSelectionAsAsync<T>(Func<PdfWord, T> processFull,
-        Func<PdfWord, int, int, T> processPartial, PdfPageService pdfPageService, [EnumeratorCancellation] CancellationToken token)
+        Func<PdfWord, int, int, T> processPartial, Func<int, CancellationToken, Task<PdfTextLayer?>> getTextLayerAsync, [EnumeratorCancellation] CancellationToken token)
     {
-        Debug.ThrowOnUiThread();
         
         System.Diagnostics.Debug.Assert(IsValid);
 
         foreach (int p in GetSelectedPagesIndexes())
         {
-            await foreach (T b in GetPageSelectionAsAsync(p, processFull, processPartial, pdfPageService, token))
+            await foreach (T b in GetPageSelectionAsAsync(p, processFull, processPartial, getTextLayerAsync, token))
             {
                 yield return b;
             }

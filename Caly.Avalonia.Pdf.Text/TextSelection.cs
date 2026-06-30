@@ -19,11 +19,10 @@
 // SOFTWARE.
 
 using Avalonia;
-using Caly.Core.Events;
 using Caly.Pdf.Models;
 using System;
 
-namespace Caly.Core.Models;
+namespace Caly.Avalonia.Pdf.Text;
 
 // References:
 // - https://www.w3.org/TR/selection-api/

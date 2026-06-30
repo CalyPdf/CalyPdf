@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Caly.Core.Events;
+namespace Caly.Avalonia.Pdf.Text;
 
 public sealed class TextSelectionFocusPageChangedEventArgs : EventArgs
 {
