@@ -25,8 +25,6 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
-using Avalonia.VisualTree;
-using Caly.Core.Utilities;
 using Caly.Pdf.Models;
 using System.Collections.Generic;
 using System.Linq;
@@ -34,7 +32,7 @@ using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Styling;
 using UglyToad.PdfPig.Core;
 
-namespace Caly.Core.Controls;
+namespace Caly.Avalonia.Pdf.Text;
 
 /// <summary>
 /// Control that represents the text layer of a PDF page, handling text selection and interaction.
@@ -44,11 +42,19 @@ public sealed class PageInteractiveLayerControl : Control
     // https://github.com/AvaloniaUI/Avalonia/blob/master/src/Avalonia.Controls/Primitives/TextSelectionCanvas.cs#L62
     // Check caret handle
 
-    private static readonly Color SelectionColor = Color.FromArgb(169, 0x33, 0x99, 0xFF);
-    private static readonly Color SearchColor = Color.FromArgb(120, 255, 0, 0);
+    /// <summary>Defines the <see cref="SelectionBrush"/> property.</summary>
+    public static readonly StyledProperty<IBrush> SelectionBrushProperty =
+        AvaloniaProperty.Register<PageInteractiveLayerControl, IBrush>(nameof(SelectionBrush),
+            new ImmutableSolidColorBrush(Color.FromArgb(169, 0x33, 0x99, 0xFF)));
 
-    private static readonly ImmutableSolidColorBrush SelectionBrush = new(SelectionColor);
-    private static readonly ImmutableSolidColorBrush SearchBrush = new(SearchColor);
+    /// <summary>Defines the <see cref="SearchBrush"/> property.</summary>
+    public static readonly StyledProperty<IBrush> SearchBrushProperty =
+        AvaloniaProperty.Register<PageInteractiveLayerControl, IBrush>(nameof(SearchBrush),
+            new ImmutableSolidColorBrush(Color.FromArgb(120, 255, 0, 0)));
+
+    /// <summary>Defines the <see cref="ShowDiagnosticsOverlay"/> property.</summary>
+    public static readonly StyledProperty<bool> ShowDiagnosticsOverlayProperty =
+        AvaloniaProperty.Register<PageInteractiveLayerControl, bool>(nameof(ShowDiagnosticsOverlay));
 
     private const string AnnotationFlyoutClass = "calyAnnotationFlyout";
 
@@ -84,7 +90,8 @@ public sealed class PageInteractiveLayerControl : Control
     static PageInteractiveLayerControl()
     {
         AffectsRender<PageInteractiveLayerControl>(PdfTextLayerProperty, VisibleAreaProperty,
-            SelectedWordsProperty, SearchResultsProperty);
+            SelectedWordsProperty, SearchResultsProperty,
+            SelectionBrushProperty, SearchBrushProperty, ShowDiagnosticsOverlayProperty);
     }
 
     public PageInteractiveLayerControl()
@@ -128,47 +135,28 @@ public sealed class PageInteractiveLayerControl : Control
         set => SetValue(VisibleAreaProperty, value);
     }
 
-    internal Matrix GetLayoutTransformMatrix()
+    /// <summary>Brush used to paint the selected-text highlight.</summary>
+    public IBrush SelectionBrush
     {
-        return this.FindAncestorOfType<PageItemsControl>()?
-            .LayoutTransform?
-            .LayoutTransform?.Value ?? Matrix.Identity;
+        get => GetValue(SelectionBrushProperty);
+        set => SetValue(SelectionBrushProperty, value);
     }
 
-    internal void SetIbeamCursor()
+    /// <summary>Brush used to paint search-result highlights.</summary>
+    public IBrush SearchBrush
     {
-        Debug.ThrowNotOnUiThread();
-
-        var itemsControl = this.FindAncestorOfType<PageItemsControl>();
-        if (itemsControl is not null && itemsControl.Cursor != App.IbeamCursor)
-        {
-            itemsControl.Cursor = App.IbeamCursor;
-        }
+        get => GetValue(SearchBrushProperty);
+        set => SetValue(SearchBrushProperty, value);
     }
 
-    internal void SetHandCursor()
+    /// <summary>Gets or sets whether the diagnostics overlay (block/line/word/annotation geometry) is drawn. Works in any build configuration.</summary>
+    public bool ShowDiagnosticsOverlay
     {
-        Debug.ThrowNotOnUiThread();
-
-        var itemsControl = this.FindAncestorOfType<PageItemsControl>();
-        if (itemsControl is not null && itemsControl.Cursor != App.HandCursor)
-        {
-            itemsControl.Cursor = App.HandCursor;
-        }
+        get => GetValue(ShowDiagnosticsOverlayProperty);
+        set => SetValue(ShowDiagnosticsOverlayProperty, value);
     }
 
-    internal void SetDefaultCursor()
-    {
-        Debug.ThrowNotOnUiThread();
-
-        var itemsControl = this.FindAncestorOfType<PageItemsControl>();
-        if (itemsControl is not null && itemsControl.Cursor != App.DefaultCursor)
-        {
-            itemsControl.Cursor = App.DefaultCursor;
-        }
-    }
-
-    internal void HideAnnotation()
+    public void HideAnnotation()
     {
         if (FlyoutBase.GetAttachedFlyout(this) is not Flyout attachedFlyout)
         {
@@ -180,7 +168,7 @@ public sealed class PageInteractiveLayerControl : Control
         attachedFlyout.Content = null;
     }
 
-    internal void ShowAnnotation(PdfAnnotation annotation)
+    public void ShowAnnotation(PdfAnnotation annotation)
     {
         if (FlyoutBase.GetAttachedFlyout(this) is not Flyout attachedFlyout)
         {
@@ -246,7 +234,7 @@ public sealed class PageInteractiveLayerControl : Control
             _selectedWordsGeometry = null;
             if (change.NewValue is IReadOnlyCollection<PdfRectangle> rects && rects.Count > 0)
             {
-                _selectedWordsGeometry = rects.Select(r => PdfWordHelpers.GetGeometry(r, true)).ToArray();
+                _selectedWordsGeometry = rects.Select(r => TextGeometry.GetGeometry(r, true)).ToArray();
             }
             else
             {
@@ -258,14 +246,13 @@ public sealed class PageInteractiveLayerControl : Control
             _searchResultsGeometry = null;
             if (change.NewValue is IReadOnlyCollection<PdfRectangle> rects && rects.Count > 0)
             {
-                _searchResultsGeometry = rects.Select(r => PdfWordHelpers.GetGeometry(r, true)).ToArray();
+                _searchResultsGeometry = rects.Select(r => TextGeometry.GetGeometry(r, true)).ToArray();
             }
             else
             {
                 _searchResultsGeometry = null;
             }
         }
-#if DEBUG
         else if (change.Property == PdfTextLayerProperty)
         {
             _annotationsGeometry = null;
@@ -281,7 +268,7 @@ public sealed class PageInteractiveLayerControl : Control
             if (textLayer.Annotations?.Count > 0)
             {
                 _annotationsGeometry = textLayer.Annotations
-                    .Select(a => PdfWordHelpers.GetGeometry(a.BoundingBox, true)).ToArray();
+                    .Select(a => TextGeometry.GetGeometry(a.BoundingBox, true)).ToArray();
             }
 
             if (textLayer.TextBlocks?.Count > 0)
@@ -291,13 +278,13 @@ public sealed class PageInteractiveLayerControl : Control
                 var wordGeometries = new List<StreamGeometry>();
                 foreach (var block in textLayer.TextBlocks)
                 {
-                    blockGeometries.Add(PdfWordHelpers.GetGeometry(block.BoundingBox, true));
+                    blockGeometries.Add(TextGeometry.GetGeometry(block.BoundingBox, true));
                     foreach (var line in block.TextLines)
                     {
-                        lineGeometries.Add(PdfWordHelpers.GetGeometry(line.BoundingBox, true));
+                        lineGeometries.Add(TextGeometry.GetGeometry(line.BoundingBox, true));
                         foreach (var word in line.Words)
                         {
-                            wordGeometries.Add(PdfWordHelpers.GetGeometry(word.BoundingBox, false));
+                            wordGeometries.Add(TextGeometry.GetGeometry(word.BoundingBox, false));
                         }
                     }
                 }
@@ -307,7 +294,6 @@ public sealed class PageInteractiveLayerControl : Control
                 _wordsGeometry = wordGeometries.ToArray();
             }
         }
-#endif
     }
 
     public override void Render(DrawingContext context)
@@ -330,9 +316,10 @@ public sealed class PageInteractiveLayerControl : Control
             return;
         }
 
-#if DEBUG
-        RenderDebug(context);
-#endif
+        if (ShowDiagnosticsOverlay)
+        {
+            RenderDebug(context);
+        }
 
         // Draw search results first
         if (_searchResultsGeometry?.Length > 0)
@@ -363,7 +350,6 @@ public sealed class PageInteractiveLayerControl : Control
         }
     }
 
-#if DEBUG
     private static readonly ImmutableSolidColorBrush AnnotationsBrush = new(Colors.Purple, 0.4);
     private static readonly ImmutablePen AnnotationsPen = new(AnnotationsBrush, 0.5);
     private static readonly ImmutableSolidColorBrush YellowBrush = new(Colors.Yellow, 0.4);
@@ -439,5 +425,4 @@ public sealed class PageInteractiveLayerControl : Control
             }
         }
     }
-#endif
 }
