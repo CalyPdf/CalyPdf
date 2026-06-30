@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFrameworks>net9.0;net10.0</TargetFrameworks>
+		<Nullable>enable</Nullable>
+		<LangVersion>latest</LangVersion>
+		<AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+		<SignAssembly>True</SignAssembly>
+		<AssemblyOriginatorKeyFile>..\Caly.snk</AssemblyOriginatorKeyFile>
+
+		<IsPackable>true</IsPackable>
+		<PackageId>Caly.Avalonia.Pdf.Rendering</PackageId>
+		<Version>0.1.0</Version>
+		<Authors>BobLd</Authors>
+		<Description>Avalonia controls that render a recorded Skia SKPicture as a PDF page: a direct-draw control and a tiled, zoomable control with a background tile-rendering service.</Description>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageTags>avalonia;pdf;skia;skiasharp;rendering;control</PackageTags>
+		<RepositoryUrl>https://github.com/CalyPdf/Caly</RepositoryUrl>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Avalonia" Version="12.0.5" />
+		<PackageReference Include="Avalonia.Skia" Version="12.0.5" />
+		<PackageReference Include="SkiaSharp" Version="3.119.4" />
+	</ItemGroup>
+</Project>
