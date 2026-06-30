@@ -29,6 +29,8 @@ using Caly.Core.ViewModels;
 using SkiaSharp;
 using System;
 
+using Caly.Avalonia.Pdf.Text;
+
 namespace Caly.Core.Controls;
 
 /// <summary>

@@ -7,6 +7,8 @@ using System.Collections.Generic;
 using System.Threading;
 using Caly.Core.Services.Interfaces;
 
+using Caly.Avalonia.Pdf.Text;
+
 namespace Caly.Core.Services;
 
 internal sealed class SelectedDocumentChangedMessage(DocumentViewModel value) : ValueChangedMessage<DocumentViewModel>(value);

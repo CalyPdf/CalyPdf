@@ -1,6 +1,7 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:controls="using:Caly.Core.Controls"
+                    xmlns:text="clr-namespace:Caly.Avalonia.Pdf.Text;assembly=Caly.Avalonia.Pdf.Text"
                     xmlns:vm="clr-namespace:Caly.Core.ViewModels"
                     xmlns:progRing="clr-namespace:AvaloniaProgressRing;assembly=AvaloniaProgressRing"
                     xmlns:utilities="clr-namespace:Caly.Core.Utilities"
@@ -101,7 +102,7 @@
                                                                HorizontalAlignment="Stretch"
                                                                VerticalAlignment="Stretch"/>
 
-								<controls:PageInteractiveLayerControl Name="PART_PageInteractiveLayerControl"
+								<text:PageInteractiveLayerControl Name="PART_PageInteractiveLayerControl"
                                                                       VisibleArea="{Binding VisibleArea}"
                                                                       PdfTextLayer="{Binding PdfTextLayer}"
                                                                       PageNumber="{Binding PageNumber}"
@@ -117,7 +118,7 @@
 												OverlayInputPassThroughElement="{Binding $parent}"/>
 									</FlyoutBase.AttachedFlyout>
 
-								</controls:PageInteractiveLayerControl>
+								</text:PageInteractiveLayerControl>
 
 							</Grid>
 						</LayoutTransformControl>

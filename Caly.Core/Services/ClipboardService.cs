@@ -30,6 +30,8 @@ using Caly.Core.Models;
 using Caly.Core.Services.Interfaces;
 using Caly.Pdf.Models;
 
+using Caly.Avalonia.Pdf.Text;
+
 namespace Caly.Core.Services;
 
 internal sealed class ClipboardService : IClipboardService
@@ -98,7 +100,7 @@ internal sealed class ClipboardService : IClipboardService
         {
             var request = selection.GetDocumentSelectionAsAsync(
                 GetWord, GetPartialWord,
-                pdfPageService, token);
+                pdfPageService.GetTextLayer, token);
 
             await using (var enumerator = request.GetAsyncEnumerator(token))
             {

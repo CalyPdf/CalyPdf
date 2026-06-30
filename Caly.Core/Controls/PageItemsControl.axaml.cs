@@ -28,6 +28,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
 using Avalonia.Media.Transformation;
+using Caly.Avalonia.Pdf.Text;
 using Caly.Core.Models;
 using Caly.Core.Utilities;
 using Caly.Pdf;
@@ -775,7 +776,7 @@ public sealed class PageItemsControl : ItemsControl
             return;
         }
 
-        interactiveLayer.SetDefaultCursor();
+        SetDefaultCursor();
         interactiveLayer.HideAnnotation();
         SetCurrentValue(InteractiveActionOverProperty, null);
     }
@@ -807,7 +808,7 @@ public sealed class PageItemsControl : ItemsControl
             // https://github.com/AvaloniaUI/Avalonia/blob/dadc9ab69284bb228ad460f36d5442b4eee4a82a/src/Avalonia.Controls/Presenters/ScrollContentPresenter.cs#L684
 
             var adjPoint = new Point(50, 50);
-            var matrix = control.GetLayoutTransformMatrix();
+            var matrix = (LayoutTransform?.LayoutTransform?.Value ?? Matrix.Identity);
 
             if (!matrix.IsIdentity && matrix.TryInvert(out var inverted))
             {
@@ -891,7 +892,7 @@ public sealed class PageItemsControl : ItemsControl
         // Always set the focus word
         TextSelection.Extend(control.PageNumber!.Value, word, partialSelectLoc);
 
-        control.SetIbeamCursor();
+        SetIbeamCursor();
 
         _isSelecting = TextSelection.IsSelecting;
     }
@@ -915,7 +916,7 @@ public sealed class PageItemsControl : ItemsControl
 
             if (annotation.IsInteractive)
             {
-                control.SetHandCursor();
+                SetHandCursor();
                 if (annotation.Action is UriAction uriAction)
                 {
                     SetCurrentValue(InteractiveActionOverProperty, $"Open '{uriAction.Uri}'");
@@ -935,18 +936,18 @@ public sealed class PageItemsControl : ItemsControl
             //if (control.PdfTextLayer.GetLine(word)?.IsInteractive == true)
             if (control.PdfTextLayer.GetLine(word) is { IsInteractive: true } line)
             {
-                control.SetHandCursor();
+                SetHandCursor();
                 SetCurrentValue(InteractiveActionOverProperty, $"Open '{line.InteractiveLink}'");
             }
             else
             {
-                control.SetIbeamCursor();
+                SetIbeamCursor();
                 SetCurrentValue(InteractiveActionOverProperty, null);
             }
         }
         else
         {
-            control.SetDefaultCursor();
+            SetDefaultCursor();
             SetCurrentValue(InteractiveActionOverProperty, null);
         }
     }
@@ -1186,6 +1187,24 @@ public sealed class PageItemsControl : ItemsControl
     {
         Debug.ThrowNotOnUiThread();
         Cursor = App.DefaultCursor;
+    }
+
+    internal void SetIbeamCursor()
+    {
+        Debug.ThrowNotOnUiThread();
+        if (Cursor != App.IbeamCursor)
+        {
+            Cursor = App.IbeamCursor;
+        }
+    }
+
+    internal void SetHandCursor()
+    {
+        Debug.ThrowNotOnUiThread();
+        if (Cursor != App.HandCursor)
+        {
+            Cursor = App.HandCursor;
+        }
     }
 
     protected override void OnApplyTemplate(TemplateAppliedEventArgs e)

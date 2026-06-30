@@ -23,7 +23,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Caly.Avalonia.Pdf.Rendering;
 using Caly.Avalonia.Pdf.Rendering.Tiling;
-using Caly.Core.Events;
+using Caly.Avalonia.Pdf.Text;
 using Caly.Core.Models;
 using Caly.Core.Utilities;
 using Caly.Pdf.Models;

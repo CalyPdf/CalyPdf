@@ -31,6 +31,8 @@ using Avalonia.VisualTree;
 using Caly.Core.Models;
 using Caly.Core.Utilities;
 
+using Caly.Avalonia.Pdf.Text;
+
 namespace Caly.Core.Controls;
 
 /// <summary>

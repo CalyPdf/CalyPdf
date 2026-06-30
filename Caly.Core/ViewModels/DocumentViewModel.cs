@@ -41,6 +41,8 @@ using System.Reactive.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
+using Caly.Avalonia.Pdf.Text;
+
 namespace Caly.Core.ViewModels;
 
 /// <summary>

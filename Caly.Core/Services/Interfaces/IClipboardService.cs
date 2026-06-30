@@ -22,6 +22,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Caly.Core.Models;
 
+using Caly.Avalonia.Pdf.Text;
+
 namespace Caly.Core.Services.Interfaces
 {
     internal interface IClipboardService
