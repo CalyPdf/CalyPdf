@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFrameworks>net9.0;net10.0</TargetFrameworks>
+		<Nullable>enable</Nullable>
+		<LangVersion>latest</LangVersion>
+		<AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+		<SignAssembly>True</SignAssembly>
+		<AssemblyOriginatorKeyFile>..\Caly.snk</AssemblyOriginatorKeyFile>
+
+		<IsPackable>true</IsPackable>
+		<PackageId>Caly.Avalonia.Pdf.Document</PackageId>
+		<Version>0.1.0</Version>
+		<Authors>BobLd</Authors>
+		<Description>Avalonia PDF viewer controls: a page container and a virtualized multi-page scroller with zoom, selection, and link events.</Description>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageTags>avalonia;pdf;viewer;control;scroll;zoom</PackageTags>
+		<RepositoryUrl>https://github.com/CalyPdf/Caly</RepositoryUrl>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Avalonia" Version="12.0.5" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Caly.Avalonia.Pdf.Rendering\Caly.Avalonia.Pdf.Rendering.csproj" />
+		<ProjectReference Include="..\Caly.Avalonia.Pdf.Text\Caly.Avalonia.Pdf.Text.csproj" />
+	</ItemGroup>
+</Project>
