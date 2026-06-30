@@ -15,11 +15,16 @@
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<PackageTags>avalonia;pdf;skia;skiasharp;rendering;control</PackageTags>
 		<RepositoryUrl>https://github.com/CalyPdf/Caly</RepositoryUrl>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
 	</PropertyGroup>
 
 	<ItemGroup>
 		<PackageReference Include="Avalonia" Version="12.0.5" />
 		<PackageReference Include="Avalonia.Skia" Version="12.0.5" />
 		<PackageReference Include="SkiaSharp" Version="3.119.4" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="README.md" Pack="true" PackagePath="\" />
 	</ItemGroup>
 </Project>
