@@ -32,6 +32,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Caly.Avalonia.Pdf.Rendering
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Caly.Avalonia.Pdf.Rendering.Tests", "Caly.Avalonia.Pdf.Rendering.Tests\Caly.Avalonia.Pdf.Rendering.Tests.csproj", "{7EFDF061-2A65-4FE5-9ADD-5F8C612C7A3B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Caly.Pdf.Models", "Caly.Pdf.Models\Caly.Pdf.Models.csproj", "{91E2A908-D193-40C7-9A97-912F2EFE19DD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		AOT|Any CPU = AOT|Any CPU
@@ -265,6 +267,24 @@ Global
 		{7EFDF061-2A65-4FE5-9ADD-5F8C612C7A3B}.Release|x64.Build.0 = Release|Any CPU
 		{7EFDF061-2A65-4FE5-9ADD-5F8C612C7A3B}.Release|x86.ActiveCfg = Release|Any CPU
 		{7EFDF061-2A65-4FE5-9ADD-5F8C612C7A3B}.Release|x86.Build.0 = Release|Any CPU
+		{91E2A908-D193-40C7-9A97-912F2EFE19DD}.AOT|Any CPU.ActiveCfg = Debug|Any CPU
+		{91E2A908-D193-40C7-9A97-912F2EFE19DD}.AOT|Any CPU.Build.0 = Debug|Any CPU
+		{91E2A908-D193-40C7-9A97-912F2EFE19DD}.AOT|x64.ActiveCfg = Debug|Any CPU
+		{91E2A908-D193-40C7-9A97-912F2EFE19DD}.AOT|x64.Build.0 = Debug|Any CPU
+		{91E2A908-D193-40C7-9A97-912F2EFE19DD}.AOT|x86.ActiveCfg = Debug|Any CPU
+		{91E2A908-D193-40C7-9A97-912F2EFE19DD}.AOT|x86.Build.0 = Debug|Any CPU
+		{91E2A908-D193-40C7-9A97-912F2EFE19DD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{91E2A908-D193-40C7-9A97-912F2EFE19DD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{91E2A908-D193-40C7-9A97-912F2EFE19DD}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{91E2A908-D193-40C7-9A97-912F2EFE19DD}.Debug|x64.Build.0 = Debug|Any CPU
+		{91E2A908-D193-40C7-9A97-912F2EFE19DD}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{91E2A908-D193-40C7-9A97-912F2EFE19DD}.Debug|x86.Build.0 = Debug|Any CPU
+		{91E2A908-D193-40C7-9A97-912F2EFE19DD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{91E2A908-D193-40C7-9A97-912F2EFE19DD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{91E2A908-D193-40C7-9A97-912F2EFE19DD}.Release|x64.ActiveCfg = Release|Any CPU
+		{91E2A908-D193-40C7-9A97-912F2EFE19DD}.Release|x64.Build.0 = Release|Any CPU
+		{91E2A908-D193-40C7-9A97-912F2EFE19DD}.Release|x86.ActiveCfg = Release|Any CPU
+		{91E2A908-D193-40C7-9A97-912F2EFE19DD}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

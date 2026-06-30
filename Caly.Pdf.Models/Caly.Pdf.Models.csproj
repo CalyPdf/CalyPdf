@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFrameworks>net9.0;net10.0</TargetFrameworks>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<LangVersion>latest</LangVersion>
+		<Version>0.1.0</Version>
+		<SignAssembly>True</SignAssembly>
+		<AssemblyOriginatorKeyFile>..\Caly.snk</AssemblyOriginatorKeyFile>
+
+		<IsPackable>true</IsPackable>
+		<PackageId>Caly.Pdf.Models</PackageId>
+		<Authors>BobLd</Authors>
+		<Description>PDF text-layer model types (text layer, blocks, lines, words, letters, annotations) used by Caly. Non-Avalonia; depends only on PdfPig.</Description>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageTags>pdf;pdfpig;text;layout;models</PackageTags>
+		<RepositoryUrl>https://github.com/CalyPdf/Caly</RepositoryUrl>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="PdfPig" Version="0.1.16-alpha-20260629-34229" />
+		<PackageReference Include="CommunityToolkit.HighPerformance" Version="8.4.2" />
+	</ItemGroup>
+</Project>
