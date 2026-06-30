@@ -38,7 +38,7 @@ internal sealed class FilesService : IFilesService
     public FilesService(IStorageProvider? storageProvider)
     {
 #if DEBUG
-        if (Avalonia.Controls.Design.IsDesignMode)
+        if (global::Avalonia.Controls.Design.IsDesignMode)
         {
             _storageProvider = storageProvider!;
             return;

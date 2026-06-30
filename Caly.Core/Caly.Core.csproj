@@ -37,6 +37,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\Caly.Pdf\Caly.Pdf.csproj" />
+		<ProjectReference Include="..\Caly.Avalonia.Pdf.Rendering\Caly.Avalonia.Pdf.Rendering.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

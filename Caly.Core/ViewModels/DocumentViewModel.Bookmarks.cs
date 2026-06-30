@@ -90,7 +90,7 @@ public partial class DocumentViewModel
         return null;
     }
 
-    private void BookmarksSelectionChanged(object? sender, Avalonia.Controls.Selection.TreeSelectionModelSelectionChangedEventArgs<PdfBookmarkNode> e)
+    private void BookmarksSelectionChanged(object? sender, global::Avalonia.Controls.Selection.TreeSelectionModelSelectionChangedEventArgs<PdfBookmarkNode> e)
     {
         if (_isSyncingBookmarkFromScroll)
         {

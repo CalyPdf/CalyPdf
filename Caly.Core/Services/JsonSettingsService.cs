@@ -155,22 +155,22 @@ internal sealed class JsonSettingsService : ISettingsService
                 // Set debug UI elements
                 if (_current.Debug.Render)
                 {
-                    mw.RendererDiagnostics.DebugOverlays |= Avalonia.Rendering.RendererDebugOverlays.RenderTimeGraph;
+                    mw.RendererDiagnostics.DebugOverlays |= global::Avalonia.Rendering.RendererDebugOverlays.RenderTimeGraph;
                 }
 
                 if (_current.Debug.Layout)
                 {
-                    mw.RendererDiagnostics.DebugOverlays |= Avalonia.Rendering.RendererDebugOverlays.LayoutTimeGraph;
+                    mw.RendererDiagnostics.DebugOverlays |= global::Avalonia.Rendering.RendererDebugOverlays.LayoutTimeGraph;
                 }
 
                 if (_current.Debug.Fps)
                 {
-                    mw.RendererDiagnostics.DebugOverlays |= Avalonia.Rendering.RendererDebugOverlays.Fps;
+                    mw.RendererDiagnostics.DebugOverlays |= global::Avalonia.Rendering.RendererDebugOverlays.Fps;
                 }
 
                 if (_current.Debug.DirtyRects)
                 {
-                    mw.RendererDiagnostics.DebugOverlays |= Avalonia.Rendering.RendererDebugOverlays.DirtyRects;
+                    mw.RendererDiagnostics.DebugOverlays |= global::Avalonia.Rendering.RendererDebugOverlays.DirtyRects;
                 }
             }
 

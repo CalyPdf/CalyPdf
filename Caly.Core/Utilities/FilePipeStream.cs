@@ -50,7 +50,7 @@ public sealed class FilePipeStream : IDisposable, IAsyncDisposable
     public FilePipeStream()
     {
 #if DEBUG
-        if (Avalonia.Controls.Design.IsDesignMode)
+        if (global::Avalonia.Controls.Design.IsDesignMode)
         {
             _pipeServer = new(Guid.NewGuid().ToString(), PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.CurrentUserOnly);
             return;

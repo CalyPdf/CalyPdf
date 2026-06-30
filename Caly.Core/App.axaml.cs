@@ -134,7 +134,7 @@ public partial class App : Application
                 throw new ArgumentNullException(nameof(IClipboard)));
         }
 #if DEBUG
-        else if (ApplicationLifetime is null && Avalonia.Controls.Design.IsDesignMode)
+        else if (ApplicationLifetime is null && global::Avalonia.Controls.Design.IsDesignMode)
         {
             var mainView = new MainView { DataContext = new MainViewModel() };
             services.AddSingleton<Visual>(_ => mainView);

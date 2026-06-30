@@ -4,7 +4,7 @@
                     xmlns:vm="clr-namespace:Caly.Core.ViewModels"
                     xmlns:progRing="clr-namespace:AvaloniaProgressRing;assembly=AvaloniaProgressRing"
                     xmlns:utilities="clr-namespace:Caly.Core.Utilities"
-                    xmlns:rendering="clr-namespace:Caly.Core.Controls.Rendering">
+                    xmlns:rendering="clr-namespace:Caly.Avalonia.Pdf.Rendering;assembly=Caly.Avalonia.Pdf.Rendering">
 
     <Design.PreviewWith>
 		<StackPanel Width="400" Height="400">

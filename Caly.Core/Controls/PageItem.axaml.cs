@@ -23,6 +23,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Metadata;
 using Avalonia.Controls.Primitives;
 using Avalonia.Data;
+using Caly.Avalonia.Pdf.Rendering;
 using Caly.Core.Utilities;
 using Caly.Core.ViewModels;
 using SkiaSharp;

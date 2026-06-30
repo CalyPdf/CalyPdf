@@ -22,6 +22,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls.Notifications;
+using Caly.Avalonia.Pdf.Rendering;
 using Caly.Core.Utilities;
 using CommunityToolkit.Mvvm.Messaging;
 using SkiaSharp;
@@ -69,7 +70,7 @@ internal sealed partial class PdfPigDocumentService
                 .ConfigureAwait(false);
         }, token);
 
-        return pic is null ? null : RefCountable.Create(pic);
+        return pic is null ? null : PdfRef.Create(pic);
     }
 
     private SKPicture? GetTimeOutPicture(int pageNumber, CancellationToken token)

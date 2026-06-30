@@ -21,9 +21,10 @@
 using Avalonia;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
+using Caly.Avalonia.Pdf.Rendering;
+using Caly.Avalonia.Pdf.Rendering.Tiling;
 using Caly.Core.Events;
 using Caly.Core.Models;
-using Caly.Core.Services.Rendering;
 using Caly.Core.Utilities;
 using Caly.Pdf.Models;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -193,7 +194,7 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
     /// </summary>
     public PageViewModel()
     {
-        if (!Avalonia.Controls.Design.IsDesignMode)
+        if (!global::Avalonia.Controls.Design.IsDesignMode)
         {
             throw new InvalidOperationException(
                 $"{typeof(PageViewModel)} empty constructor should only be called in design mode");
