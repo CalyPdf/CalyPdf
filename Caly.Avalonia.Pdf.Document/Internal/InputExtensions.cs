@@ -25,7 +25,7 @@ using Avalonia.Input;
 
 namespace Caly.Avalonia.Pdf.Document.Internal;
 
-internal static class InputExtensions
+internal static class PdfInputExtensions
 {
     public static bool IsMobilePlatform()
     {

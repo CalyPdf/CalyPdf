@@ -29,8 +29,7 @@ using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
 using Avalonia.Media.Transformation;
 using Caly.Avalonia.Pdf.Text;
-using Caly.Core.Models;
-using Caly.Core.Utilities;
+using Caly.Avalonia.Pdf.Document.Internal;
 using Caly.Pdf;
 using Caly.Pdf.Models;
 using System;
@@ -40,19 +39,19 @@ using Avalonia.Threading;
 using UglyToad.PdfPig.Actions;
 using UglyToad.PdfPig.Core;
 
-namespace Caly.Core.Controls;
+namespace Caly.Avalonia.Pdf.Document;
 
 /// <summary>
 /// Control that displays the PDF document pages.
 /// </summary>
 [TemplatePart("PART_ScrollViewer", typeof(ScrollViewer))]
 [TemplatePart("PART_LayoutTransformControl", typeof(LayoutTransformControl))]
-public sealed class PageItemsControl : ItemsControl
+public sealed class PdfDocumentView : ItemsControl
 {
     private const double _zoomFactor = 1.1;
 
     /// <summary>
-    /// The default value for the <see cref="PageItemsControl.ItemsPanel"/> property.
+    /// The default value for the <see cref="PdfDocumentView.ItemsPanel"/> property.
     /// </summary>
     private static readonly FuncTemplate<Panel?> DefaultPanel = new(() => new VirtualizingStackPanel()
     {
@@ -85,89 +84,89 @@ public sealed class PageItemsControl : ItemsControl
     /// <summary>
     /// Defines the <see cref="Scroll"/> property.
     /// </summary>
-    public static readonly DirectProperty<PageItemsControl, ScrollViewer?> ScrollProperty =
-        AvaloniaProperty.RegisterDirect<PageItemsControl, ScrollViewer?>(nameof(Scroll),
+    public static readonly DirectProperty<PdfDocumentView, ScrollViewer?> ScrollProperty =
+        AvaloniaProperty.RegisterDirect<PdfDocumentView, ScrollViewer?>(nameof(Scroll),
             o => o.Scroll);
 
     /// <summary>
     /// Defines the <see cref="LayoutTransform"/> property.
     /// </summary>
-    public static readonly DirectProperty<PageItemsControl, LayoutTransformControl?> LayoutTransformControlProperty =
-        AvaloniaProperty.RegisterDirect<PageItemsControl, LayoutTransformControl?>(nameof(LayoutTransform),
+    public static readonly DirectProperty<PdfDocumentView, LayoutTransformControl?> LayoutTransformControlProperty =
+        AvaloniaProperty.RegisterDirect<PdfDocumentView, LayoutTransformControl?>(nameof(LayoutTransform),
             o => o.LayoutTransform);
 
     /// <summary>
     /// Defines the <see cref="InteractiveActionOver"/> property. Starts at 1.
     /// </summary>
     public static readonly StyledProperty<string?> InteractiveActionOverProperty =
-        AvaloniaProperty.Register<PageItemsControl, string?>(nameof(InteractiveActionOver),
+        AvaloniaProperty.Register<PdfDocumentView, string?>(nameof(InteractiveActionOver),
             defaultBindingMode: BindingMode.OneWayToSource);
 
     /// <summary>
     /// Defines the <see cref="PageCount"/> property.
     /// </summary>
     public static readonly StyledProperty<int> PageCountProperty =
-        AvaloniaProperty.Register<PageItemsControl, int>(nameof(PageCount));
+        AvaloniaProperty.Register<PdfDocumentView, int>(nameof(PageCount));
 
     /// <summary>
     /// Defines the <see cref="SelectedPageNumber"/> property. Starts at 1.
     /// </summary>
     public static readonly StyledProperty<int?> SelectedPageNumberProperty =
-        AvaloniaProperty.Register<PageItemsControl, int?>(nameof(SelectedPageNumber), defaultBindingMode: BindingMode.TwoWay);
+        AvaloniaProperty.Register<PdfDocumentView, int?>(nameof(SelectedPageNumber), defaultBindingMode: BindingMode.TwoWay);
 
     /// <summary>
     /// Defines the <see cref="MinZoomLevel"/> property.
     /// </summary>
     public static readonly StyledProperty<double> MinZoomLevelProperty =
-        AvaloniaProperty.Register<PageItemsControl, double>(nameof(MinZoomLevel));
+        AvaloniaProperty.Register<PdfDocumentView, double>(nameof(MinZoomLevel));
 
     /// <summary>
     /// Defines the <see cref="MaxZoomLevel"/> property.
     /// </summary>
     public static readonly StyledProperty<double> MaxZoomLevelProperty =
-        AvaloniaProperty.Register<PageItemsControl, double>(nameof(MaxZoomLevel), 1);
+        AvaloniaProperty.Register<PdfDocumentView, double>(nameof(MaxZoomLevel), 1);
 
     /// <summary>
     /// Defines the <see cref="ZoomLevel"/> property.
     /// </summary>
     public static readonly StyledProperty<double> ZoomLevelProperty =
-        AvaloniaProperty.Register<PageItemsControl, double>(nameof(ZoomLevel), 1, defaultBindingMode: BindingMode.TwoWay);
+        AvaloniaProperty.Register<PdfDocumentView, double>(nameof(ZoomLevel), 1, defaultBindingMode: BindingMode.TwoWay);
 
     /// <summary>
     /// Defines the <see cref="ScrollOffset"/> property.
     /// </summary>
     public static readonly StyledProperty<Vector> ScrollOffsetProperty =
-        AvaloniaProperty.Register<PageItemsControl, Vector>(nameof(ScrollOffset),
+        AvaloniaProperty.Register<PdfDocumentView, Vector>(nameof(ScrollOffset),
             defaultBindingMode: BindingMode.TwoWay);
 
     /// <summary>
     /// Defines the <see cref="TextSelection"/> property.
     /// </summary>
     public static readonly StyledProperty<TextSelection?> TextSelectionProperty =
-        AvaloniaProperty.Register<PageItemsControl, TextSelection?>(nameof(TextSelection));
+        AvaloniaProperty.Register<PdfDocumentView, TextSelection?>(nameof(TextSelection));
 
     /// <summary>
     /// Defines the <see cref="RealisedPages"/> property. Starts at 1.
     /// </summary>
     public static readonly StyledProperty<Range?> RealisedPagesProperty =
-        AvaloniaProperty.Register<PageItemsControl, Range?>(nameof(RealisedPages), defaultBindingMode: BindingMode.TwoWay);
+        AvaloniaProperty.Register<PdfDocumentView, Range?>(nameof(RealisedPages), defaultBindingMode: BindingMode.TwoWay);
 
     /// <summary>
     /// Defines the <see cref="VisiblePages"/> property. Starts at 1.
     /// </summary>
     public static readonly StyledProperty<Range?> VisiblePagesProperty =
-        AvaloniaProperty.Register<PageItemsControl, Range?>(nameof(VisiblePages), defaultBindingMode: BindingMode.TwoWay);
+        AvaloniaProperty.Register<PdfDocumentView, Range?>(nameof(VisiblePages), defaultBindingMode: BindingMode.TwoWay);
 
     public static readonly StyledProperty<ICommand?> RefreshPagesProperty =
-        AvaloniaProperty.Register<PageItemsControl, ICommand?>(nameof(RefreshPages));
+        AvaloniaProperty.Register<PdfDocumentView, ICommand?>(nameof(RefreshPages));
 
     public static readonly StyledProperty<ICommand?> ClearSelectionProperty =
-        AvaloniaProperty.Register<PageItemsControl, ICommand?>(nameof(ClearSelection));
+        AvaloniaProperty.Register<PdfDocumentView, ICommand?>(nameof(ClearSelection));
 
-    static PageItemsControl()
+    static PdfDocumentView()
     {
-        ItemsPanelProperty.OverrideDefaultValue<PageItemsControl>(DefaultPanel);
-        KeyboardNavigation.TabNavigationProperty.OverrideDefaultValue(typeof(PageItemsControl),
+        ItemsPanelProperty.OverrideDefaultValue<PdfDocumentView>(DefaultPanel);
+        KeyboardNavigation.TabNavigationProperty.OverrideDefaultValue(typeof(PdfDocumentView),
             KeyboardNavigationMode.Once);
     }
 
@@ -189,7 +188,7 @@ public sealed class PageItemsControl : ItemsControl
         set => SetValue(ClearSelectionProperty, value);
     }
 
-    public PageItemsControl()
+    public PdfDocumentView()
     {
         _scrollChangedHandler = (_, e) =>
         {
@@ -298,10 +297,10 @@ public sealed class PageItemsControl : ItemsControl
     /// </summary>
     /// <param name="pageNumber">The page number. Starts at 1.</param>
     /// <returns>The page control, or <c>null</c> if not found.</returns>
-    public PageItem? GetPageItem(int pageNumber)
+    public PdfPageView? GetPageItem(int pageNumber)
     {
         System.Diagnostics.Debug.WriteLine($"GetPageItem {pageNumber}.");
-        if (ContainerFromIndex(pageNumber - 1) is PageItem presenter)
+        if (ContainerFromIndex(pageNumber - 1) is PdfPageView presenter)
         {
             return presenter;
         }
@@ -375,7 +374,7 @@ public sealed class PageItemsControl : ItemsControl
             return;
         }
 
-        if (ContainerFromIndex(pageNumber - 1) is not PageItem pageItem)
+        if (ContainerFromIndex(pageNumber - 1) is not PdfPageView pageItem)
         {
             return;
         }
@@ -423,7 +422,7 @@ public sealed class PageItemsControl : ItemsControl
             return null;
         }
 
-        if (ContainerFromIndex(pageNumber.Value - 1) is not PageItem pageItem)
+        if (ContainerFromIndex(pageNumber.Value - 1) is not PdfPageView pageItem)
         {
             return null;
         }
@@ -457,7 +456,7 @@ public sealed class PageItemsControl : ItemsControl
             return;
         }
 
-        if (ContainerFromIndex(SelectedPageNumber.Value - 1) is not PageItem pageItem)
+        if (ContainerFromIndex(SelectedPageNumber.Value - 1) is not PdfPageView pageItem)
         {
             return;
         }
@@ -471,7 +470,7 @@ public sealed class PageItemsControl : ItemsControl
     protected override void PrepareContainerForItemOverride(Control container, object? item, int index)
     {
         base.PrepareContainerForItemOverride(container, item, index);
-        if (container is not PageItem pageItem)
+        if (container is not PdfPageView pageItem)
         {
             return;
         }
@@ -479,12 +478,12 @@ public sealed class PageItemsControl : ItemsControl
         pageItem.Loaded += PageItem_Loaded;
         pageItem.Unloaded += PageItem_Unloaded;
 
-        pageItem.SetCurrentValue(PageItem.VisibleAreaProperty, null);
+        pageItem.SetCurrentValue(PdfPageView.VisibleAreaProperty, null);
     }
 
     private void PageItem_Unloaded(object? sender, RoutedEventArgs e)
     {
-        if (sender is not PageItem pageItem)
+        if (sender is not PdfPageView pageItem)
         {
             return;
         }
@@ -507,7 +506,7 @@ public sealed class PageItemsControl : ItemsControl
 
     private void PageItem_Loaded(object? sender, RoutedEventArgs e)
     {
-        if (sender is not PageItem pageItem)
+        if (sender is not PdfPageView pageItem)
         {
             return;
         }
@@ -559,7 +558,7 @@ public sealed class PageItemsControl : ItemsControl
 
     private void InteractiveLayerPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        Debug.ThrowNotOnUiThread();
+        UiThread.AssertOnUiThread();
 
         if (TextSelection is null || sender is not PageInteractiveLayerControl control || control.PdfTextLayer is null)
         {
@@ -675,7 +674,7 @@ public sealed class PageItemsControl : ItemsControl
 
     private void InteractiveLayerPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
-        Debug.ThrowNotOnUiThread();
+        UiThread.AssertOnUiThread();
 
         if (sender is not PageInteractiveLayerControl control || control.PdfTextLayer is null)
         {
@@ -710,7 +709,7 @@ public sealed class PageItemsControl : ItemsControl
                         string? uri = ((UriAction)annotation.Action)?.Uri;
                         if (!string.IsNullOrEmpty(uri))
                         {
-                            CalyExtensions.OpenUriAsync(uri);
+                            RaiseLinkActivated(uri);
                             return;
                         }
                         break;
@@ -756,7 +755,7 @@ public sealed class PageItemsControl : ItemsControl
 
                 if (!string.IsNullOrEmpty(line.InteractiveLink))
                 {
-                    CalyExtensions.OpenUriAsync(line.InteractiveLink);
+                    RaiseLinkActivated(line.InteractiveLink);
                 }
             }
         }
@@ -769,7 +768,7 @@ public sealed class PageItemsControl : ItemsControl
 
     private void InteractiveLayerPointerExited(object? sender, PointerEventArgs e)
     {
-        Debug.ThrowNotOnUiThread();
+        UiThread.AssertOnUiThread();
 
         if (sender is not PageInteractiveLayerControl interactiveLayer)
         {
@@ -783,7 +782,7 @@ public sealed class PageItemsControl : ItemsControl
 
     private void InteractiveLayerPointerMoved(object? sender, PointerEventArgs e)
     {
-        Debug.ThrowNotOnUiThread();
+        UiThread.AssertOnUiThread();
 
         // Needs to be on UI thread to access
         if (sender is not PageInteractiveLayerControl control || control.PdfTextLayer is null)
@@ -1026,7 +1025,7 @@ public sealed class PageItemsControl : ItemsControl
     /// </summary>
     private void TrySwitchCapture(PointerEventArgs e)
     {
-        PageItem? endPage = GetPageItemOver(e);
+        PdfPageView? endPage = GetPageItemOver(e);
         if (endPage?.InteractiveLayer is null)
         {
             // Cursor is not over any page, do nothing or
@@ -1041,24 +1040,24 @@ public sealed class PageItemsControl : ItemsControl
     {
         base.ClearContainerForItemOverride(container);
 
-        if (container is not PageItem pageItem)
+        if (container is not PdfPageView pageItem)
         {
             return;
         }
 
         pageItem.Loaded -= PageItem_Loaded;
         pageItem.Unloaded -= PageItem_Unloaded;
-        pageItem.SetCurrentValue(PageItem.VisibleAreaProperty, null);
+        pageItem.SetCurrentValue(PdfPageView.VisibleAreaProperty, null);
     }
 
     protected override Control CreateContainerForItemOverride(object? item, int index, object? recycleKey)
     {
-        return new PageItem();
+        return new PdfPageView();
     }
 
     protected override bool NeedsContainerOverride(object? item, int index, out object? recycleKey)
     {
-        return NeedsContainer<PageItem>(item, out recycleKey);
+        return NeedsContainer<PdfPageView>(item, out recycleKey);
     }
 
     /// <summary>
@@ -1092,7 +1091,7 @@ public sealed class PageItemsControl : ItemsControl
         return PageCount;
     }
 
-    public PageItem? GetPageItemOver(PointerEventArgs e)
+    public PdfPageView? GetPageItemOver(PointerEventArgs e)
     {
         if (Presenter is null)
         {
@@ -1121,7 +1120,7 @@ public sealed class PageItemsControl : ItemsControl
         bool isAfterSelectedPage = false;
 
         // Check selected current page
-        if (ContainerFromIndex(startIndex) is PageItem presenter)
+        if (ContainerFromIndex(startIndex) is PdfPageView presenter)
         {
             if (presenter.Bounds.Contains(point))
             {
@@ -1136,7 +1135,7 @@ public sealed class PageItemsControl : ItemsControl
             // Start with checking forward
             for (int p = startIndex + 1; p < maxPageIndex; ++p)
             {
-                if (ContainerFromIndex(p) is not PageItem cp)
+                if (ContainerFromIndex(p) is not PdfPageView cp)
                 {
                     continue;
                 }
@@ -1157,7 +1156,7 @@ public sealed class PageItemsControl : ItemsControl
             // Continue with checking backward
             for (int p = startIndex - 1; p >= minPageIndex; --p)
             {
-                if (ContainerFromIndex(p) is not PageItem cp)
+                if (ContainerFromIndex(p) is not PdfPageView cp)
                 {
                     continue;
                 }
@@ -1177,33 +1176,63 @@ public sealed class PageItemsControl : ItemsControl
         return null;
     }
 
+    /// <summary>Cursor shown while panning the document. Defaults to <see cref="StandardCursorType.SizeAll"/>.</summary>
+    public static readonly StyledProperty<Cursor?> PanCursorProperty =
+        AvaloniaProperty.Register<PdfDocumentView, Cursor?>(nameof(PanCursor), new Cursor(StandardCursorType.SizeAll));
+
+    /// <summary>Cursor shown over selectable text. Defaults to <see cref="StandardCursorType.Ibeam"/>.</summary>
+    public static readonly StyledProperty<Cursor?> IbeamCursorProperty =
+        AvaloniaProperty.Register<PdfDocumentView, Cursor?>(nameof(IbeamCursor), new Cursor(StandardCursorType.Ibeam));
+
+    /// <summary>Cursor shown over interactive links/annotations. Defaults to <see cref="StandardCursorType.Hand"/>.</summary>
+    public static readonly StyledProperty<Cursor?> HandCursorProperty =
+        AvaloniaProperty.Register<PdfDocumentView, Cursor?>(nameof(HandCursor), new Cursor(StandardCursorType.Hand));
+
+    public Cursor? PanCursor { get => GetValue(PanCursorProperty); set => SetValue(PanCursorProperty, value); }
+    public Cursor? IbeamCursor { get => GetValue(IbeamCursorProperty); set => SetValue(IbeamCursorProperty, value); }
+    public Cursor? HandCursor { get => GetValue(HandCursorProperty); set => SetValue(HandCursorProperty, value); }
+
+    /// <summary>
+    /// Raised when the user activates an external link in the document. In-document GoTo
+    /// destinations are navigated internally and do not raise this event.
+    /// </summary>
+    public event EventHandler<PdfLinkActivatedEventArgs>? LinkActivated;
+
+    private void RaiseLinkActivated(string uriString)
+    {
+        if (Uri.TryCreate(uriString, UriKind.Absolute, out var uri))
+        {
+            LinkActivated?.Invoke(this, new PdfLinkActivatedEventArgs(uri));
+        }
+    }
+
     internal void SetPanCursor()
     {
-        Debug.ThrowNotOnUiThread();
-        Cursor = App.PanCursor;
+        UiThread.AssertOnUiThread();
+        Cursor = PanCursor;
     }
 
     internal void SetDefaultCursor()
     {
-        Debug.ThrowNotOnUiThread();
-        Cursor = App.DefaultCursor;
+        UiThread.AssertOnUiThread();
+        Cursor = Cursor.Default;
     }
 
     internal void SetIbeamCursor()
     {
-        Debug.ThrowNotOnUiThread();
-        if (Cursor != App.IbeamCursor)
+        UiThread.AssertOnUiThread();
+        if (Cursor != IbeamCursor)
         {
-            Cursor = App.IbeamCursor;
+            Cursor = IbeamCursor;
         }
     }
 
     internal void SetHandCursor()
     {
-        Debug.ThrowNotOnUiThread();
-        if (Cursor != App.HandCursor)
+        UiThread.AssertOnUiThread();
+        if (Cursor != HandCursor)
         {
-            Cursor = App.HandCursor;
+            Cursor = HandCursor;
         }
     }
 
@@ -1221,7 +1250,7 @@ public sealed class PageItemsControl : ItemsControl
         LayoutTransform.AddHandler(PointerMovedEvent, OnPointerMoved);
         LayoutTransform.AddHandler(PointerReleasedEvent, OnPointerReleased);
 
-        if (CalyExtensions.IsMobilePlatform())
+        if (PdfInputExtensions.IsMobilePlatform())
         {
             LayoutTransform.GestureRecognizers.Add(new PinchGestureRecognizer());
             LayoutTransform.AddHandler(PinchEvent, _onPinchChangedHandler);
@@ -1246,7 +1275,7 @@ public sealed class PageItemsControl : ItemsControl
             LayoutTransform.RemoveHandler(PointerMovedEvent, OnPointerMoved);
             LayoutTransform.RemoveHandler(PointerReleasedEvent, OnPointerReleased);
 
-            if (CalyExtensions.IsMobilePlatform())
+            if (PdfInputExtensions.IsMobilePlatform())
             {
                 LayoutTransform.RemoveHandler(PinchEvent, _onPinchChangedHandler);
                 LayoutTransform.RemoveHandler(PinchEndedEvent, _onPinchChangedHandler);
@@ -1352,8 +1381,8 @@ public sealed class PageItemsControl : ItemsControl
             return;
         }
 
-        var realised = GetRealizedContainers().OfType<PageItem>();
-        var visibleChildren = ItemsPanelRoot.Children.Where(c => c.IsVisible).OfType<PageItem>();
+        var realised = GetRealizedContainers().OfType<PdfPageView>();
+        var visibleChildren = ItemsPanelRoot.Children.Where(c => c.IsVisible).OfType<PdfPageView>();
 
         foreach (var child in visibleChildren.Except(realised))
         {
@@ -1481,7 +1510,6 @@ public sealed class PageItemsControl : ItemsControl
             return false;
         }
 
-        Debug.AssertIsNullOrScale(LayoutTransform.LayoutTransform?.Value);
 
         // Compute viewport in document coordinates
         double invScale = 1.0 / (LayoutTransform.LayoutTransform?.Value.M11 ?? 1.0);
@@ -1522,21 +1550,21 @@ public sealed class PageItemsControl : ItemsControl
         bool CheckPage(int index, out bool visible)
         {
             visible = false;
-            if (ContainerFromIndex(index) is not PageItem page)
+            if (ContainerFromIndex(index) is not PdfPageView page)
             {
                 return !wasVisible; // Skip unrealised pages but stop after last visible one.
             }
 
             if (!needMoreChecks || page.Bounds.IsEmpty())
             {
-                page.SetCurrentValue(PageItem.VisibleAreaProperty, null);
+                page.SetCurrentValue(PdfPageView.VisibleAreaProperty, null);
                 return wasVisible;
             }
 
             var bounds = GetAlignedBounds(page);
             if (!OverlapsHeight(viewport.Top, viewport.Bottom, bounds.Top, bounds.Bottom))
             {
-                page.SetCurrentValue(PageItem.VisibleAreaProperty, null);
+                page.SetCurrentValue(PdfPageView.VisibleAreaProperty, null);
                 needMoreChecks = !wasVisible;
                 return true;
             }
@@ -1545,7 +1573,7 @@ public sealed class PageItemsControl : ItemsControl
             double overlapArea = intersect.Height * intersect.Width;
             if (overlapArea <= 0)
             {
-                page.SetCurrentValue(PageItem.VisibleAreaProperty, null);
+                page.SetCurrentValue(PdfPageView.VisibleAreaProperty, null);
                 needMoreChecks = !wasVisible;
                 return true;
             }
@@ -1557,7 +1585,7 @@ public sealed class PageItemsControl : ItemsControl
             }
 
             visible = true;
-            page.SetCurrentValue(PageItem.VisibleAreaProperty, ComputeVisibleArea(page, intersect));
+            page.SetCurrentValue(PdfPageView.VisibleAreaProperty, ComputeVisibleArea(page, intersect));
             return true;
         }
 
@@ -1630,15 +1658,15 @@ public sealed class PageItemsControl : ItemsControl
 #if DEBUG
         if (VisiblePages.HasValue)
         {
-            foreach (var item in Items.OfType<ViewModels.PageViewModel>())
+            foreach (var page in GetRealizedContainers().OfType<PdfPageView>())
             {
-                if (item.PageNumber >= VisiblePages.Value.Start.Value && item.PageNumber < VisiblePages.Value.End.Value)
+                if (page.PageNumber >= VisiblePages.Value.Start.Value && page.PageNumber < VisiblePages.Value.End.Value)
                 {
-                    System.Diagnostics.Debug.Assert(item.IsPageVisible);
+                    System.Diagnostics.Debug.Assert(page.IsPageVisible);
                 }
                 else
                 {
-                    System.Diagnostics.Debug.Assert(!item.IsPageVisible);
+                    System.Diagnostics.Debug.Assert(!page.IsPageVisible);
                 }
             }
         }
@@ -1650,7 +1678,7 @@ public sealed class PageItemsControl : ItemsControl
         return true;
     }
 
-    private static Rect ComputeVisibleArea(PageItem page, Rect visible)
+    private static Rect ComputeVisibleArea(PdfPageView page, Rect visible)
     {
         visible = visible.Translate(new Vector(-page.Bounds.Left, -page.Bounds.Top));
         return page.Rotation switch
@@ -1662,7 +1690,7 @@ public sealed class PageItemsControl : ItemsControl
         };
     }
 
-    private static Rect GetAlignedBounds(PageItem page)
+    private static Rect GetAlignedBounds(PdfPageView page)
     {
         var bounds = page.Bounds;
         if (bounds.Height == 0) return bounds;
