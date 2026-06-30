@@ -251,29 +251,6 @@ namespace Caly.Pdf
             return new PdfRectangle(topLeft, topRight, bottomLeft, bottomRight);
         }
 
-        internal static TextOrientation GetTextOrientation(IReadOnlyList<IPdfTextElement> letters)
-        {
-            if (letters.Count == 1)
-            {
-                return letters[0].TextOrientation;
-            }
-
-            TextOrientation tempTextOrientation = letters[0].TextOrientation;
-            if (tempTextOrientation == TextOrientation.Other)
-            {
-                return tempTextOrientation;
-            }
-
-            foreach (IPdfTextElement letter in letters)
-            {
-                if (letter.TextOrientation != tempTextOrientation)
-                {
-                    return TextOrientation.Other;
-                }
-            }
-            return tempTextOrientation;
-        }
-
         /// <summary>
         /// Returns the axis-aligned rectangle that completely contains
         /// <paramref name="rectangle"/>, with no rotation, while preserving the

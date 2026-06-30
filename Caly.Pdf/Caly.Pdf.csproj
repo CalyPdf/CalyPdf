@@ -14,4 +14,8 @@
 		<PackageReference Include="CommunityToolkit.HighPerformance" Version="8.4.2" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<ProjectReference Include="..\Caly.Pdf.Models\Caly.Pdf.Models.csproj" />
+	</ItemGroup>
+
 </Project>

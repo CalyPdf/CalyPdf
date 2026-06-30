@@ -54,7 +54,7 @@ public sealed class PdfTextBlock : IPdfTextElement
         }
 
         TextLines = textLines;
-        TextOrientation = PdfTextLayerHelper.GetTextOrientation(textLines);
+        TextOrientation = PdfTextElementHelper.GetTextOrientation(textLines);
 
         BoundingBox = TextOrientation switch
         {

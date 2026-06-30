@@ -81,7 +81,7 @@ public sealed class PdfTextLine : IPdfTextElement
         }
         else
         {
-            TextOrientation = PdfTextLayerHelper.GetTextOrientation(words);
+            TextOrientation = PdfTextElementHelper.GetTextOrientation(words);
 
             switch (TextOrientation)
             {

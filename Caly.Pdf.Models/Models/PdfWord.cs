@@ -76,7 +76,7 @@ public sealed class PdfWord : IPdfTextElement
             throw new ArgumentException("Cannot construct word if no letters provided.", nameof(letters));
         }
 
-        TextOrientation = PdfTextLayerHelper.GetTextOrientation(letters);
+        TextOrientation = PdfTextElementHelper.GetTextOrientation(letters);
 
         Count = (ushort)letters.Count;
 
