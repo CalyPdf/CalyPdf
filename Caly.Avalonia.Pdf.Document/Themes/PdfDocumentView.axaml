@@ -1,0 +1,41 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:doc="clr-namespace:Caly.Avalonia.Pdf.Document">
+
+	<ControlTheme x:Key="{x:Type doc:PdfDocumentView}" TargetType="doc:PdfDocumentView">
+		<Setter Property="Template">
+			<ControlTemplate>
+				<Border Background="{TemplateBinding Background}"
+				        BorderBrush="{TemplateBinding BorderBrush}"
+				        BorderThickness="{TemplateBinding BorderThickness}"
+				        CornerRadius="{TemplateBinding CornerRadius}"
+				        HorizontalAlignment="Stretch"
+				        VerticalAlignment="Stretch"
+				        Padding="{TemplateBinding Padding}">
+					<Grid>
+						<ScrollViewer Name="PART_ScrollViewer"
+						              VerticalScrollBarVisibility="Auto"
+						              HorizontalScrollBarVisibility="Auto"
+						              AllowAutoHide="False"
+						              Focusable="True"
+						              HorizontalAlignment="Stretch"
+						              VerticalAlignment="Stretch"
+						              IsScrollInertiaEnabled="True"
+						              BringIntoViewOnFocusChange="False">
+							<LayoutTransformControl Name="PART_LayoutTransformControl"
+							                        HorizontalAlignment="Center"
+							                        VerticalAlignment="Center"
+							                        ClipToBounds="True">
+								<ItemsPresenter Name="PART_ItemsPresenter"
+								                HorizontalAlignment="Center"
+								                VerticalAlignment="Stretch"
+								                ItemsPanel="{TemplateBinding ItemsPanel}"/>
+							</LayoutTransformControl>
+						</ScrollViewer>
+					</Grid>
+				</Border>
+			</ControlTemplate>
+		</Setter>
+	</ControlTheme>
+
+</ResourceDictionary>

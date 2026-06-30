@@ -1,0 +1,63 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:doc="clr-namespace:Caly.Avalonia.Pdf.Document"
+                    xmlns:rendering="clr-namespace:Caly.Avalonia.Pdf.Rendering;assembly=Caly.Avalonia.Pdf.Rendering"
+                    xmlns:text="clr-namespace:Caly.Avalonia.Pdf.Text;assembly=Caly.Avalonia.Pdf.Text">
+
+	<ControlTheme x:Key="{x:Type doc:PdfPageView}" TargetType="doc:PdfPageView">
+		<Setter Property="Margin" Value="0,0,0,5"/>
+		<Setter Property="Template">
+			<ControlTemplate>
+				<LayoutTransformControl>
+					<LayoutTransformControl.LayoutTransform>
+						<RotateTransform Angle="{Binding Rotation, RelativeSource={RelativeSource TemplatedParent}}"/>
+					</LayoutTransformControl.LayoutTransform>
+
+					<Grid Background="White"
+					      Width="{Binding PageSize.Width, RelativeSource={RelativeSource TemplatedParent}}"
+					      Height="{Binding PageSize.Height, RelativeSource={RelativeSource TemplatedParent}}">
+
+						<rendering:TiledPdfPageControl TileRenderService="{TemplateBinding TileRenderService}"
+						                               Picture="{TemplateBinding Picture}"
+						                               PpiScale="{TemplateBinding PpiScale}"
+						                               VisibleArea="{TemplateBinding VisibleArea}"
+						                               IsPageVisible="{TemplateBinding IsPageVisible}"
+						                               PageNumber="{TemplateBinding PageNumber}"
+						                               PageDisplaySize="{TemplateBinding PageSize}"
+						                               ZoomLevel="{TemplateBinding ZoomLevel}"
+						                               HorizontalAlignment="Stretch"
+						                               VerticalAlignment="Stretch"/>
+
+						<text:PageInteractiveLayerControl Name="PART_PageInteractiveLayerControl"
+						                                  VisibleArea="{TemplateBinding VisibleArea}"
+						                                  PdfTextLayer="{TemplateBinding PdfTextLayer}"
+						                                  PageNumber="{TemplateBinding PageNumber}"
+						                                  SelectedWords="{TemplateBinding SelectedWords}"
+						                                  SearchResults="{TemplateBinding SearchResults}"
+						                                  HorizontalAlignment="Stretch"
+						                                  VerticalAlignment="Stretch">
+							<FlyoutBase.AttachedFlyout>
+								<Flyout ShowMode="Standard"
+								        Placement="Pointer"
+								        HorizontalOffset="15"/>
+							</FlyoutBase.AttachedFlyout>
+						</text:PageInteractiveLayerControl>
+
+						<!-- Minimal busy affordance (no external ProgressRing dependency). -->
+						<Border IsVisible="{TemplateBinding IsPageRendering}"
+						        IsHitTestVisible="False"
+						        HorizontalAlignment="Left"
+						        VerticalAlignment="Top"
+						        Margin="8"
+						        Width="16"
+						        Height="16"
+						        CornerRadius="8"
+						        Background="{DynamicResource SystemAccentColor}"
+						        Opacity="0.6"/>
+					</Grid>
+				</LayoutTransformControl>
+			</ControlTemplate>
+		</Setter>
+	</ControlTheme>
+
+</ResourceDictionary>
