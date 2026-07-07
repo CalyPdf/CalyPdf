@@ -63,6 +63,12 @@ public sealed partial class DocumentViewModel : ViewModelBase
 
     public bool IsActive => _pdfService.IsActive;
 
+    /// <summary>
+    /// App-level state of the document side pane, shared across all documents. Exposed
+    /// here so views inside the document's template can bind to it directly.
+    /// </summary>
+    public DocumentPaneState Pane { get; }
+
     [ObservableProperty] private ObservableCollection<PageViewModel> _pages = [];
 
     [ObservableProperty] private int _selectedTabIndex;
@@ -174,6 +180,7 @@ public sealed partial class DocumentViewModel : ViewModelBase
         _bookmarksTask = null!;
         _buildSearchIndex = null!;
         _searchResultsSource = null!;
+        Pane = new DocumentPaneState();
 
         _pdfService = new PdfPigDocumentService(new JsonSettingsService(null!));
 
@@ -185,9 +192,12 @@ public sealed partial class DocumentViewModel : ViewModelBase
     }
 #endif
 
-    public DocumentViewModel(IPdfDocumentService pdfService, PdfPageService pdfPageService, ITextSearchService textSearchService)
+    public DocumentViewModel(IPdfDocumentService pdfService, PdfPageService pdfPageService,
+        ITextSearchService textSearchService, DocumentPaneState paneState)
     {
         ArgumentNullException.ThrowIfNull(pdfService, nameof(pdfService));
+        ArgumentNullException.ThrowIfNull(paneState, nameof(paneState));
+        Pane = paneState;
 
         System.Diagnostics.Debug.Assert(pdfService.NumberOfPages == 0);
 

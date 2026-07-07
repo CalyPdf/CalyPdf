@@ -19,7 +19,6 @@
 // SOFTWARE.
 
 using Avalonia.Collections;
-using Caly.Core.Models;
 using Caly.Core.Services;
 using Caly.Core.Services.Interfaces;
 using Caly.Core.Utilities;
@@ -53,17 +52,9 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool _isSettingsPaneOpen;
 
     /// <summary>
-    /// Whether the document side pane is open. App-level value shared across all documents:
-    /// closing the pane on one document keeps it closed for every document.
+    /// App-level state of the document side pane, shared across all documents.
     /// </summary>
-    [ObservableProperty]
-    public partial bool IsDocumentPaneOpen { get; set; } = !CalyExtensions.IsMobilePlatform();
-
-    /// <summary>
-    /// Width of the document side pane. App-level value (shared across all documents) persisted to settings.
-    /// </summary>
-    [ObservableProperty]
-    public partial double PaneSize { get; set; }
+    public DocumentPaneState Pane { get; }
 
     public DocumentViewModel? SelectedDocument
     {
@@ -116,14 +107,18 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
         }
     }
 
-    partial void OnPaneSizeChanged(double oldValue, double newValue)
+    /// <summary>
+    /// Design-time constructor.
+    /// </summary>
+    public MainViewModel() : this(new DocumentPaneState())
     {
-        App.Current?.Services?.GetService<ISettingsService>()?
-            .SetProperty(CalySettings.CalySettingsProperty.PaneSize, newValue);
     }
 
-    public MainViewModel()
+    public MainViewModel(DocumentPaneState paneState)
     {
+        ArgumentNullException.ThrowIfNull(paneState, nameof(paneState));
+        Pane = paneState;
+
         // Documents are added/removed on the UI thread; the selected document can
         // change on collection changes without SelectedDocumentIndex changing.
         PdfDocuments.CollectionChanged += (_, _) => AnnounceSelectedDocumentChanged();
@@ -252,7 +247,7 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void ActivateSearchTextTab()
     {
-        IsDocumentPaneOpen = true;
+        Pane.IsDocumentPaneOpen = true;
         SelectedDocument?.SelectedTabIndex = 2;
     }
 

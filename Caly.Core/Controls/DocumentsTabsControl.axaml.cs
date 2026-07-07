@@ -20,7 +20,6 @@
 
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Metadata;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.VisualTree;
@@ -35,8 +34,6 @@ namespace Caly.Core.Controls;
 /// Control that represents all open PDF documents, together with the top and left navigation panels.
 /// Each PDF document is displayed in a tab.
 /// </summary>
-[TemplatePart("PART_TextBoxPageNumber", typeof(TextBox))]
-[TemplatePart("PART_SplitView", typeof(SplitView))]
 public sealed partial class DocumentsTabsControl : UserControl
 {
     private const int MaxPaneLength = 500;
