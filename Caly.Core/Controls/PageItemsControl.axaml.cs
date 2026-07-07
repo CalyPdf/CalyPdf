@@ -27,7 +27,6 @@ using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
-using Avalonia.VisualTree;
 using Caly.Core.Models;
 using Caly.Core.Utilities;
 using System;
@@ -224,11 +223,13 @@ public sealed class PageItemsControl : ItemsControl
     /// <summary>
     /// Resolves the page interactive layer an input event originates from, or
     /// <c>null</c> when the event comes from elsewhere (scrollbars, gaps between
-    /// pages, flyouts).
+    /// pages, flyouts). The layer is a leaf control, so it is the event source
+    /// itself whenever the event is relevant (also while it holds pointer capture)
+    /// — no ancestor walk needed, and this runs on every pointer event.
     /// </summary>
     private static PageInteractiveLayerControl? GetSourceInteractiveLayer(RoutedEventArgs e)
     {
-        return (e.Source as Visual)?.FindAncestorOfType<PageInteractiveLayerControl>(includeSelf: true);
+        return e.Source as PageInteractiveLayerControl;
     }
 
     private void OnInteractiveLayerPointerPressed(object? sender, PointerPressedEventArgs e)

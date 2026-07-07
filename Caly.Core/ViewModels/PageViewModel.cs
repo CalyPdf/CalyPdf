@@ -202,11 +202,27 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
         TextSelection.TextSelectionReset += _onTextSelectionReset;
     }
 
+    /// <summary>
+    /// Assigns <see cref="SelectedWords"/> on the UI thread without blocking the
+    /// caller. Always posted (never inline) so UI-thread and background callers are
+    /// serialized in FIFO order; the generated setter ignores no-op assignments.
+    /// </summary>
+    private void SetSelectedWords(IReadOnlyList<PdfRectangle>? value)
+    {
+        Dispatcher.UIThread.Post(() => SelectedWords = value);
+    }
+
+    /// <summary>
+    /// Same dispatch strategy as <see cref="SetSelectedWords"/>, for <see cref="SearchResults"/>.
+    /// </summary>
+    private void SetSearchResults(IReadOnlyList<PdfRectangle>? value)
+    {
+        Dispatcher.UIThread.Post(() => SearchResults = value);
+    }
+
     private void _onTextSelectionReset(object? sender, EventArgs e)
     {
-        // Post (not Invoke) so background callers never block on the UI thread; posts
-        // apply in FIFO order and the generated setter ignores no-op assignments.
-        Dispatcher.UIThread.Post(() => SelectedWords = null);
+        SetSelectedWords(null);
     }
 
     private void _onTextSelectionFocusPageChanged(object? sender, TextSelectionFocusPageChangedEventArgs e)
@@ -251,7 +267,7 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
     {
         if (_searchResultsRanges is null || _searchResultsRanges.Count == 0)
         {
-            Dispatcher.UIThread.Post(() => SearchResults = null);
+            SetSearchResults(null);
             return;
         }
 
@@ -266,14 +282,7 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
                 .Select(x => x.BoundingBox));
         }
 
-        if (results.Count > 0)
-        {
-            Dispatcher.UIThread.Post(() => SearchResults = results);
-        }
-        else
-        {
-            Dispatcher.UIThread.Post(() => SearchResults = null);
-        }
+        SetSearchResults(results.Count > 0 ? results : null);
     }
 
     private void RefreshTextSelection()
@@ -282,7 +291,7 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
 
         if (!TextSelection.IsPageInSelection(PageNumber))
         {
-            Dispatcher.UIThread.Post(() => SelectedWords = null);
+            SetSelectedWords(null);
             return;
         }
 
@@ -290,7 +299,7 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
 
         if (selectedWords.Length == 0)
         {
-            Dispatcher.UIThread.Post(() => SelectedWords = null);  // TODO - Check if we should do that here
+            SetSelectedWords(null);  // TODO - Check if we should do that here
         }
         else
         {
@@ -298,7 +307,7 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
                     selectedWords, PageNumber,
                     PdfWordHelpers.GetRectangle, PdfWordHelpers.GetRectangle)
                 .ToArray();
-            Dispatcher.UIThread.Post(() => SelectedWords = selectedWordRects);
+            SetSelectedWords(selectedWordRects);
         }
     }
 

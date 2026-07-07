@@ -60,15 +60,11 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
     {
         get
         {
-            try
-            {
-                return (SelectedDocumentIndex < 0 || PdfDocuments.Count == 0) ? null : PdfDocuments[SelectedDocumentIndex];
-            }
-            catch (Exception e)
-            {
-                Debug.WriteExceptionToFile(e);
-                return null;
-            }
+            // Explicit range check instead of try/catch: the index is transiently
+            // out of range while PdfDocumentsManagerService removes a document
+            // before correcting SelectedDocumentIndex on the next line.
+            int index = SelectedDocumentIndex;
+            return index >= 0 && index < PdfDocuments.Count ? PdfDocuments[index] : null;
         }
     }
 
@@ -81,14 +77,40 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
     /// </summary>
     private DocumentViewModel? _lastAnnouncedSelectedDocument;
 
+    private bool _isAnnounceSelectedDocumentScheduled;
+
     partial void OnSelectedDocumentIndexChanged(int value)
     {
-        AnnounceSelectedDocumentChanged();
+        ScheduleAnnounceSelectedDocumentChanged();
+    }
+
+    /// <summary>
+    /// Schedules a single <see cref="AnnounceSelectedDocumentChanged"/> on the UI thread.
+    /// Index and collection changes come in non-atomic bursts (e.g.
+    /// PdfDocumentsManagerService removes a document and only then corrects
+    /// <see cref="SelectedDocumentIndex"/>; Tabalonia reorders tabs with Remove + Add),
+    /// so announcing synchronously would observe transient states and activate the
+    /// wrong document. Deferring to a posted callback coalesces the burst and runs
+    /// once the state is settled.
+    /// </summary>
+    private void ScheduleAnnounceSelectedDocumentChanged()
+    {
+        if (_isAnnounceSelectedDocumentScheduled)
+        {
+            return;
+        }
+
+        _isAnnounceSelectedDocumentScheduled = true;
+        Dispatcher.UIThread.Post(() =>
+        {
+            _isAnnounceSelectedDocumentScheduled = false;
+            AnnounceSelectedDocumentChanged();
+        });
     }
 
     /// <summary>
     /// Sends <see cref="SelectedDocumentChangedMessage"/> when the effective
-    /// <see cref="SelectedDocument"/> instance changes. Called on index changes and on
+    /// <see cref="SelectedDocument"/> instance changed. Triggered by index changes and
     /// collection changes, because the selected document can change without the index
     /// moving (first document added at index 0, or the selected document being removed).
     /// </summary>
@@ -121,7 +143,7 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
 
         // Documents are added/removed on the UI thread; the selected document can
         // change on collection changes without SelectedDocumentIndex changing.
-        PdfDocuments.CollectionChanged += (_, _) => AnnounceSelectedDocumentChanged();
+        PdfDocuments.CollectionChanged += (_, _) => ScheduleAnnounceSelectedDocumentChanged();
 
         _documentCollectionDisposable = PdfDocuments
             .GetWeakCollectionChangedObservable()
