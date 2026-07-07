@@ -136,9 +136,9 @@ public sealed class PageItem : ContentControl
     }
 
     /// <summary>
-    /// Gets the interactive layer.
+    /// Gets the interactive layer. Set when the template is applied.
     /// </summary>
-    public PageInteractiveLayerControl? InteractiveLayer { get; set; }
+    public PageInteractiveLayerControl? InteractiveLayer { get; private set; }
 
     public PageItem()
     {

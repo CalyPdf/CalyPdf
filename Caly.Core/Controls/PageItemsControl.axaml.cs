@@ -197,7 +197,54 @@ public sealed class PageItemsControl : ItemsControl
         AddHandler(KeyDownEvent, OnKeyDownHandler, RoutingStrategies.Tunnel, handledEventsToo: true);
         AddHandler(KeyUpEvent, OnKeyUpHandler, RoutingStrategies.Tunnel, handledEventsToo: true);
 
+        // Selection input for every page's interactive layer is handled here through
+        // routed events instead of subscribing to each realized container. Tunnel phase
+        // keeps the ordering the per-layer subscriptions used to give: it runs before
+        // the pan handlers on the LayoutTransformControl and before the ScrollViewer
+        // consumes wheel events, and a ctrl+wheel zoom handled by the handler above
+        // still suppresses it (same-element tunnel handlers run in registration order).
+        // PointerExited does not tunnel/bubble this way and stays subscribed
+        // per-container in PageItem_Loaded.
+        AddHandler(PointerPressedEvent, OnInteractiveLayerPointerPressed, RoutingStrategies.Tunnel);
+        AddHandler(PointerReleasedEvent, OnInteractiveLayerPointerReleased, RoutingStrategies.Tunnel);
+        AddHandler(PointerMovedEvent, OnInteractiveLayerPointerMoved, RoutingStrategies.Tunnel);
+        AddHandler(PointerWheelChangedEvent, OnInteractiveLayerPointerMoved, RoutingStrategies.Tunnel);
+
         ResetState();
+    }
+
+    /// <summary>
+    /// Resolves the page interactive layer an input event originates from, or
+    /// <c>null</c> when the event comes from elsewhere (scrollbars, gaps between
+    /// pages, flyouts).
+    /// </summary>
+    private static PageInteractiveLayerControl? GetSourceInteractiveLayer(RoutedEventArgs e)
+    {
+        return (e.Source as Visual)?.FindAncestorOfType<PageInteractiveLayerControl>(includeSelf: true);
+    }
+
+    private void OnInteractiveLayerPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (GetSourceInteractiveLayer(e) is { } layer)
+        {
+            _textSelectionHandler.OnPointerPressed(layer, e);
+        }
+    }
+
+    private void OnInteractiveLayerPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (GetSourceInteractiveLayer(e) is { } layer)
+        {
+            _textSelectionHandler.OnPointerReleased(layer, e);
+        }
+    }
+
+    private void OnInteractiveLayerPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (GetSourceInteractiveLayer(e) is { } layer)
+        {
+            _textSelectionHandler.OnPointerMoved(layer, e);
+        }
     }
 
     /// <summary>
@@ -489,11 +536,7 @@ public sealed class PageItemsControl : ItemsControl
             return;
         }
 
-        pageItem.InteractiveLayer.PointerMoved -= _textSelectionHandler.OnPointerMoved;
-        pageItem.InteractiveLayer.PointerWheelChanged -= _textSelectionHandler.OnPointerMoved;
         pageItem.InteractiveLayer.PointerExited -= _textSelectionHandler.OnPointerExited;
-        pageItem.InteractiveLayer.PointerReleased -= _textSelectionHandler.OnPointerReleased;
-        pageItem.InteractiveLayer.PointerPressed -= _textSelectionHandler.OnPointerPressed;
         pageItem.BeforeRotation -= OnBeforePageRotation;
     }
 
@@ -511,20 +554,15 @@ public sealed class PageItemsControl : ItemsControl
             return;
         }
 
+        // Pressed/Released/Moved/Wheel are handled through routed tunnel handlers on
+        // this control (see the constructor); only PointerExited needs a per-container
+        // subscription as it does not route through ancestors.
         // Make sure we unsubscribe first
-        pageItem.InteractiveLayer.PointerMoved -= _textSelectionHandler.OnPointerMoved;
-        pageItem.InteractiveLayer.PointerWheelChanged -= _textSelectionHandler.OnPointerMoved;
         pageItem.InteractiveLayer.PointerExited -= _textSelectionHandler.OnPointerExited;
-        pageItem.InteractiveLayer.PointerReleased -= _textSelectionHandler.OnPointerReleased;
-        pageItem.InteractiveLayer.PointerPressed -= _textSelectionHandler.OnPointerPressed;
         pageItem.BeforeRotation -= OnBeforePageRotation;
 
         // Then subscribe to events
-        pageItem.InteractiveLayer.PointerMoved += _textSelectionHandler.OnPointerMoved;
-        pageItem.InteractiveLayer.PointerWheelChanged += _textSelectionHandler.OnPointerMoved;
         pageItem.InteractiveLayer.PointerExited += _textSelectionHandler.OnPointerExited;
-        pageItem.InteractiveLayer.PointerReleased += _textSelectionHandler.OnPointerReleased;
-        pageItem.InteractiveLayer.PointerPressed += _textSelectionHandler.OnPointerPressed;
         pageItem.BeforeRotation += OnBeforePageRotation;
     }
 

@@ -67,12 +67,12 @@ internal sealed class TextSelectionInputHandler
         _startPointerPressed = null;
     }
 
-    public void OnPointerPressed(object? sender, PointerPressedEventArgs e)
+    public void OnPointerPressed(PageInteractiveLayerControl control, PointerPressedEventArgs e)
     {
         Debug.ThrowNotOnUiThread();
 
         var textSelection = _owner.TextSelection;
-        if (textSelection is null || sender is not PageInteractiveLayerControl control || control.PdfTextLayer is null)
+        if (textSelection is null || control.PdfTextLayer is null)
         {
             return;
         }
@@ -156,11 +156,11 @@ internal sealed class TextSelectionInputHandler
         System.Diagnostics.Debug.WriteLine($"HandleMultipleClick: {startWord} -> {endWord}.");
     }
 
-    public void OnPointerReleased(object? sender, PointerReleasedEventArgs e)
+    public void OnPointerReleased(PageInteractiveLayerControl control, PointerReleasedEventArgs e)
     {
         Debug.ThrowNotOnUiThread();
 
-        if (sender is not PageInteractiveLayerControl control || control.PdfTextLayer is null)
+        if (control.PdfTextLayer is null)
         {
             return;
         }
@@ -246,7 +246,15 @@ internal sealed class TextSelectionInputHandler
 
         _isSelecting = false;
 
-        e.Handled = true;
+        // Right-button releases must stay unhandled: this runs in the tunnel phase, and
+        // Control.OnPointerReleased on the layer only raises ContextRequested (which
+        // opens the page's ContextFlyout) for unhandled events. Opening the flyout
+        // marks the event handled right after, so the rest of the route is unaffected.
+        if (e.InitialPressMouseButton != MouseButton.Right)
+        {
+            e.Handled = true;
+        }
+
         e.PreventGestureRecognition();
     }
 
@@ -264,12 +272,12 @@ internal sealed class TextSelectionInputHandler
         _owner.SetCurrentValue(PageItemsControl.InteractiveActionOverProperty, null);
     }
 
-    public void OnPointerMoved(object? sender, PointerEventArgs e)
+    public void OnPointerMoved(PageInteractiveLayerControl control, PointerEventArgs e)
     {
         Debug.ThrowNotOnUiThread();
 
         // Needs to be on UI thread to access
-        if (sender is not PageInteractiveLayerControl control || control.PdfTextLayer is null)
+        if (control.PdfTextLayer is null)
         {
             return;
         }
