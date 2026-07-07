@@ -11,20 +11,11 @@
 
 	<ControlTheme x:Key="{x:Type controls:DocumentControl}" TargetType="controls:DocumentControl" x:DataType="vm:DocumentViewModel">
 		<Setter Property="Exception" Value="{Binding Exception}"/>
-        <Setter Property="RefreshPages" Value="{Binding RefreshPagesCommand}"/>
-        <Setter Property="TextSelection" Value="{Binding TextSelection}"/>
-		<Setter Property="SelectedPageNumber" Value="{Binding SelectedPageNumber, Mode=TwoWay}"/>
-        <Setter Property="RealisedPages" Value="{Binding RealisedPages}"/>
-        <Setter Property="VisiblePages" Value="{Binding VisiblePages}"/>
-		<Setter Property="ItemsSource" Value="{Binding Pages}"/>
-		<Setter Property="PageCount" Value="{Binding PageCount}"/>
-		<Setter Property="ZoomLevel" Value="{Binding ZoomLevel, Mode=TwoWay}"/>
-        <Setter Property="ScrollOffset" Value="{Binding ScrollOffset, Mode=TwoWay}"/>
+		<Setter Property="SelectedPageNumber" Value="{Binding SelectedPageNumber}"/>
 		<Setter Property="SelectedBookmark" Value="{Binding SelectedBookmark, Mode=OneWay}"/>
 		<Setter Property="SelectedTextSearchResult" Value="{Binding SelectedTextSearchResult, Mode=OneWay}"/>
 		<Setter Property="UseLayoutRounding" Value="True"/>
 		<Setter Property="ClearSelection" Value="{Binding ClearSelectionCommand}"/>
-        <Setter Property="DocumentChanged" Value="{Binding ActivatedCommand}"/>
 
 		<Setter Property="ContextFlyout">
 			<MenuFlyout>
@@ -43,19 +34,10 @@
                         <KeyBinding Gesture="{x:Static utilities:CalyHotkeyConfiguration.DocumentZoomOutGesture}" Command="{Binding ZoomOutCommand}" />
                     </Grid.KeyBindings>
 
-                    <!-- The pages control -->
+                    <!-- The pages control. Its document state is bound directly
+                         to the DocumentViewModel by its own control theme. -->
                     <controls:PageItemsControl Name="PART_PageItemsControl"
-                                               HorizontalAlignment="Stretch"
-                                               ItemsSource="{TemplateBinding ItemsSource}"
-                                               PageCount="{TemplateBinding PageCount}"
-                                               SelectedPageNumber="{TemplateBinding SelectedPageNumber, Mode=TwoWay}"
-                                               ZoomLevel="{TemplateBinding ZoomLevel, Mode=TwoWay}"
-                                               TextSelection="{TemplateBinding TextSelection}"
-                                               ClearSelection="{TemplateBinding ClearSelection}"
-                                               RealisedPages="{TemplateBinding RealisedPages, Mode=TwoWay}"
-                                               VisiblePages="{TemplateBinding VisiblePages, Mode=TwoWay}"
-                                               ScrollOffset="{TemplateBinding ScrollOffset, Mode=TwoWay}"
-                                               RefreshPages="{TemplateBinding RefreshPages}"/>
+                                               HorizontalAlignment="Stretch"/>
 
                     <Grid IsVisible="{Binding !Pages.Count}">
                         <!-- Progress Ring for when the document is opening -->

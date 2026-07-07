@@ -28,6 +28,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
 using Avalonia.Media.Transformation;
+using Avalonia.VisualTree;
 using Caly.Core.Models;
 using Caly.Core.Utilities;
 using Caly.Pdf;
@@ -1321,6 +1322,52 @@ public sealed class PageItemsControl : ItemsControl
             ItemsPanelRoot?.LayoutUpdated -= ItemsPanelRoot_LayoutUpdated;
             ItemsPanelRoot?.LayoutUpdated += ItemsPanelRoot_LayoutUpdated;
         }
+        else if (change.Property == ZoomLevelProperty)
+        {
+            HandleExternalZoomLevelChanged(change);
+        }
+    }
+
+    /// <summary>
+    /// Applies a <see cref="ZoomLevel"/> change that did not originate from this control's
+    /// own zoom handlers (e.g. the view model's zoom in/out commands), zooming around the
+    /// viewport centre. Changes produced by the wheel/pinch/programmatic handlers have
+    /// already updated the layout transform, so the scale comparison below turns them
+    /// into no-ops.
+    /// </summary>
+    private void HandleExternalZoomLevelChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        if (LayoutTransform is null || change.NewValue is not double newZoom)
+        {
+            return;
+        }
+
+        if (!LayoutTransform.IsAttachedToVisualTree())
+        {
+            return;
+        }
+
+        var currentScale = LayoutTransform.LayoutTransform?.Value.M11;
+        if (currentScale.HasValue && Math.Abs(currentScale.Value - newZoom) < 1e-9)
+        {
+            return; // Ignore as no change in zoom level
+        }
+
+        double dZoom = newZoom / (double?)change.OldValue ?? 1.0;
+
+        double w = 0, h = 0;
+        if (!DesiredSize.IsEmpty())
+        {
+            DesiredSize.Deconstruct(out w, out h);
+        }
+        else if (!Bounds.Size.IsEmpty())
+        {
+            Bounds.Size.Deconstruct(out w, out h);
+        }
+
+        var pixelPoint = this.PointToScreen(new Point((int)(w / 2.0), (int)(h / 2.0)));
+        var point = LayoutTransform.PointToClient(pixelPoint);
+        ZoomTo(dZoom, point);
     }
 
     private void EnsureValidContainersVisibility()
@@ -1912,7 +1959,7 @@ public sealed class PageItemsControl : ItemsControl
         }
     }
 
-    internal void ZoomTo(double dZoom, Point point)
+    private void ZoomTo(double dZoom, Point point)
     {
         if (LayoutTransform is null || Scroll is null)
         {

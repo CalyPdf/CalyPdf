@@ -20,6 +20,7 @@
 
 using Avalonia.Collections;
 using Caly.Core.Models;
+using Caly.Core.Services;
 using Caly.Core.Services.Interfaces;
 using Caly.Core.Utilities;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -34,6 +35,7 @@ using System.Reactive.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Threading;
+using CommunityToolkit.Mvvm.Messaging;
 using Tabalonia.Controls;
 
 namespace Caly.Core.ViewModels;
@@ -81,6 +83,39 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
 
     public string Version => CalyExtensions.CalyVersion;
 
+    /// <summary>
+    /// The document the last <see cref="SelectedDocumentChangedMessage"/> was sent for,
+    /// so switching between index/collection updates that resolve to the same document
+    /// does not re-announce it.
+    /// </summary>
+    private DocumentViewModel? _lastAnnouncedSelectedDocument;
+
+    partial void OnSelectedDocumentIndexChanged(int value)
+    {
+        AnnounceSelectedDocumentChanged();
+    }
+
+    /// <summary>
+    /// Sends <see cref="SelectedDocumentChangedMessage"/> when the effective
+    /// <see cref="SelectedDocument"/> instance changes. Called on index changes and on
+    /// collection changes, because the selected document can change without the index
+    /// moving (first document added at index 0, or the selected document being removed).
+    /// </summary>
+    private void AnnounceSelectedDocumentChanged()
+    {
+        DocumentViewModel? selected = SelectedDocument;
+        if (ReferenceEquals(_lastAnnouncedSelectedDocument, selected))
+        {
+            return;
+        }
+
+        _lastAnnouncedSelectedDocument = selected;
+        if (selected is not null)
+        {
+            App.Messenger.Send(new SelectedDocumentChangedMessage(selected));
+        }
+    }
+
     partial void OnPaneSizeChanged(double oldValue, double newValue)
     {
         App.Current?.Services?.GetService<ISettingsService>()?
@@ -89,6 +124,10 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
 
     public MainViewModel()
     {
+        // Documents are added/removed on the UI thread; the selected document can
+        // change on collection changes without SelectedDocumentIndex changing.
+        PdfDocuments.CollectionChanged += (_, _) => AnnounceSelectedDocumentChanged();
+
         _documentCollectionDisposable = PdfDocuments
             .GetWeakCollectionChangedObservable()
             .ObserveOn(Scheduler.Default)

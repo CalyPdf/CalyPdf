@@ -16,8 +16,18 @@
                   TargetType="controls:PageItemsControl"
                   x:DataType="vm:DocumentViewModel">
 
+        <Setter Property="ItemsSource" Value="{Binding Pages}"/>
+        <Setter Property="PageCount" Value="{Binding PageCount}"/>
+        <Setter Property="SelectedPageNumber" Value="{Binding SelectedPageNumber, Mode=TwoWay}"/>
         <Setter Property="MinZoomLevel" Value="{Binding MinZoomLevel}"/>
 		<Setter Property="MaxZoomLevel" Value="{Binding MaxZoomLevel}"/>
+        <Setter Property="ZoomLevel" Value="{Binding ZoomLevel, Mode=TwoWay}"/>
+        <Setter Property="ScrollOffset" Value="{Binding ScrollOffset, Mode=TwoWay}"/>
+        <Setter Property="TextSelection" Value="{Binding TextSelection}"/>
+        <Setter Property="RealisedPages" Value="{Binding RealisedPages, Mode=TwoWay}"/>
+        <Setter Property="VisiblePages" Value="{Binding VisiblePages, Mode=TwoWay}"/>
+        <Setter Property="RefreshPages" Value="{Binding RefreshPagesCommand}"/>
+        <Setter Property="ClearSelection" Value="{Binding ClearSelectionCommand}"/>
 		<Setter Property="InteractiveActionOver" Value="{Binding InteractiveActionOver}"/>
 
 		<Setter Property="Template">
