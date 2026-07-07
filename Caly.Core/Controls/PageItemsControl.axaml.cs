@@ -31,14 +31,10 @@ using Avalonia.Media.Transformation;
 using Avalonia.VisualTree;
 using Caly.Core.Models;
 using Caly.Core.Utilities;
-using Caly.Pdf;
-using Caly.Pdf.Models;
 using System;
 using System.Linq;
 using System.Windows.Input;
 using Avalonia.Threading;
-using UglyToad.PdfPig.Actions;
-using UglyToad.PdfPig.Core;
 
 namespace Caly.Core.Controls;
 
@@ -62,16 +58,11 @@ public sealed class PageItemsControl : ItemsControl
     });
 
     /// <summary>
-    /// <c>true</c> if we are currently selecting text. <c>false</c> otherwise.
+    /// Handles pointer input over the pages' interactive layers (text selection,
+    /// annotations, links, hover feedback).
     /// </summary>
-    private bool _isSelecting;
+    private readonly TextSelectionInputHandler _textSelectionHandler;
 
-    /// <summary>
-    /// <c>true</c> if we are selecting text though multiple click (full word selection).
-    /// </summary>
-    private bool _isMultipleClickSelection;
-
-    private Point? _startPointerPressed;
     private Point? _currentPosition;
     private bool _isSettingPageVisibility;
     private bool _isZooming;
@@ -191,6 +182,7 @@ public sealed class PageItemsControl : ItemsControl
 
     public PageItemsControl()
     {
+        _textSelectionHandler = new TextSelectionInputHandler(this);
         _scrollChangedHandler = (_, e) =>
         {
             AdjustXOffsetOnExtentChanged(e);
@@ -497,11 +489,11 @@ public sealed class PageItemsControl : ItemsControl
             return;
         }
 
-        pageItem.InteractiveLayer.PointerMoved -= InteractiveLayerPointerMoved;
-        pageItem.InteractiveLayer.PointerWheelChanged -= InteractiveLayerPointerMoved;
-        pageItem.InteractiveLayer.PointerExited -= InteractiveLayerPointerExited;
-        pageItem.InteractiveLayer.PointerReleased -= InteractiveLayerPointerReleased;
-        pageItem.InteractiveLayer.PointerPressed -= InteractiveLayerPointerPressed;
+        pageItem.InteractiveLayer.PointerMoved -= _textSelectionHandler.OnPointerMoved;
+        pageItem.InteractiveLayer.PointerWheelChanged -= _textSelectionHandler.OnPointerMoved;
+        pageItem.InteractiveLayer.PointerExited -= _textSelectionHandler.OnPointerExited;
+        pageItem.InteractiveLayer.PointerReleased -= _textSelectionHandler.OnPointerReleased;
+        pageItem.InteractiveLayer.PointerPressed -= _textSelectionHandler.OnPointerPressed;
         pageItem.BeforeRotation -= OnBeforePageRotation;
     }
 
@@ -520,19 +512,19 @@ public sealed class PageItemsControl : ItemsControl
         }
 
         // Make sure we unsubscribe first
-        pageItem.InteractiveLayer.PointerMoved -= InteractiveLayerPointerMoved;
-        pageItem.InteractiveLayer.PointerWheelChanged -= InteractiveLayerPointerMoved;
-        pageItem.InteractiveLayer.PointerExited -= InteractiveLayerPointerExited;
-        pageItem.InteractiveLayer.PointerReleased -= InteractiveLayerPointerReleased;
-        pageItem.InteractiveLayer.PointerPressed -= InteractiveLayerPointerPressed;
+        pageItem.InteractiveLayer.PointerMoved -= _textSelectionHandler.OnPointerMoved;
+        pageItem.InteractiveLayer.PointerWheelChanged -= _textSelectionHandler.OnPointerMoved;
+        pageItem.InteractiveLayer.PointerExited -= _textSelectionHandler.OnPointerExited;
+        pageItem.InteractiveLayer.PointerReleased -= _textSelectionHandler.OnPointerReleased;
+        pageItem.InteractiveLayer.PointerPressed -= _textSelectionHandler.OnPointerPressed;
         pageItem.BeforeRotation -= OnBeforePageRotation;
 
         // Then subscribe to events
-        pageItem.InteractiveLayer.PointerMoved += InteractiveLayerPointerMoved;
-        pageItem.InteractiveLayer.PointerWheelChanged += InteractiveLayerPointerMoved;
-        pageItem.InteractiveLayer.PointerExited += InteractiveLayerPointerExited;
-        pageItem.InteractiveLayer.PointerReleased += InteractiveLayerPointerReleased;
-        pageItem.InteractiveLayer.PointerPressed += InteractiveLayerPointerPressed;
+        pageItem.InteractiveLayer.PointerMoved += _textSelectionHandler.OnPointerMoved;
+        pageItem.InteractiveLayer.PointerWheelChanged += _textSelectionHandler.OnPointerMoved;
+        pageItem.InteractiveLayer.PointerExited += _textSelectionHandler.OnPointerExited;
+        pageItem.InteractiveLayer.PointerReleased += _textSelectionHandler.OnPointerReleased;
+        pageItem.InteractiveLayer.PointerPressed += _textSelectionHandler.OnPointerPressed;
         pageItem.BeforeRotation += OnBeforePageRotation;
     }
 
@@ -557,474 +549,10 @@ public sealed class PageItemsControl : ItemsControl
         }, DispatcherPriority.Loaded);
     }
 
-    private void InteractiveLayerPointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        Debug.ThrowNotOnUiThread();
-
-        if (TextSelection is null || sender is not PageInteractiveLayerControl control || control.PdfTextLayer is null)
-        {
-            return;
-        }
-
-        if (e.IsPanningOrZooming())
-        {
-            // Panning pages is not handled here
-            control.HideAnnotation();
-            return;
-        }
-
-        bool clearSelection = false;
-
-        _isMultipleClickSelection = e.ClickCount > 1;
-
-        var pointerPoint = e.GetCurrentPoint(control);
-        var point = pointerPoint.Position;
-
-        if (pointerPoint.Properties.IsLeftButtonPressed)
-        {
-            _startPointerPressed = point;
-
-            // Text selection
-            PdfWord? word = control.PdfTextLayer.FindWordOver(point.X, point.Y);
-
-            if (word is not null && TextSelection.IsWordSelected(control.PageNumber!.Value, word))
-            {
-                clearSelection = e.ClickCount == 1; // Clear selection if single click
-                if (e.ClickCount >= 2)
-                {
-                    HandleMultipleClick(control, e, word);
-                }
-            }
-            else if (word is not null && e.ClickCount == 2)
-            {
-                // TODO - do better multiple click selection
-                HandleMultipleClick(control, e, word);
-            }
-            else
-            {
-                clearSelection = true;
-            }
-        }
-        else if (pointerPoint.Properties.IsRightButtonPressed)
-        {
-            // Always hide annotation on right-click to not conflict with context flyout. This works
-            // on Windows but would need to be tested on other platforms
-            control.HideAnnotation();
-        }
-
-        if (clearSelection)
-        {
-            ClearSelection?.Execute(null);
-        }
-
-        e.Handled = true;
-        e.PreventGestureRecognition();
-    }
-
-    private void HandleMultipleClick(PageInteractiveLayerControl control, PointerPressedEventArgs e, PdfWord word)
-    {
-        if (TextSelection is null || control.PdfTextLayer is null)
-        {
-            return;
-        }
-
-        PdfWord? startWord;
-        PdfWord? endWord;
-
-        switch (e.ClickCount)
-        {
-            case 2:
-                {
-                    // Select whole word
-                    startWord = word;
-                    endWord = word;
-                    break;
-                }
-            case 3:
-                {
-                    // Select whole line
-                    var block = control.PdfTextLayer.TextBlocks![word.TextBlockIndex];
-                    var line = block.TextLines![word.TextLineIndex - block.TextLines[0].IndexInPage];
-
-                    startWord = line.Words[0];
-                    endWord = line.Words[^1];
-                    break;
-                }
-            case 4:
-                {
-                    // Select whole paragraph
-                    var block = control.PdfTextLayer.TextBlocks![word.TextBlockIndex];
-
-                    startWord = block.TextLines![0].Words![0];
-                    endWord = block.TextLines![^1].Words![^1];
-                    break;
-                }
-            default:
-                System.Diagnostics.Debug.WriteLine($"HandleMultipleClick: Not handled, got {e.ClickCount} click(s).");
-                return;
-        }
-
-        ClearSelection?.Execute(null);
-
-        int pageNumber = control.PageNumber!.Value;
-        TextSelection.Start(pageNumber, startWord);
-        TextSelection.Extend(pageNumber, endWord);
-
-        System.Diagnostics.Debug.WriteLine($"HandleMultipleClick: {startWord} -> {endWord}.");
-    }
-
-    private void InteractiveLayerPointerReleased(object? sender, PointerReleasedEventArgs e)
-    {
-        Debug.ThrowNotOnUiThread();
-
-        if (sender is not PageInteractiveLayerControl control || control.PdfTextLayer is null)
-        {
-            return;
-        }
-
-        if (e.IsPanningOrZooming())
-        {
-            // Panning pages is not handled here
-            return;
-        }
-
-        _startPointerPressed = null;
-
-        var pointerPoint = e.GetCurrentPoint(control);
-
-        bool ignore = _isSelecting || _isMultipleClickSelection;
-        if (!ignore && pointerPoint.Properties.PointerUpdateKind == PointerUpdateKind.LeftButtonReleased)
-        {
-            ClearSelection?.Execute(null);
-
-            var point = pointerPoint.Position;
-
-            // Annotation
-            PdfAnnotation? annotation = control.PdfTextLayer.FindAnnotationOver(point.X, point.Y);
-
-            if (annotation?.Action is not null)
-            {
-                switch (annotation.Action.Type)
-                {
-                    case ActionType.URI:
-                        string? uri = ((UriAction)annotation.Action)?.Uri;
-                        if (!string.IsNullOrEmpty(uri))
-                        {
-                            CalyExtensions.OpenUriAsync(uri);
-                            return;
-                        }
-                        break;
-
-                    case ActionType.GoTo:
-                    case ActionType.GoToE:
-                    case ActionType.GoToR:
-                        var goToAction = (AbstractGoToAction)annotation.Action;
-                        var dest = goToAction?.Destination;
-                        if (dest is not null)
-                        {
-                            // Ignore destination types for the moment
-                            if (dest.Coordinates.Top.HasValue)
-                            {
-                                double scaledTop = dest.Coordinates.Top.Value * annotation.PpiScale;
-                                GoToPage(dest.PageNumber, scaledTop, true);
-                            }
-                            else
-                            {
-                                GoToPage(dest.PageNumber, 0); // Top of page
-                            }
-                            return;
-                        }
-                        else
-                        {
-                            // Log error
-                        }
-                        break;
-                }
-            }
-
-            // Words
-            PdfWord? word = control.PdfTextLayer.FindWordOver(point.X, point.Y);
-            if (word is not null && control.PdfTextLayer.GetLine(word) is { IsInteractive: true } line)
-            {
-                /*
-                 * TODO - Use TopLevel.GetTopLevel(source)?.Launcher
-                 *  if (e.Source is Control source && TopLevel.GetTopLevel(source)?.Launcher is {}
-                 *  launcher && word is not null && control.PdfTextLayer.GetLine(word) is { IsInteractive: true } line)
-                 *  ...
-                 *  launcher.LaunchUriAsync(new Uri(match.ToString()))
-                 */
-
-                if (!string.IsNullOrEmpty(line.InteractiveLink))
-                {
-                    CalyExtensions.OpenUriAsync(line.InteractiveLink);
-                }
-            }
-        }
-
-        _isSelecting = false;
-
-        e.Handled = true;
-        e.PreventGestureRecognition();
-    }
-
-    private void InteractiveLayerPointerExited(object? sender, PointerEventArgs e)
-    {
-        Debug.ThrowNotOnUiThread();
-
-        if (sender is not PageInteractiveLayerControl interactiveLayer)
-        {
-            return;
-        }
-
-        interactiveLayer.SetDefaultCursor();
-        interactiveLayer.HideAnnotation();
-        SetCurrentValue(InteractiveActionOverProperty, null);
-    }
-
-    private void InteractiveLayerPointerMoved(object? sender, PointerEventArgs e)
-    {
-        Debug.ThrowNotOnUiThread();
-
-        // Needs to be on UI thread to access
-        if (sender is not PageInteractiveLayerControl control || control.PdfTextLayer is null)
-        {
-            return;
-        }
-
-        if (e.IsPanningOrZooming())
-        {
-            // Panning pages is not handled here
-            return;
-        }
-
-        var pointerPoint = e.GetCurrentPoint(control);
-        var loc = pointerPoint.Position;
-
-        if (e is PointerWheelEventArgs we)
-        {
-            // TODO - Looks like there's a bug in Avalonia (TBC) where the position of the pointer
-            // is 1 step behind the actual position.
-            // We need to add back this step (1 scroll step is 50, see link below)
-            // https://github.com/AvaloniaUI/Avalonia/blob/dadc9ab69284bb228ad460f36d5442b4eee4a82a/src/Avalonia.Controls/Presenters/ScrollContentPresenter.cs#L684
-
-            var adjPoint = new Point(50, 50);
-            var matrix = control.GetLayoutTransformMatrix();
-
-            if (!matrix.IsIdentity && matrix.TryInvert(out var inverted))
-            {
-                adjPoint = inverted.Transform(adjPoint);
-            }
-
-            double x = Math.Max(loc.X - we.Delta.X * adjPoint.X, 0);
-            double y = Math.Max(loc.Y - we.Delta.Y * adjPoint.Y, 0);
-
-            loc = new Point(x, y);
-
-            // TODO - We have an issue when scrolling and changing page here, similar the TrySwitchCapture
-            // not sure how we should address it
-        }
-
-        if (pointerPoint.Properties.IsLeftButtonPressed && _startPointerPressed.HasValue && _startPointerPressed.Value.Euclidean(loc) > 1.0)
-        {
-            // Text selection
-            HandleMouseMoveSelection(control, e, loc);
-        }
-        else
-        {
-            HandleMouseMoveOver(control, pointerPoint.Properties, loc);
-        }
-    }
-
-    private void HandleMouseMoveSelection(PageInteractiveLayerControl control, PointerEventArgs e, Point loc)
-    {
-        if (_isMultipleClickSelection || TextSelection is null)
-        {
-            return;
-        }
-
-        if (!control.Bounds.Contains(loc))
-        {
-            TrySwitchCapture(e);
-            return;
-        }
-
-        // Get the line under the cursor or nearest from the top
-        PdfTextLine? lineBox = control.PdfTextLayer!.FindLineOver(loc.X, loc.Y);
-
-        PdfWord? word = null;
-        if (TextSelection.HasStarted && lineBox is null)
-        {
-            // Try to find the closest line as we are already selecting something
-            word = FindNearestWordWhileSelecting(loc, control.PdfTextLayer);
-        }
-
-        if (lineBox is null && word is null)
-        {
-            return;
-        }
-
-        if (lineBox is not null && word is null)
-        {
-            // Get the word under the cursor
-            word = lineBox.FindWordOver(loc.X, loc.Y);
-
-            // If no word found under the cursor use the last or the first word in the line
-            if (word is null)
-            {
-                word = lineBox.FindNearestWord(loc.X, loc.Y);
-            }
-        }
-
-        if (word is null)
-        {
-            return;
-        }
-
-        // If there is matching word
-        bool allowPartialSelect = !_isMultipleClickSelection;
-
-        Point? partialSelectLoc = allowPartialSelect ? loc : null;
-        if (!TextSelection.HasStarted)
-        {
-            TextSelection.Start(control.PageNumber!.Value, word, partialSelectLoc);
-        }
-
-        // Always set the focus word
-        TextSelection.Extend(control.PageNumber!.Value, word, partialSelectLoc);
-
-        control.SetIbeamCursor();
-
-        _isSelecting = TextSelection.IsSelecting;
-    }
-
-    /// <summary>
-    /// Handle mouse hover over words, links or others
-    /// </summary>
-    private void HandleMouseMoveOver(PageInteractiveLayerControl control, PointerPointProperties properties, Point loc)
-    {
-        PdfAnnotation? annotation = control.PdfTextLayer!.FindAnnotationOver(loc.X, loc.Y);
-
-        if (annotation is not null)
-        {
-            if (!string.IsNullOrEmpty(annotation.Content) && !properties.IsRightButtonPressed)
-            {
-                // We do not show annotation when right-clicking
-                // to not conflict with context flyout. This works
-                // on Windows but would need to be tested on other platforms
-                control.ShowAnnotation(annotation);
-            }
-
-            if (annotation.IsInteractive)
-            {
-                control.SetHandCursor();
-                if (annotation.Action is UriAction uriAction)
-                {
-                    SetCurrentValue(InteractiveActionOverProperty, $"Open '{uriAction.Uri}'");
-                }
-
-                return;
-            }
-        }
-        else
-        {
-            control.HideAnnotation();
-        }
-
-        PdfWord? word = control.PdfTextLayer!.FindWordOver(loc.X, loc.Y);
-        if (word is not null)
-        {
-            //if (control.PdfTextLayer.GetLine(word)?.IsInteractive == true)
-            if (control.PdfTextLayer.GetLine(word) is { IsInteractive: true } line)
-            {
-                control.SetHandCursor();
-                SetCurrentValue(InteractiveActionOverProperty, $"Open '{line.InteractiveLink}'");
-            }
-            else
-            {
-                control.SetIbeamCursor();
-                SetCurrentValue(InteractiveActionOverProperty, null);
-            }
-        }
-        else
-        {
-            control.SetDefaultCursor();
-            SetCurrentValue(InteractiveActionOverProperty, null);
-        }
-    }
-
-    private static PdfWord? FindNearestWordWhileSelecting(Point loc, PdfTextLayer textLayer)
-    {
-        if (textLayer.TextBlocks is null || textLayer.TextBlocks.Count == 0)
-        {
-            return null;
-        }
-
-        // Try finding the closest line as we are already selecting something
-
-        // TODO - To finish, improve performance
-        var point = new PdfPoint(loc.X, loc.Y);
-
-        double dist = double.MaxValue;
-        double projectionOnLine = 0;
-        PdfTextLine? l = null;
-
-        foreach (var block in textLayer.TextBlocks)
-        {
-            foreach (var line in block.TextLines)
-            {
-                PdfPoint? projection = PdfPointExtensions.ProjectPointOnLine(in point,
-                    line.BoundingBox.BottomLeft,
-                    line.BoundingBox.BottomRight,
-                    out double s);
-
-                if (!projection.HasValue || s < 0)
-                {
-                    // If s < 0, the cursor is before the line (to the left), we ignore
-                    continue;
-                }
-
-                // If s > 1, the cursor is after the line (to the right), we measure distance from bottom right corner
-                PdfPoint referencePoint = s > 1 ? line.BoundingBox.BottomRight : projection.Value;
-
-                double localDist = SquaredWeightedEuclidean(in point, in referencePoint, wY: 4); // Make y direction farther
-
-                // TODO - Prevent selection line 'below' cursor
-
-                if (localDist < dist)
-                {
-                    dist = localDist;
-                    l = line;
-                    projectionOnLine = s;
-                }
-            }
-        }
-
-        if (l is null)
-        {
-            return null;
-        }
-
-        if (projectionOnLine >= 1)
-        {
-            // Cursor after line, return last word
-            return l.Words[^1];
-        }
-
-        // TODO - to improve, we already know where on the line is the point thanks to 'projectionOnLine'
-        return l.FindNearestWord(loc.X, loc.Y);
-
-        static double SquaredWeightedEuclidean(in PdfPoint point1, in PdfPoint point2, double wX = 1.0, double wY = 1.0)
-        {
-            double dx = point1.X - point2.X;
-            double dy = point1.Y - point2.Y;
-            return wX * dx * dx + wY * dy * dy;
-        }
-    }
-
     /// <summary>
     /// Switch pointer capture to the page under the cursor if we are selecting text and the cursor is outside the current page.
     /// </summary>
-    private void TrySwitchCapture(PointerEventArgs e)
+    internal void TrySwitchCapture(PointerEventArgs e)
     {
         PageItem? endPage = GetPageItemOver(e);
         if (endPage?.InteractiveLayer is null)
@@ -2051,10 +1579,8 @@ public sealed class PageItemsControl : ItemsControl
     private void ResetState()
     {
         SetCurrentValue(VisiblePagesProperty, null);
+        _textSelectionHandler.Reset();
         _currentPosition = null;
-        _isSelecting = false;
-        _isMultipleClickSelection = false;
-        _startPointerPressed = null;
         _isSettingPageVisibility = false;
         _isZooming = false;
         _pendingScrollToPage = false;
