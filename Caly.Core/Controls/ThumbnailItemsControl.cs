@@ -24,19 +24,17 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Data;
 using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
-using Avalonia.Threading;
 using Caly.Core.Utilities;
 using System;
-using System.Linq;
 using System.Windows.Input;
-using Avalonia.Controls.Presenters;
 
 namespace Caly.Core.Controls;
 
 public sealed class ThumbnailItemsControl : ListBox
 {
     private bool _isScrollingToPage;
-    private bool _isUpdateThumbnailsVisibilityScheduled;
+
+    private readonly VirtualizedVisibilityTracker _visibilityTracker;
 
     private ScrollViewer? _scrollViewer;
 
@@ -90,9 +88,10 @@ public sealed class ThumbnailItemsControl : ListBox
     
     public ThumbnailItemsControl()
     {
-        _scrollChangedHandler = (_, _) => PostUpdateThumbnailsVisibility();
-        _sizeChangedHandler = (_, _) => PostUpdateThumbnailsVisibility();
-        _loadedHandler = (_, _) => PostUpdateThumbnailsVisibility();
+        _visibilityTracker = new VirtualizedVisibilityTracker(this, () => UpdateThumbnailsVisibility());
+        _scrollChangedHandler = (_, _) => _visibilityTracker.PostUpdateVisibility();
+        _sizeChangedHandler = (_, _) => _visibilityTracker.PostUpdateVisibility();
+        _loadedHandler = (_, _) => _visibilityTracker.PostUpdateVisibility();
         ResetState();
     }
 
@@ -118,21 +117,6 @@ public sealed class ThumbnailItemsControl : ListBox
         }
     }
 
-    private void PostUpdateThumbnailsVisibility()
-    {
-        if (_isUpdateThumbnailsVisibilityScheduled)
-        {
-            return;
-        }
-
-        _isUpdateThumbnailsVisibilityScheduled = true;
-        Dispatcher.UIThread.Post(() =>
-        {
-            _isUpdateThumbnailsVisibilityScheduled = false;
-            UpdateThumbnailsVisibility();
-        }, DispatcherPriority.Loaded);
-    }
-
     private bool UpdateThumbnailsVisibility()
     {
         if (_scrollViewer is null)
@@ -145,8 +129,8 @@ public sealed class ThumbnailItemsControl : ListBox
             return false;
         }
 
-        int firstRealisedIndex = GetMinPageIndex();
-        int lastRealisedIndex = GetMaxPageIndex();
+        int firstRealisedIndex = _visibilityTracker.GetFirstRealizedIndex();
+        int lastRealisedIndex = _visibilityTracker.GetLastRealizedIndexExclusive();
 
         if (firstRealisedIndex == -1 || lastRealisedIndex == -1)
         {
@@ -214,38 +198,6 @@ public sealed class ThumbnailItemsControl : ListBox
         return true;
     }
 
-    /// <summary>
-    /// Starts at 0. Inclusive.
-    /// </summary>
-    private int GetMinPageIndex()
-    {
-        if (ItemsPanelRoot is VirtualizingStackPanel v)
-        {
-            return v.FirstRealizedIndex;
-        }
-        return 0;
-    }
-
-    /// <summary>
-    /// Starts at 0. Exclusive.
-    /// <para>-1 if not realised.</para>
-    /// </summary>
-    private int GetMaxPageIndex()
-    {
-        if (ItemsPanelRoot is VirtualizingStackPanel v)
-        {
-            if (v.LastRealizedIndex == -1)
-            {
-                return -1;
-            }
-            
-            return Math.Min(ItemCount, v.LastRealizedIndex + 1);
-        }
-
-        return ItemCount;
-    }
-    
-
     protected override void PrepareContainerForItemOverride(Control container, object? item, int index)
     {
         base.PrepareContainerForItemOverride(container, item, index);
@@ -255,7 +207,7 @@ public sealed class ThumbnailItemsControl : ListBox
             return;
         }
 
-        PostUpdateThumbnailsVisibility();
+        _visibilityTracker.PostUpdateVisibility();
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -265,7 +217,7 @@ public sealed class ThumbnailItemsControl : ListBox
         if (change.Property == DataContextProperty)
         {
             ResetState();
-            EnsureValidContainersVisibility();
+            _visibilityTracker.EnsureValidContainersVisibility();
         }
         else if (change.Property == IsVisibleProperty)
         {
@@ -281,8 +233,8 @@ public sealed class ThumbnailItemsControl : ListBox
                     _isScrollingToPage = false;
                 }
 
-                EnsureValidContainersVisibility();
-                PostUpdateThumbnailsVisibility();
+                _visibilityTracker.EnsureValidContainersVisibility();
+                _visibilityTracker.PostUpdateVisibility();
             }
             else if (change is { OldValue: true, NewValue: false })
             {
@@ -294,30 +246,11 @@ public sealed class ThumbnailItemsControl : ListBox
         }
     }
 
-    private void EnsureValidContainersVisibility()
-    {
-        // This is a hack to ensure only valid containers (realised) are visible
-        // See https://github.com/CalyPdf/Caly/issues/11
-
-        if (ItemsPanelRoot is null)
-        {
-            return;
-        }
-
-        var realised = GetRealizedContainers().OfType<ListBoxItem>();
-        var visibleChildren = ItemsPanelRoot.Children.Where(c => c.IsVisible).OfType<ListBoxItem>();
-
-        foreach (var child in visibleChildren.Except(realised))
-        {
-            child.SetCurrentValue(IsVisibleProperty, false);
-        }
-    }
-    
     private void ResetState()
     {
         SetCurrentValue(RealisedThumbnailsProperty, null);
         SetCurrentValue(VisibleThumbnailsProperty, null);
         _isScrollingToPage = false;
-        _isUpdateThumbnailsVisibilityScheduled = false;
+        _visibilityTracker.Reset();
     }
 }
