@@ -1,7 +1,7 @@
 {
     "GeneralSettings": {
         "NetProjectPath": "Caly.Desktop.csproj",
-        "ApplicationName": "Caly Pdf Reader",
+        "ApplicationName": "Caly Pdf Reader (Slim)",
         "Version": "0.3.0.0",
         "PackageName": {
             "$type": "msbuild",
@@ -30,9 +30,7 @@
         "SigningCredentialsType": "AdHoc"
     },
     "PublishSettings": {
-        "PublishSingleFile": "True",
-        "PublishTrimmed": "True",
-        "PublishReadyToRun": "True",
+        "Configuration": "AOT",
         "ExtraBuildProperties": {}
     }
 }
