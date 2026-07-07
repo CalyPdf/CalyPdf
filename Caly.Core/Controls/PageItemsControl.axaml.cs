@@ -140,6 +140,13 @@ public sealed class PageItemsControl : ItemsControl
             defaultBindingMode: BindingMode.TwoWay);
 
     /// <summary>
+    /// Defines the <see cref="ViewportWidth"/> property.
+    /// </summary>
+    public static readonly StyledProperty<double> ViewportWidthProperty =
+        AvaloniaProperty.Register<PageItemsControl, double>(nameof(ViewportWidth),
+            defaultBindingMode: BindingMode.OneWayToSource);
+
+    /// <summary>
     /// Defines the <see cref="TextSelection"/> property.
     /// </summary>
     public static readonly StyledProperty<TextSelection?> TextSelectionProperty =
@@ -193,9 +200,14 @@ public sealed class PageItemsControl : ItemsControl
         _scrollChangedHandler = (_, e) =>
         {
             AdjustXOffsetOnExtentChanged(e);
+            UpdateViewportWidth(); // Viewport width changes when a vertical scrollbar appears/disappears.
             PostUpdatePagesVisibility();
         };
-        _sizeChangedHandler = (_, _) => PostUpdatePagesVisibility();
+        _sizeChangedHandler = (_, _) =>
+        {
+            UpdateViewportWidth();
+            PostUpdatePagesVisibility();
+        };
 
         // Use a Tunnel handler to ensure zoom checks run before bubble-phase handlers
         // and avoid unwanted event scrolls by 50px before we can reject them.
@@ -272,6 +284,16 @@ public sealed class PageItemsControl : ItemsControl
     {
         get => GetValue(ScrollOffsetProperty);
         set => SetValue(ScrollOffsetProperty, value);
+    }
+
+    /// <summary>
+    /// Width of the scroll viewport in display pixels (the area available to the page
+    /// content, excluding a visible vertical scrollbar). Independent of <see cref="ZoomLevel"/>.
+    /// </summary>
+    public double ViewportWidth
+    {
+        get => GetValue(ViewportWidthProperty);
+        set => SetValue(ViewportWidthProperty, value);
     }
 
     /// <summary>
@@ -1429,6 +1451,14 @@ public sealed class PageItemsControl : ItemsControl
         finally
         {
             _suppressScrollAdjustment = false;
+        }
+    }
+
+    private void UpdateViewportWidth()
+    {
+        if (Scroll is not null)
+        {
+            SetCurrentValue(ViewportWidthProperty, Scroll.Viewport.Width);
         }
     }
 

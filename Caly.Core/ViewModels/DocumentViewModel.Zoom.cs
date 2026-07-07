@@ -37,20 +37,29 @@ public partial class DocumentViewModel
      * See PDF Reference 1.7 - C.2 Architectural limits
      * The magnification factor of a view should be constrained to be between approximately 8 percent and 6400 percent.
      */
-    public double MinZoomLevel => 0.08;
-    public double MaxZoomLevel => 64;
+    public static double MinZoomLevel => 0.08;
+    public static double MaxZoomLevel => 64;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ZoomInCommand))]
     [NotifyCanExecuteChangedFor(nameof(ZoomOutCommand))]
-    private double _zoomLevel = 1;
+    public partial double ZoomLevel { get; set; } = 1;
 
     /// <summary>
     /// Scroll offset to restore when this document's tab becomes active again. Y is
     /// relative to the top of <see cref="SelectedPageNumber"/>. Stored in unscaled
     /// document coordinates (independent of <see cref="ZoomLevel"/>).
     /// </summary>
-    [ObservableProperty] private Vector _scrollOffset;
+    [ObservableProperty]
+    public partial Vector ScrollOffset { get; set; }
+
+    /// <summary>
+    /// Width of the page viewport in display pixels, pushed up from the view. Independent
+    /// of <see cref="ZoomLevel"/> (the zoom scale is applied to the content inside the
+    /// viewport). Used by <see cref="FitToPage"/> to compute the zoom that fits a page width.
+    /// </summary>
+    [ObservableProperty]
+    public partial double ViewportWidth { get; set; }
 
     [RelayCommand(CanExecute = nameof(CanZoomIn))]
     private void ZoomIn()
@@ -100,6 +109,42 @@ public partial class DocumentViewModel
         return ZoomLevel > MinZoomLevel;
     }
 
+    /// <summary>
+    /// Adjusts <see cref="ZoomLevel"/> so the active (selected) page's width fills the
+    /// viewport width.
+    /// </summary>
+    [RelayCommand]
+    private void FitToPage()
+    {
+        // TODO - This is actually "Fit to Width". We also need:
+        // "Fit to Page": fit to width or height so that full page is visible on screen
+        // "Fit to Content": Fit to relevant part of the page that actually contains sthing (us SKPicture CullRect).
+        // These different "fit" options should be made available through a drop-down button, that can be clicked,
+        // but only display one choice at a time (each should have its own shortcut though)
+        // NB:
+        // - When fitting to width, the page x location should stay the same (i.e. if top of the page is visible,
+        //      it should stay visible)
+        // - When fitting to content, the (x,y) top corner zoomed in should be the top corner of the content (i.e.
+        //      page location should be adjusted after the zoom). The ScrollOffset property is one-way, only
+        //      update from view.
+
+        int index = SelectedPageIndex;
+        if (index < 0 || index >= Pages.Count)
+        {
+            return;
+        }
+
+        // 100.5% of the width to avoid showing horizontal scrollbar
+        double pageWidth = Pages[index].DisplayWidth * 1.005;
+        double viewportWidth = ViewportWidth;
+        if (pageWidth <= 0 || viewportWidth <= 0)
+        {
+            return;
+        }
+
+        ZoomLevel = Math.Clamp(viewportWidth / pageWidth, MinZoomLevel, MaxZoomLevel);
+    }
+    
     [RelayCommand]
     private void RotateAllPagesClockwise()
     {

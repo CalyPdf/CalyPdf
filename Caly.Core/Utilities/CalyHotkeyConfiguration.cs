@@ -70,6 +70,11 @@ internal static class CalyHotkeyConfiguration
     public static KeyGesture DocumentZoomOutGesture => new KeyGesture(Key.OemMinus, CommandModifiers);
 
     /// <summary>
+    /// Gets a platform-specific <see cref="KeyGesture"/> for the 'Fit to Page' action.
+    /// </summary>
+    public static KeyGesture DocumentFitToPageGesture => new KeyGesture(Key.Multiply, CommandModifiers);
+
+    /// <summary>
     /// Gets a platform-specific <see cref="KeyGesture"/> for the 'Search in Document' action.
     /// </summary>
     public static KeyGesture DocumentSearchGesture => new KeyGesture(Key.F, CommandModifiers);
