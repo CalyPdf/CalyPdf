@@ -27,7 +27,6 @@ using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
-using Avalonia.Media.Transformation;
 using Avalonia.VisualTree;
 using Caly.Core.Models;
 using Caly.Core.Utilities;
@@ -45,8 +44,6 @@ namespace Caly.Core.Controls;
 [TemplatePart("PART_LayoutTransformControl", typeof(LayoutTransformControl))]
 public sealed class PageItemsControl : ItemsControl
 {
-    private const double _zoomFactor = 1.1;
-
     /// <summary>
     /// The default value for the <see cref="PageItemsControl.ItemsPanel"/> property.
     /// </summary>
@@ -69,9 +66,13 @@ public sealed class PageItemsControl : ItemsControl
     /// </summary>
     private readonly VirtualizedVisibilityTracker _visibilityTracker;
 
-    private Point? _currentPosition;
+    /// <summary>
+    /// Handles ctrl+wheel/pinch/external zoom and drag panning, owning the
+    /// in-flight zoom/pan state.
+    /// </summary>
+    private readonly ZoomPanController _zoomPanController;
+
     private bool _isSettingPageVisibility;
-    private bool _isZooming;
     private bool _pendingScrollToPage;
     private bool _isApplyingPendingScroll;
 
@@ -189,6 +190,7 @@ public sealed class PageItemsControl : ItemsControl
     {
         _textSelectionHandler = new TextSelectionInputHandler(this);
         _visibilityTracker = new VirtualizedVisibilityTracker(this, () => UpdatePagesVisibility());
+        _zoomPanController = new ZoomPanController(this);
         _scrollChangedHandler = (_, e) =>
         {
             AdjustXOffsetOnExtentChanged(e);
@@ -199,7 +201,7 @@ public sealed class PageItemsControl : ItemsControl
         // Use a Tunnel handler to ensure zoom checks run before bubble-phase handlers
         // and avoid unwanted event scrolls by 50px before we can reject them.
         // No need to RemoveHandler() as it is on 'this', so it's GC'd with the control.
-        AddHandler(PointerWheelChangedEvent, OnPointerWheelChangedHandler, RoutingStrategies.Tunnel);
+        AddHandler(PointerWheelChangedEvent, _zoomPanController.OnPointerWheelChanged, RoutingStrategies.Tunnel);
         AddHandler(KeyDownEvent, OnKeyDownHandler, RoutingStrategies.Tunnel, handledEventsToo: true);
         AddHandler(KeyUpEvent, OnKeyUpHandler, RoutingStrategies.Tunnel, handledEventsToo: true);
 
@@ -740,16 +742,16 @@ public sealed class PageItemsControl : ItemsControl
         Scroll.Focus(); // Make sure the Scroll has focus
 
         LayoutTransform = e.NameScope.FindFromNameScope<LayoutTransformControl>("PART_LayoutTransformControl");
-        LayoutTransform.AddHandler(PointerPressedEvent, OnPointerPressed);
-        LayoutTransform.AddHandler(PointerMovedEvent, OnPointerMoved);
-        LayoutTransform.AddHandler(PointerReleasedEvent, OnPointerReleased);
+        LayoutTransform.AddHandler(PointerPressedEvent, _zoomPanController.OnPointerPressed);
+        LayoutTransform.AddHandler(PointerMovedEvent, _zoomPanController.OnPointerMoved);
+        LayoutTransform.AddHandler(PointerReleasedEvent, _zoomPanController.OnPointerReleased);
 
         if (CalyExtensions.IsMobilePlatform())
         {
             LayoutTransform.GestureRecognizers.Add(new PinchGestureRecognizer());
-            LayoutTransform.AddHandler(PinchEvent, _onPinchChangedHandler);
-            LayoutTransform.AddHandler(PinchEndedEvent, _onPinchChangedHandler);
-            LayoutTransform.AddHandler(HoldingEvent, _onPinchChangedHandler);
+            LayoutTransform.AddHandler(PinchEvent, _zoomPanController.OnPinchChanged);
+            LayoutTransform.AddHandler(PinchEndedEvent, _zoomPanController.OnPinchEnded);
+            LayoutTransform.AddHandler(HoldingEvent, _zoomPanController.OnHolding);
         }
     }
 
@@ -765,15 +767,15 @@ public sealed class PageItemsControl : ItemsControl
 
         if (LayoutTransform is not null)
         {
-            LayoutTransform.RemoveHandler(PointerPressedEvent, OnPointerPressed);
-            LayoutTransform.RemoveHandler(PointerMovedEvent, OnPointerMoved);
-            LayoutTransform.RemoveHandler(PointerReleasedEvent, OnPointerReleased);
+            LayoutTransform.RemoveHandler(PointerPressedEvent, _zoomPanController.OnPointerPressed);
+            LayoutTransform.RemoveHandler(PointerMovedEvent, _zoomPanController.OnPointerMoved);
+            LayoutTransform.RemoveHandler(PointerReleasedEvent, _zoomPanController.OnPointerReleased);
 
             if (CalyExtensions.IsMobilePlatform())
             {
-                LayoutTransform.RemoveHandler(PinchEvent, _onPinchChangedHandler);
-                LayoutTransform.RemoveHandler(PinchEndedEvent, _onPinchChangedHandler);
-                LayoutTransform.RemoveHandler(HoldingEvent, _onPinchChangedHandler);
+                LayoutTransform.RemoveHandler(PinchEvent, _zoomPanController.OnPinchChanged);
+                LayoutTransform.RemoveHandler(PinchEndedEvent, _zoomPanController.OnPinchEnded);
+                LayoutTransform.RemoveHandler(HoldingEvent, _zoomPanController.OnHolding);
             }
         }
     }
@@ -865,50 +867,8 @@ public sealed class PageItemsControl : ItemsControl
         }
         else if (change.Property == ZoomLevelProperty)
         {
-            HandleExternalZoomLevelChanged(change);
+            _zoomPanController.HandleExternalZoomLevelChanged(change);
         }
-    }
-
-    /// <summary>
-    /// Applies a <see cref="ZoomLevel"/> change that did not originate from this control's
-    /// own zoom handlers (e.g. the view model's zoom in/out commands), zooming around the
-    /// viewport centre. Changes produced by the wheel/pinch/programmatic handlers have
-    /// already updated the layout transform, so the scale comparison below turns them
-    /// into no-ops.
-    /// </summary>
-    private void HandleExternalZoomLevelChanged(AvaloniaPropertyChangedEventArgs change)
-    {
-        if (LayoutTransform is null || change.NewValue is not double newZoom)
-        {
-            return;
-        }
-
-        if (!LayoutTransform.IsAttachedToVisualTree())
-        {
-            return;
-        }
-
-        var currentScale = LayoutTransform.LayoutTransform?.Value.M11;
-        if (currentScale.HasValue && Math.Abs(currentScale.Value - newZoom) < 1e-9)
-        {
-            return; // Ignore as no change in zoom level
-        }
-
-        double dZoom = newZoom / (double?)change.OldValue ?? 1.0;
-
-        double w = 0, h = 0;
-        if (!DesiredSize.IsEmpty())
-        {
-            DesiredSize.Deconstruct(out w, out h);
-        }
-        else if (!Bounds.Size.IsEmpty())
-        {
-            Bounds.Size.Deconstruct(out w, out h);
-        }
-
-        var pixelPoint = this.PointToScreen(new Point((int)(w / 2.0), (int)(h / 2.0)));
-        var point = LayoutTransform.PointToClient(pixelPoint);
-        ZoomTo(dZoom, point);
     }
 
     private void ItemsPanelRoot_DataContextChanged(object? sender, EventArgs e)
@@ -930,7 +890,8 @@ public sealed class PageItemsControl : ItemsControl
 
     private void AdjustXOffsetOnExtentChanged(ScrollChangedEventArgs e)
     {
-        if (Scroll is null || _suppressScrollAdjustment || _isZooming || _isPinching || _pendingScrollToPage)
+        if (Scroll is null || _suppressScrollAdjustment || _zoomPanController.IsZooming ||
+            _zoomPanController.IsPinching || _pendingScrollToPage)
         {
             return;
         }
@@ -1213,7 +1174,7 @@ public sealed class PageItemsControl : ItemsControl
     {
         if (e.IsPanningOrZooming())
         {
-            ResetPanTo();
+            _zoomPanController.ResetPan();
         }
     }
 
@@ -1226,7 +1187,7 @@ public sealed class PageItemsControl : ItemsControl
 
         if (e.IsPanningOrZooming())
         {
-            ResetPanTo();
+            _zoomPanController.ResetPan();
             return;
         }
 
@@ -1293,268 +1254,14 @@ public sealed class PageItemsControl : ItemsControl
         }
     }
 
-    #region Mobile handling
-
-    private void _onHoldingChangedHandler(object? sender, HoldingRoutedEventArgs e)
-    {
-        System.Diagnostics.Debug.WriteLine($"Holding {e.HoldingState}: {e.Position.X}, {e.Position.Y}");
-    }
-
-    private double _pinchZoomReference = 1.0;
-    private bool _isPinching;
-
-    private void _onPinchEndedHandler(object? sender, PinchEndedEventArgs e)
-    {
-        _pinchZoomReference = ZoomLevel;
-        _isPinching = false;
-    }
-
-    private void _onPinchChangedHandler(object? sender, PinchEventArgs e)
-    {
-        if (!_isPinching)
-        {
-            // Capture the zoom level at the start of each new pinch gesture so the
-            // first event doesn't compute dZoom against a stale reference of 1.0.
-            _pinchZoomReference = ZoomLevel;
-            _isPinching = true;
-        }
-
-        if (e.Scale != 0)
-        {
-            ZoomTo(e);
-            e.Handled = true;
-        }
-    }
-
-    private void ZoomTo(PinchEventArgs e)
-    {
-        if (LayoutTransform is null)
-        {
-            return;
-        }
-
-        if (_isZooming)
-        {
-            return;
-        }
-
-        try
-        {
-            _isZooming = true;
-
-            // Pinch zoom always starts with a scale of 1, then increase/decrease until PinchEnded
-            double dZoom = (e.Scale * _pinchZoomReference) / ZoomLevel;
-
-            // TODO - Origin still not correct
-            var point = LayoutTransform.PointToClient(new PixelPoint((int)e.ScaleOrigin.X, (int)e.ScaleOrigin.Y));
-            ZoomToInternal(dZoom, point);
-            SetCurrentValue(ZoomLevelProperty, LayoutTransform.LayoutTransform?.Value.M11);
-        }
-        finally
-        {
-            SetZoomFinished();
-        }
-    }
-    #endregion
-
-    private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (!e.IsPanning())
-        {
-            return;
-        }
-
-        var point = e.GetCurrentPoint(this);
-        _currentPosition = point.Position;
-        e.Handled = true;
-    }
-
-    private void OnPointerMoved(object? sender, PointerEventArgs e)
-    {
-        if (!e.IsPanningOrZooming())
-        {
-            return;
-        }
-
-        if (e.IsPanning())
-        {
-            SetPanCursor();
-            PanTo(e);
-        }
-
-        e.Handled = true;
-    }
-
-    private void OnPointerReleased(object? sender, PointerReleasedEventArgs e)
-    {
-        ResetPanTo();
-    }
-
-    private void PanTo(PointerEventArgs e)
-    {
-        if (Scroll is null)
-        {
-            return;
-        }
-
-        var point = e.GetCurrentPoint(this);
-
-        if (!_currentPosition.HasValue)
-        {
-            _currentPosition = point.Position;
-            return;
-        }
-
-        var delta = point.Position - _currentPosition;
-
-        var offset = Scroll.Offset - delta.Value;
-        Scroll.SetCurrentValue(ScrollViewer.OffsetProperty, offset);
-        _currentPosition = point.Position;
-    }
-
-    private void ResetPanTo()
-    {
-        _currentPosition = null;
-        SetDefaultCursor();
-    }
-
-    private void OnPointerWheelChangedHandler(object? sender, PointerWheelEventArgs e)
-    {
-        var hotkeys = Application.Current!.PlatformSettings?.HotkeyConfiguration;
-        var ctrl = hotkeys is not null && e.KeyModifiers.HasFlag(hotkeys.CommandModifiers);
-
-        if (ctrl && e.Delta.Y != 0)
-        {
-            ZoomTo(e);
-            e.Handled = true;
-            e.PreventGestureRecognition();
-        }
-    }
-
-    private void ZoomTo(PointerWheelEventArgs e)
-    {
-        if (LayoutTransform is null)
-        {
-            return;
-        }
-
-        if (_isZooming)
-        {
-            return;
-        }
-
-        try
-        {
-            _isZooming = true;
-            double dZoom = Math.Round(Math.Pow(_zoomFactor, e.Delta.Y), 4); // If IsScrollInertiaEnabled = false, Y is only 1 or -1
-            ZoomToInternal(dZoom, e.GetPosition(LayoutTransform));
-            SetCurrentValue(ZoomLevelProperty, LayoutTransform.LayoutTransform?.Value.M11);
-        }
-        finally
-        {
-            SetZoomFinished();
-        }
-    }
-
-    private void ZoomTo(double dZoom, Point point)
-    {
-        if (LayoutTransform is null || Scroll is null)
-        {
-            return;
-        }
-
-        if (_isZooming)
-        {
-            return;
-        }
-
-        try
-        {
-            _isZooming = true;
-            ZoomToInternal(dZoom, point);
-        }
-        finally
-        {
-            SetZoomFinished();
-        }
-    }
-
-    private void SetZoomFinished()
-    {
-        // ZoomToInternal positions the offset around the zoom origin itself, so
-        // suppress the auto-anchor in AdjustXOffsetOnExtentChanged for the layout/
-        // scroll events this transform change is about to produce. Setting to 'false'
-        // is posted at Loaded priority so it runs after the layout pass that
-        // updates Scroll.Extent.
-        //_isZooming = false;
-        Dispatcher.UIThread.Post(() =>
-        {
-            _isZooming = false;
-        }, DispatcherPriority.Loaded);
-    }
-
-    private void ZoomToInternal(double dZoom, Point point)
-    {
-        if (LayoutTransform is null || Scroll is null)
-        {
-            return;
-        }
-
-        double oldZoom = LayoutTransform.LayoutTransform?.Value.M11 ?? 1.0;
-        double newZoom = oldZoom * dZoom;
-
-        if (newZoom < MinZoomLevel)
-        {
-            if (oldZoom.Equals(MinZoomLevel))
-            {
-                return;
-            }
-
-            newZoom = MinZoomLevel;
-            dZoom = newZoom / oldZoom;
-        }
-        else if (newZoom > MaxZoomLevel)
-        {
-            if (oldZoom.Equals(MaxZoomLevel))
-            {
-                return;
-            }
-
-            newZoom = MaxZoomLevel;
-            dZoom = newZoom / oldZoom;
-        }
-
-        var builder = TransformOperations.CreateBuilder(1);
-        builder.AppendScale(newZoom, newZoom);
-        LayoutTransform.LayoutTransform = builder.Build();
-
-        var offset = Scroll.Offset - GetOffset(dZoom, point.X, point.Y);
-        if (newZoom > oldZoom)
-        {
-            // When zooming-in, we need to re-arrange the scroll viewer
-            Scroll.Measure(Size.Infinity);
-            Scroll.Arrange(new Rect(Scroll.DesiredSize));
-        }
-
-        Scroll.SetCurrentValue(ScrollViewer.OffsetProperty, offset);
-    }
-
-    private static Vector GetOffset(double scale, double x, double y)
-    {
-        double s = 1 - scale;
-        return new Vector(x * s, y * s);
-    }
-
     private void ResetState()
     {
         SetCurrentValue(VisiblePagesProperty, null);
         _textSelectionHandler.Reset();
-        _currentPosition = null;
+        _zoomPanController.Reset();
         _isSettingPageVisibility = false;
-        _isZooming = false;
         _pendingScrollToPage = false;
         _isApplyingPendingScroll = false;
-        _isPinching = false;
         _visibilityTracker.Reset();
         _suppressScrollAdjustment = false;
     }
