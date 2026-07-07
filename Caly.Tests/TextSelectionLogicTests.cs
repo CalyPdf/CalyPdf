@@ -37,39 +37,12 @@ public class TextSelectionLogicTests
     }
 
     /// <summary>
-    /// Assigns the word/line/block indices exactly like PdfTextLayerHelper.GetTextLayer().
+    /// Builds a layer with the production indexing scheme
+    /// (<see cref="Caly.Pdf.PdfTextLayerHelper.AssignIndices"/>).
     /// </summary>
     private static PdfTextLayer BuildLayer(params PdfTextBlock[] blocks)
     {
-        ushort wordIndex = 0;
-        ushort lineIndex = 0;
-        ushort blockIndex = 0;
-
-        foreach (PdfTextBlock block in blocks)
-        {
-            ushort blockStartIndex = wordIndex;
-
-            foreach (PdfTextLine line in block.TextLines)
-            {
-                ushort lineStartIndex = wordIndex;
-
-                foreach (PdfWord word in line.Words)
-                {
-                    word.IndexInPage = wordIndex++;
-                    word.TextLineIndex = lineIndex;
-                    word.TextBlockIndex = blockIndex;
-                }
-
-                line.IndexInPage = lineIndex++;
-                line.TextBlockIndex = blockIndex;
-                line.WordStartIndex = lineStartIndex;
-            }
-
-            block.IndexInPage = blockIndex++;
-            block.WordStartIndex = blockStartIndex;
-            block.WordEndIndex = (ushort)(wordIndex - 1);
-        }
-
+        Caly.Pdf.PdfTextLayerHelper.AssignIndices(blocks);
         return new PdfTextLayer(blocks, []);
     }
 

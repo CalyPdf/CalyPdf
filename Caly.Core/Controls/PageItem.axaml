@@ -81,6 +81,8 @@
 								  Width="{Binding Size.Width}"
 								  Height="{Binding Size.Height}">
 
+								<!-- No Height binding: the child is square and the Viewbox
+								     stretches uniformly, so Height follows Width. -->
 								<Viewbox IsVisible="{Binding IsPageRendering}"
 										 IsEnabled="{Binding IsPageRendering}"
 										 HorizontalAlignment="Left"
@@ -91,12 +93,6 @@
 											<Binding Path="Size"/>
 										</MultiBinding>
 									</Viewbox.Width>
-									<Viewbox.Height>
-										<MultiBinding Converter="{StaticResource ProgressRingSizeConverter}">
-											<Binding Path="VisibleArea"/>
-											<Binding Path="Size"/>
-										</MultiBinding>
-									</Viewbox.Height>
 									<Viewbox.Margin>
 										<MultiBinding Converter="{StaticResource ProgressRingMarginConverter}">
 											<Binding Path="VisibleArea"/>

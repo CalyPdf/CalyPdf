@@ -56,8 +56,7 @@ internal static class TextSelectionLogic
             case 3:
                 {
                     // Select whole line
-                    var block = textLayer.TextBlocks![word.TextBlockIndex];
-                    var line = block.TextLines![word.TextLineIndex - block.TextLines[0].IndexInPage];
+                    var line = textLayer.GetLine(word)!;
 
                     startWord = line.Words[0];
                     endWord = line.Words[^1];

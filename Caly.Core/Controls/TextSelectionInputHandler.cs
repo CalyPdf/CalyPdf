@@ -134,13 +134,11 @@ internal sealed class TextSelectionInputHandler
 
     private void HandleMultipleClick(PageInteractiveLayerControl control, PointerPressedEventArgs e, PdfWord word)
     {
-        var textSelection = _owner.TextSelection;
-        if (textSelection is null || control.PdfTextLayer is null)
-        {
-            return;
-        }
+        // The only caller (OnPointerPressed) has already verified both are non-null.
+        System.Diagnostics.Debug.Assert(_owner.TextSelection is not null && control.PdfTextLayer is not null);
+        var textSelection = _owner.TextSelection!;
 
-        if (!TextSelectionLogic.TryGetMultipleClickSelection(control.PdfTextLayer, word, e.ClickCount,
+        if (!TextSelectionLogic.TryGetMultipleClickSelection(control.PdfTextLayer!, word, e.ClickCount,
                 out PdfWord startWord, out PdfWord endWord))
         {
             System.Diagnostics.Debug.WriteLine($"HandleMultipleClick: Not handled, got {e.ClickCount} click(s).");
@@ -372,17 +370,15 @@ internal sealed class TextSelectionInputHandler
             return;
         }
 
-        // If there is matching word
-        bool allowPartialSelect = !_isMultipleClickSelection;
-
-        Point? partialSelectLoc = allowPartialSelect ? loc : null;
+        // If there is matching word. Partial (within-word) selection is always allowed
+        // here: the multiple-click case already returned at the top of the method.
         if (!textSelection.HasStarted)
         {
-            textSelection.Start(control.PageNumber!.Value, word, partialSelectLoc);
+            textSelection.Start(control.PageNumber!.Value, word, loc);
         }
 
         // Always set the focus word
-        textSelection.Extend(control.PageNumber!.Value, word, partialSelectLoc);
+        textSelection.Extend(control.PageNumber!.Value, word, loc);
 
         control.SetIbeamCursor();
 
