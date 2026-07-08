@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2025 BobLd
+﻿// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -19,7 +19,6 @@
 // SOFTWARE.
 
 using Avalonia.Collections;
-using Caly.Core.Models;
 using Caly.Core.Services;
 using Caly.Core.Services.Interfaces;
 using Caly.Core.Utilities;
@@ -53,17 +52,9 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool _isSettingsPaneOpen;
 
     /// <summary>
-    /// Whether the document side pane is open. App-level value shared across all documents:
-    /// closing the pane on one document keeps it closed for every document.
+    /// App-level states, shared across all documents.
     /// </summary>
-    [ObservableProperty]
-    public partial bool IsDocumentPaneOpen { get; set; } = !CalyExtensions.IsMobilePlatform();
-
-    /// <summary>
-    /// Width of the document side pane. App-level value (shared across all documents) persisted to settings.
-    /// </summary>
-    [ObservableProperty]
-    public partial double PaneSize { get; set; }
+    public ApplicationStates AppStates { get; }
 
     public DocumentViewModel? SelectedDocument
     {
@@ -120,20 +111,25 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
             _lastAnnouncedSelectedDocument = selected;
             if (selected is not null)
             {
-                App.Messenger.Send(new SelectedDocumentChangedMessage(selected));
+                Core.App.Messenger.Send(new SelectedDocumentChangedMessage(selected));
             }
         });
     }
 
-
-    partial void OnPaneSizeChanged(double oldValue, double newValue)
+#if DEBUG
+    /// <summary>
+    /// Design-time constructor.
+    /// </summary>
+    public MainViewModel() : this(new ApplicationStates())
     {
-        App.Current?.Services?.GetService<ISettingsService>()?
-            .SetProperty(CalySettings.CalySettingsProperty.PaneSize, newValue);
     }
+#endif
 
-    public MainViewModel()
+    public MainViewModel(ApplicationStates appStates)
     {
+        ArgumentNullException.ThrowIfNull(appStates, nameof(appStates));
+        AppStates = appStates;
+
         // Documents are added/removed on the UI thread; the selected document can
         // change on collection changes without SelectedDocumentIndex changing.
         PdfDocuments.CollectionChanged += (_, _) => ScheduleSelectedDocumentChanged();
@@ -222,7 +218,6 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private async Task CloseTab(object tabItem, CancellationToken token)
     {
-        // TODO - Finish proper dispose / unload of document on close 
         if (((DragTabItem)tabItem)?.DataContext is DocumentViewModel vm)
         {
             await CloseDocumentInternal(vm, token);
@@ -262,7 +257,7 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void ActivateSearchTextTab()
     {
-        IsDocumentPaneOpen = true;
+        AppStates.IsDocumentPaneOpen = true;
         SelectedDocument?.SelectedTabIndex = 2;
     }
 

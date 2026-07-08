@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2025 BobLd
+﻿// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -62,6 +62,12 @@ public sealed partial class DocumentViewModel : ViewModelBase
     internal string? LocalPath { get; private set; }
 
     public bool IsActive => _pdfService.IsActive;
+
+    /// <summary>
+    /// App-level states, shared across all documents. Exposed
+    /// here so views inside the document's template can bind to it directly.
+    /// </summary>
+    public ApplicationStates AppStates { get; }
 
     [ObservableProperty] private ObservableCollection<PageViewModel> _pages = [];
 
@@ -174,6 +180,7 @@ public sealed partial class DocumentViewModel : ViewModelBase
         _bookmarksTask = null!;
         _buildSearchIndex = null!;
         _searchResultsSource = null!;
+        AppStates = new ApplicationStates();
 
         _pdfService = new PdfPigDocumentService(new JsonSettingsService(null!));
 
@@ -185,9 +192,12 @@ public sealed partial class DocumentViewModel : ViewModelBase
     }
 #endif
 
-    public DocumentViewModel(IPdfDocumentService pdfService, PdfPageService pdfPageService, ITextSearchService textSearchService)
+    public DocumentViewModel(IPdfDocumentService pdfService, PdfPageService pdfPageService,
+        ITextSearchService textSearchService, ApplicationStates appStates)
     {
         ArgumentNullException.ThrowIfNull(pdfService, nameof(pdfService));
+        ArgumentNullException.ThrowIfNull(appStates, nameof(appStates));
+        AppStates = appStates;
 
         System.Diagnostics.Debug.Assert(pdfService.NumberOfPages == 0);
 

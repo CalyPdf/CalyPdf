@@ -1,4 +1,4 @@
-// Copyright (c) 2025 BobLd
+// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,7 +20,6 @@
 
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Metadata;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.VisualTree;
@@ -35,8 +34,6 @@ namespace Caly.Core.Controls;
 /// Control that represents all open PDF documents, together with the top and left navigation panels.
 /// Each PDF document is displayed in a tab.
 /// </summary>
-[TemplatePart("PART_TextBoxPageNumber", typeof(TextBox))]
-[TemplatePart("PART_SplitView", typeof(SplitView))]
 public sealed partial class DocumentsTabsControl : UserControl
 {
     private const int MaxPaneLength = 500;
