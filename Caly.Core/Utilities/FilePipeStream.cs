@@ -44,19 +44,30 @@ public sealed class FilePipeStream : IDisposable, IAsyncDisposable
 
     private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(2);
 
+    private static readonly TimeSpan ReceiveTimeout = TimeSpan.FromSeconds(5);
+
     private readonly MemoryPool<byte> _memoryPool = MemoryPool<byte>.Shared;
     private readonly NamedPipeServerStream _pipeServer;
+    private readonly TimeSpan _receiveTimeout;
 
-    public FilePipeStream()
+    public FilePipeStream() : this(PipeName)
+    {
+    }
+
+    /// <summary>
+    /// Creates the server on a specific pipe name, with an optional per-message receive
+    /// deadline override (used by tests).
+    /// </summary>
+    internal FilePipeStream(string pipeName, TimeSpan? receiveTimeout = null)
     {
 #if DEBUG
         if (Avalonia.Controls.Design.IsDesignMode)
         {
-            _pipeServer = new(Guid.NewGuid().ToString(), PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.CurrentUserOnly);
-            return;
+            pipeName = Guid.NewGuid().ToString();
         }
 #endif
-        _pipeServer = new(PipeName, PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.CurrentUserOnly);
+        _receiveTimeout = receiveTimeout ?? ReceiveTimeout;
+        _pipeServer = new(pipeName, PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.CurrentUserOnly);
     }
 
     public async IAsyncEnumerable<string?> ReceivePathAsync([EnumeratorCancellation] CancellationToken token)
@@ -72,16 +83,15 @@ public sealed class FilePipeStream : IDisposable, IAsyncDisposable
                 // https://learn.microsoft.com/en-us/dotnet/standard/io/how-to-use-named-pipes-for-network-interprocess-communication
                 await _pipeServer.WaitForConnectionAsync(token);
 
+                using var receiveCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+                receiveCts.CancelAfter(_receiveTimeout);
+                var receiveToken = receiveCts.Token;
+
                 ushort len;
                 using (var lengthMemoryOwner = _memoryPool.Rent(sizeof(ushort)))
                 {
                     Memory<byte> lengthBuffer = lengthMemoryOwner.Memory.Slice(0, sizeof(ushort));
-                    if (await _pipeServer.ReadAsync(lengthBuffer, token) != sizeof(ushort))
-                    {
-                        // TODO - Log
-                        continue;
-                    }
-
+                    await _pipeServer.ReadExactlyAsync(lengthBuffer, receiveToken);
                     len = BitConverter.ToUInt16(lengthBuffer.Span);
                 }
 
@@ -96,11 +106,7 @@ public sealed class FilePipeStream : IDisposable, IAsyncDisposable
                     Memory<byte> buffer = memoryOwner.Memory;
 
                     // Read key phrase
-                    if (await _pipeServer.ReadAsync(buffer.Slice(0, KeyPhrase.Length), token) != KeyPhrase.Length)
-                    {
-                        // TODO - Log
-                        continue;
-                    }
+                    await _pipeServer.ReadExactlyAsync(buffer.Slice(0, KeyPhrase.Length), receiveToken);
 
                     // Check key phrase
                     if (!buffer.Span.Slice(0, KeyPhrase.Length).SequenceEqual(KeyPhrase))
@@ -110,36 +116,23 @@ public sealed class FilePipeStream : IDisposable, IAsyncDisposable
                     }
 
                     // Read message type
-                    if (await _pipeServer.ReadAsync(buffer.Slice(0, 1), token) != 1)
-                    {
-                        // TODO - Log
-                        continue;
-                    }
+                    await _pipeServer.ReadExactlyAsync(buffer.Slice(0, 1), receiveToken);
 
                     PipeMessageType messageType = (PipeMessageType)buffer.Span[0];
                     switch (messageType)
                     {
                         case PipeMessageType.FilePath:
-                            {
-                                // Read file path
-                                if (await _pipeServer.ReadAsync(buffer.Slice(0, len), token) != len)
-                                {
-                                    // TODO - Log
-                                    continue;
-                                }
-                            }
+                        {
+                            // Read file path
+                            await _pipeServer.ReadExactlyAsync(buffer.Slice(0, len), receiveToken);
+                        }
                             break;
 
                         case PipeMessageType.Command:
-                            {
-                                if (await _pipeServer.ReadAsync(buffer.Slice(0, 1), token) != 1)
-                                {
-                                    // TODO - Log
-                                    continue;
-                                }
-
-                                ProcessMessageCommand((PipeCommandMessageType)buffer.Span[0]);
-                            }
+                        {
+                            await _pipeServer.ReadExactlyAsync(buffer.Slice(0, 1), receiveToken);
+                            ProcessMessageCommand((PipeCommandMessageType)buffer.Span[0]);
+                        }
                             break;
 
                         default:
@@ -154,7 +147,11 @@ public sealed class FilePipeStream : IDisposable, IAsyncDisposable
             }
             catch (OperationCanceledException)
             {
-                // No op
+                // Handled below: cancellation ends the enumeration
+            }
+            catch (EndOfStreamException)
+            {
+                // Client closed mid-message. Drop it and keep listening
             }
             catch (Exception e)
             {
@@ -163,11 +160,24 @@ public sealed class FilePipeStream : IDisposable, IAsyncDisposable
             }
             finally
             {
-                // We are not connected if operation was canceled
-                if (_pipeServer.IsConnected)
+                // Reset the server for the next client. Checking IsConnected is not
+                // enough: a client that broke the pipe mid-message leaves the server
+                // in the Broken state (IsConnected == false), yet the OS pipe still
+                // needs the disconnect before WaitForConnectionAsync can accept a
+                // new client.
+                try
                 {
                     _pipeServer.Disconnect();
                 }
+                catch (InvalidOperationException)
+                {
+                    // Never connected (e.g. cancelled while waiting for a connection)
+                }
+            }
+
+            if (token.IsCancellationRequested)
+            {
+                yield break;
             }
 
             if (!string.IsNullOrEmpty(path))
