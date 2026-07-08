@@ -72,11 +72,11 @@ public sealed class FilePipeStream : IDisposable, IAsyncDisposable
                 // https://learn.microsoft.com/en-us/dotnet/standard/io/how-to-use-named-pipes-for-network-interprocess-communication
                 await _pipeServer.WaitForConnectionAsync(token);
 
-                ushort len = 0;
-                using (var lengthMemoryOwner = _memoryPool.Rent(Math.Max(KeyPhrase.Length, len)))
+                ushort len;
+                using (var lengthMemoryOwner = _memoryPool.Rent(sizeof(ushort)))
                 {
-                    Memory<byte> lengthBuffer = lengthMemoryOwner.Memory;
-                    if (await _pipeServer.ReadAsync(lengthBuffer, token) != 2)
+                    Memory<byte> lengthBuffer = lengthMemoryOwner.Memory.Slice(0, sizeof(ushort));
+                    if (await _pipeServer.ReadAsync(lengthBuffer, token) != sizeof(ushort))
                     {
                         // TODO - Log
                         continue;
