@@ -20,6 +20,7 @@
 
 using Avalonia.Collections;
 using Caly.Core.Models;
+using Caly.Core.Services;
 using Caly.Core.Services.Interfaces;
 using Caly.Core.Utilities;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -34,6 +35,7 @@ using System.Reactive.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Threading;
+using CommunityToolkit.Mvvm.Messaging;
 using Tabalonia.Controls;
 
 namespace Caly.Core.ViewModels;
@@ -67,19 +69,62 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
     {
         get
         {
-            try
-            {
-                return (SelectedDocumentIndex < 0 || PdfDocuments.Count == 0) ? null : PdfDocuments[SelectedDocumentIndex];
-            }
-            catch (Exception e)
-            {
-                Debug.WriteExceptionToFile(e);
-                return null;
-            }
+            int index = SelectedDocumentIndex;
+            return index >= 0 && index < PdfDocuments.Count ? PdfDocuments[index] : null;
         }
     }
 
     public string Version => CalyExtensions.CalyVersion;
+
+    /// <summary>
+    /// The document the last <see cref="SelectedDocumentChangedMessage"/> was sent for,
+    /// so switching between index/collection updates that resolve to the same document
+    /// does not re-announce it.
+    /// </summary>
+    private DocumentViewModel? _lastAnnouncedSelectedDocument;
+
+    private bool _isAnnounceSelectedDocumentScheduled;
+
+    partial void OnSelectedDocumentIndexChanged(int value)
+    {
+        ScheduleSelectedDocumentChanged();
+    }
+
+    /// <summary>
+    /// Schedules a single <see cref="SelectedDocumentChangedMessage"/> on the UI thread.
+    /// </summary>
+    private void ScheduleSelectedDocumentChanged()
+    {
+        /*
+         * Index and collection changes come in non-atomic bursts (e.g.  PdfDocumentsManagerService
+         * removes a document and only then corrects SelectedDocumentIndex; Tabalonia reorders tabs
+         * with Remove + Add), so announcing synchronously would observe transient states and
+         * activate the wrong document. Deferring to a posted callback coalesces the burst and runs
+         * once the state is settled.
+         */
+        if (_isAnnounceSelectedDocumentScheduled)
+        {
+            return;
+        }
+
+        _isAnnounceSelectedDocumentScheduled = true;
+        Dispatcher.UIThread.Post(() =>
+        {
+            _isAnnounceSelectedDocumentScheduled = false;
+            DocumentViewModel? selected = SelectedDocument;
+            if (ReferenceEquals(_lastAnnouncedSelectedDocument, selected))
+            {
+                return;
+            }
+
+            _lastAnnouncedSelectedDocument = selected;
+            if (selected is not null)
+            {
+                App.Messenger.Send(new SelectedDocumentChangedMessage(selected));
+            }
+        });
+    }
+
 
     partial void OnPaneSizeChanged(double oldValue, double newValue)
     {
@@ -89,6 +134,10 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
 
     public MainViewModel()
     {
+        // Documents are added/removed on the UI thread; the selected document can
+        // change on collection changes without SelectedDocumentIndex changing.
+        PdfDocuments.CollectionChanged += (_, _) => ScheduleSelectedDocumentChanged();
+
         _documentCollectionDisposable = PdfDocuments
             .GetWeakCollectionChangedObservable()
             .ObserveOn(Scheduler.Default)

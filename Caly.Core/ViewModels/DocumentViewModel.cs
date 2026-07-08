@@ -28,7 +28,6 @@ using Caly.Core.Services;
 using Caly.Core.Services.Interfaces;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
@@ -566,11 +565,5 @@ public sealed partial class DocumentViewModel : ViewModelBase
         await _pdfPageService.CancelAndClear().ConfigureAwait(false);
 
         GC.Collect(GC.MaxGeneration, GCCollectionMode.Optimized, false);
-    }
-
-    [RelayCommand]
-    private void Activated()
-    {
-        App.Messenger.Send(new SelectedDocumentChangedMessage(this));
     }
 }
