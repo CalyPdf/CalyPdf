@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2025 BobLd
+﻿// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -189,14 +189,8 @@ namespace Caly.Pdf
             var words = CalyNNWordExtractor.Instance.GetWords(letters, token);
             var pdfBlocks = CalyDocstrum.Instance.GetBlocks(words, token);
 
-            ushort wordIndex = 0;
-            ushort lineIndex = 0;
-            ushort blockIndex = 0;
-
             foreach (PdfTextBlock block in pdfBlocks)
             {
-                ushort blockStartIndex = wordIndex;
-
                 foreach (PdfTextLine line in block.TextLines)
                 {
                     line.IsInteractive = IsInteractive(line);
@@ -208,7 +202,33 @@ namespace Caly.Pdf
                             line.InteractiveLink = new string(match);
                         }
                     }
+                }
+            }
 
+            AssignIndices(pdfBlocks, token);
+
+            return new PdfTextLayer(pdfBlocks, page.Annotations);
+        }
+
+        /// <summary>
+        /// Assigns the page-wide word/line/block indices
+        /// (<see cref="PdfWord.IndexInPage"/>, <see cref="PdfTextLine.WordStartIndex"/>,
+        /// <see cref="PdfTextBlock.WordEndIndex"/>, etc.) that the selection and search
+        /// logic rely on. Internal so test fixtures build layers with the exact same
+        /// indexing scheme as production.
+        /// </summary>
+        internal static void AssignIndices(IReadOnlyList<PdfTextBlock> pdfBlocks, CancellationToken token = default)
+        {
+            ushort wordIndex = 0;
+            ushort lineIndex = 0;
+            ushort blockIndex = 0;
+
+            foreach (PdfTextBlock block in pdfBlocks)
+            {
+                ushort blockStartIndex = wordIndex;
+
+                foreach (PdfTextLine line in block.TextLines)
+                {
                     ushort lineStartIndex = wordIndex;
 
                     foreach (PdfWord word in line.Words)
@@ -233,8 +253,6 @@ namespace Caly.Pdf
                 block.WordStartIndex = blockStartIndex;
                 block.WordEndIndex = ushort.CreateChecked(wordIndex - 1);
             }
-
-            return new PdfTextLayer(pdfBlocks, page.Annotations);
         }
 
         private static PdfPoint InverseYAxis(PdfPoint point, double height)
