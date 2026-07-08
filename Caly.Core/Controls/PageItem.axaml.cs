@@ -23,6 +23,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Metadata;
 using Avalonia.Controls.Primitives;
 using Avalonia.Data;
+using Avalonia.Interactivity;
 using Caly.Core.Utilities;
 using Caly.Core.ViewModels;
 using SkiaSharp;
@@ -88,10 +89,22 @@ public sealed class PageItem : ContentControl
     }
 
     /// <summary>
-    /// Raised synchronously just before a page rotation action executes, so the view
-    /// can capture its scroll state before the layout changes.
+    /// Defines the <see cref="BeforeRotation"/> event.
     /// </summary>
-    public event EventHandler? BeforeRotation;
+    public static readonly RoutedEvent<RoutedEventArgs> BeforeRotationEvent =
+        RoutedEvent.Register<PageItem, RoutedEventArgs>(nameof(BeforeRotation), RoutingStrategies.Bubble);
+
+    /// <summary>
+    /// Raised synchronously just before a page rotation action executes, so the view
+    /// can capture its scroll state before the layout changes. Bubbles, so ancestors
+    /// (e.g. <see cref="PageItemsControl"/>) can subscribe once instead of wiring each
+    /// container across load/unload cycles.
+    /// </summary>
+    public event EventHandler<RoutedEventArgs>? BeforeRotation
+    {
+        add => AddHandler(BeforeRotationEvent, value);
+        remove => RemoveHandler(BeforeRotationEvent, value);
+    }
 
     public int Rotation
     {
@@ -164,7 +177,7 @@ public sealed class PageItem : ContentControl
         {
             if (!change.GetOldValue<bool>() && change.GetNewValue<bool>())
             {
-                BeforeRotation?.Invoke(this, EventArgs.Empty);
+                RaiseEvent(new RoutedEventArgs(BeforeRotationEvent));
             }
         }
     }

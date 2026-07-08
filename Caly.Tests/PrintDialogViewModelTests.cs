@@ -176,7 +176,7 @@ public class PrintDialogViewModelCapabilitiesTests
         var vm = new PrintDialogViewModel(svc, new FakePdfDocumentService(), 1);
 
         vm.SelectedPrinter = new PrinterInfo("p1", null);
-        await Task.Delay(50);  // capability load is fire-and-forget
+        await Task.Delay(50, TestContext.Current.CancellationToken);  // capability load is fire-and-forget
 
         Assert.Equal(caps, vm.SelectedPrinterCapabilities);
     }
@@ -190,13 +190,13 @@ public class PrintDialogViewModelCapabilitiesTests
         // Start with all-supported.
         svc.Capabilities = new PrinterCapabilities(true, true, true, new[] { 1, 2, 4 });
         vm.SelectedPrinter = new PrinterInfo("color", null);
-        await Task.Delay(50);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
         vm.IsOrientationLandscape = true;
 
         // Switch to a printer that does not support landscape.
         svc.Capabilities = new PrinterCapabilities(false, true, true, new[] { 1, 2, 4 });
         vm.SelectedPrinter = new PrinterInfo("portrait-only", null);
-        await Task.Delay(50);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
 
         Assert.True(vm.IsOrientationAuto);
         Assert.False(vm.IsOrientationLandscape);
@@ -211,7 +211,7 @@ public class PrintDialogViewModelPrintCommandTests
         var svc = new FakePrintService();
         var vm = new PrintDialogViewModel(svc, new FakePdfDocumentService(), 1);
         vm.SelectedPrinter = new PrinterInfo("p1", null);
-        await Task.Delay(50);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
 
         vm.IsOrientationLandscape = true;
         vm.IsCustomScale = true;
@@ -235,7 +235,7 @@ public class PrintDialogViewModelPrintCommandTests
         var svc = new FakePrintService();
         var vm = new PrintDialogViewModel(svc, new FakePdfDocumentService(), 1);
         vm.SelectedPrinter = new PrinterInfo("p1", null);
-        await Task.Delay(50);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
 
         vm.IsCustomScale = true;
         vm.CustomScalePercent = 500;  // out of range

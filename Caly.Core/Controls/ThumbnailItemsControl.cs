@@ -23,7 +23,6 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Data;
 using Avalonia.Interactivity;
-using Avalonia.LogicalTree;
 using Caly.Core.Utilities;
 using System;
 using System.Windows.Input;
@@ -105,17 +104,10 @@ public sealed class ThumbnailItemsControl : ListBox
         _scrollViewer.AddHandler(LoadedEvent, _loadedHandler);
     }
 
-    protected override void OnDetachedFromLogicalTree(LogicalTreeAttachmentEventArgs e)
-    {
-        base.OnDetachedFromLogicalTree(e);
-
-        if (_scrollViewer is not null)
-        {
-            _scrollViewer.RemoveHandler(ScrollViewer.ScrollChangedEvent, _scrollChangedHandler);
-            _scrollViewer.RemoveHandler(SizeChangedEvent, _sizeChangedHandler);
-            _scrollViewer.RemoveHandler(LoadedEvent, _loadedHandler);
-        }
-    }
+    // NB: the handlers added to the scroll viewer in OnApplyTemplate are intentionally
+    // never removed. They live on this control's own template subtree (no leak beyond
+    // the control's lifetime), and removing them on detach would leave the control dead
+    // after a detach/reattach cycle because OnApplyTemplate does not run again.
 
     private void UpdateThumbnailsVisibility()
     {
