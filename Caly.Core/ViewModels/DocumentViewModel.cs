@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2025 BobLd
+﻿// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -373,7 +373,7 @@ public sealed partial class DocumentViewModel : ViewModelBase
             System.Diagnostics.Debug.Assert(TextSelection is not null);
 
             // Use 1st page size as default page size
-            var firstPage = new PageViewModel(1, TextSelection, _pdfPageService.TileRenderService, _pdfService.PpiScale);
+            var firstPage = new PageViewModel(1, TextSelection, _pdfPageService.TileRenderService, _pdfService.PpiScale, CopyTextCommand);
             var pageSize = await _pdfPageService.GetPageSize(1, _mainToken).ConfigureAwait(false);
             if (pageSize.HasValue)
             {
@@ -388,7 +388,7 @@ public sealed partial class DocumentViewModel : ViewModelBase
             for (int p = 2; p <= PageCount; ++p)
             {
                 _mainToken.ThrowIfCancellationRequested();
-                var newPage = new PageViewModel(p, TextSelection, _pdfPageService.TileRenderService, _pdfService.PpiScale)
+                var newPage = new PageViewModel(p, TextSelection, _pdfPageService.TileRenderService, _pdfService.PpiScale, CopyTextCommand)
                 {
                     Size = defaultSize
                 };

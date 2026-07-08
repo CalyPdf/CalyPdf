@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2025 BobLd
+﻿// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -34,6 +34,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
+using System.Windows.Input;
 using UglyToad.PdfPig.Core;
 
 namespace Caly.Core.ViewModels;
@@ -96,6 +97,13 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
     public double PpiScale { get; }
 
     public TileRenderService TileRenderService { get; }
+
+    /// <summary>
+    /// The owning document's copy-text command, exposed here so page-level views
+    /// (e.g. the page context flyout) can bind to it directly instead of reaching
+    /// up the visual tree for the document view model.
+    /// </summary>
+    public ICommand CopyTextCommand { get; }
 
     public bool IsPageVisible => VisibleArea.HasValue;
 
@@ -201,16 +209,20 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
 
         TextSelection = null!;
         TileRenderService = null!;
+        CopyTextCommand = null!;
     }
 #endif
-    
-    public PageViewModel(int pageNumber, TextSelection textSelection, TileRenderService tileRenderService, double ppiScale)
+
+    public PageViewModel(int pageNumber, TextSelection textSelection, TileRenderService tileRenderService,
+        double ppiScale, ICommand copyTextCommand)
     {
         ArgumentNullException.ThrowIfNull(textSelection, nameof(textSelection));
+        ArgumentNullException.ThrowIfNull(copyTextCommand, nameof(copyTextCommand));
         PageNumber = pageNumber;
         TileRenderService = tileRenderService;
         PpiScale = ppiScale;
         TextSelection = textSelection;
+        CopyTextCommand = copyTextCommand;
 
         // We don't unsubscribe from the TextSelection events as it takes
         // forever when the number of pages is large.

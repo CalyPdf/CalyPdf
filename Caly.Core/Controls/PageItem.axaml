@@ -33,7 +33,7 @@
 		<Setter Property="ContextFlyout">
 			<MenuFlyout>
 				<MenuItem Header="{DynamicResource StringTextFlyoutCopyText}"
-                          Command="{Binding $parent[controls:PageItemsControl].((vm:DocumentViewModel)DataContext).CopyTextCommand}"
+                          Command="{Binding CopyTextCommand}"
                           InputGesture="{x:Static utilities:CalyHotkeyConfiguration.CopyGesture}"/>
 
 				<Separator/>
