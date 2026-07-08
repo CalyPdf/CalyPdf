@@ -1,4 +1,4 @@
-// Copyright (c) 2025 BobLd
+// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -32,11 +32,14 @@ using Caly.Core.Utilities;
 using Caly.Pdf;
 using Caly.Pdf.Models;
 using System;
-using System.Linq;
 using System.Windows.Input;
 using Avalonia.Threading;
 using UglyToad.PdfPig.Actions;
 using UglyToad.PdfPig.Core;
+
+#if DEBUG
+using System.Linq;
+#endif
 
 namespace Caly.Core.Controls;
 
@@ -75,10 +78,15 @@ public sealed class PageItemsControl : ItemsControl
     /// </summary>
     private readonly ZoomPanController _zoomPanController;
 
+    /// <summary>
+    /// Shared visibility-tracking machinery (debounced updates, realized-range
+    /// queries, container-visibility workaround).
+    /// </summary>
+    private readonly VirtualizedVisibilityTracker _visibilityTracker;
+
     private bool _isSettingPageVisibility;
     private bool _pendingScrollToPage;
     private bool _isApplyingPendingScroll;
-    private bool _isUpdatePagesVisibilityScheduled;
 
     private readonly EventHandler<ScrollChangedEventArgs> _scrollChangedHandler;
     private readonly EventHandler<SizeChangedEventArgs> _sizeChangedHandler;
@@ -193,12 +201,13 @@ public sealed class PageItemsControl : ItemsControl
     public PageItemsControl()
     {
         _zoomPanController = new ZoomPanController(this);
+        _visibilityTracker = new VirtualizedVisibilityTracker(this, () => UpdatePagesVisibility());
         _scrollChangedHandler = (_, e) =>
         {
             AdjustXOffsetOnExtentChanged(e);
-            PostUpdatePagesVisibility();
+            _visibilityTracker.PostUpdateVisibility();
         };
-        _sizeChangedHandler = (_, _) => PostUpdatePagesVisibility();
+        _sizeChangedHandler = (_, _) => _visibilityTracker.PostUpdateVisibility();
 
         // Use a Tunnel handler to ensure zoom checks run before bubble-phase handlers
         // and avoid unwanted event scrolls by 50px before we can reject them.
@@ -1063,37 +1072,6 @@ public sealed class PageItemsControl : ItemsControl
         return NeedsContainer<PageItem>(item, out recycleKey);
     }
 
-    /// <summary>
-    /// Starts at 0. Inclusive.
-    /// </summary>
-    private int GetMinPageIndex()
-    {
-        if (ItemsPanelRoot is VirtualizingStackPanel v)
-        {
-            return v.FirstRealizedIndex;
-        }
-        return 0;
-    }
-
-    /// <summary>
-    /// Starts at 0. Exclusive.
-    /// <para>-1 if not realised.</para>
-    /// </summary>
-    private int GetMaxPageIndex()
-    {
-        if (ItemsPanelRoot is VirtualizingStackPanel v)
-        {
-            if (v.LastRealizedIndex == -1)
-            {
-                return -1;
-            }
-
-            return Math.Min(PageCount, v.LastRealizedIndex + 1);
-        }
-
-        return PageCount;
-    }
-
     public PageItem? GetPageItemOver(PointerEventArgs e)
     {
         if (Presenter is null)
@@ -1110,8 +1088,8 @@ public sealed class PageItemsControl : ItemsControl
             return null;
         }
 
-        int minPageIndex = GetMinPageIndex();
-        int maxPageIndex = GetMaxPageIndex(); // Exclusive
+        int minPageIndex = _visibilityTracker.GetFirstRealizedIndex();
+        int maxPageIndex = _visibilityTracker.GetLastRealizedIndex();
 
         if (minPageIndex == -1 || maxPageIndex == -1)
         {
@@ -1268,7 +1246,7 @@ public sealed class PageItemsControl : ItemsControl
             return;
         }
 
-        if (GetMaxPageIndex() > 0)
+        if (_visibilityTracker.GetLastRealizedIndex() > 0)
         {
             if (_pendingScrollToPage)
             {
@@ -1320,32 +1298,13 @@ public sealed class PageItemsControl : ItemsControl
             ResetState();
             _pendingScrollToPage = true;
             Scroll?.Focus();
-            EnsureValidContainersVisibility();
+            _visibilityTracker.EnsureValidContainersVisibility();
             ItemsPanelRoot?.LayoutUpdated -= ItemsPanelRoot_LayoutUpdated;
             ItemsPanelRoot?.LayoutUpdated += ItemsPanelRoot_LayoutUpdated;
         }
         else if (change.Property == ZoomLevelProperty)
         {
             _zoomPanController.HandleExternalZoomLevelChanged(change);
-        }
-    }
-
-    private void EnsureValidContainersVisibility()
-    {
-        // This is a hack to ensure only valid containers (realised) are visible
-        // See https://github.com/CalyPdf/Caly/issues/11
-
-        if (ItemsPanelRoot is null)
-        {
-            return;
-        }
-
-        var realised = GetRealizedContainers().OfType<PageItem>();
-        var visibleChildren = ItemsPanelRoot.Children.Where(c => c.IsVisible).OfType<PageItem>();
-
-        foreach (var child in visibleChildren.Except(realised))
-        {
-            child.SetCurrentValue(IsVisibleProperty, false);
         }
     }
 
@@ -1361,17 +1320,7 @@ public sealed class PageItemsControl : ItemsControl
         // Ensure the pages visibility is set when OnApplyTemplate()
         // is not called, i.e. when a new document is opened but the
         // page has exactly the same dimension of the visible page
-        PostUpdatePagesVisibility();
-    }
-
-    private bool HasRealisedItems()
-    {
-        if (ItemsPanelRoot is VirtualizingStackPanel vsp)
-        {
-            return vsp.FirstRealizedIndex != -1 && vsp.LastRealizedIndex != -1;
-        }
-
-        return false;
+        _visibilityTracker.PostUpdateVisibility();
     }
 
     private bool _suppressScrollAdjustment;
@@ -1440,21 +1389,6 @@ public sealed class PageItemsControl : ItemsControl
         }
     }
 
-    private void PostUpdatePagesVisibility()
-    {
-        if (_isUpdatePagesVisibilityScheduled)
-        {
-            return;
-        }
-
-        _isUpdatePagesVisibilityScheduled = true;
-        Dispatcher.UIThread.Post(() =>
-        {
-            _isUpdatePagesVisibilityScheduled = false;
-            UpdatePagesVisibility();
-        }, DispatcherPriority.Loaded);
-    }
-
     private bool UpdatePagesVisibility()
     {
         // Exit early if the view is unstable (e.g., user interacting, or a tab-switch
@@ -1465,7 +1399,7 @@ public sealed class PageItemsControl : ItemsControl
         }
 
         if (LayoutTransform is null || Scroll is null ||
-            Scroll.Viewport.IsEmpty() || ItemsView.Count == 0 || !HasRealisedItems())
+            Scroll.Viewport.IsEmpty() || ItemsView.Count == 0 || !_visibilityTracker.HasRealizedItems())
         {
             return false;
         }
@@ -1476,8 +1410,8 @@ public sealed class PageItemsControl : ItemsControl
         double invScale = 1.0 / (LayoutTransform.LayoutTransform?.Value.M11 ?? 1.0);
         Rect viewport = Scroll.GetViewportRect().TransformToAABB(Matrix.CreateScale(invScale, invScale));
 
-        int firstRealisedIndex = GetMinPageIndex();
-        int lastRealisedIndex = GetMaxPageIndex();
+        int firstRealisedIndex = _visibilityTracker.GetFirstRealizedIndex();
+        int lastRealisedIndex = _visibilityTracker.GetLastRealizedIndex();
 
         if (firstRealisedIndex == -1 || lastRealisedIndex == -1)
         {
@@ -1767,7 +1701,7 @@ public sealed class PageItemsControl : ItemsControl
         _isSettingPageVisibility = false;
         _pendingScrollToPage = false;
         _isApplyingPendingScroll = false;
-        _isUpdatePagesVisibilityScheduled = false;
+        _visibilityTracker.Reset();
         _suppressScrollAdjustment = false;
     }
 }
