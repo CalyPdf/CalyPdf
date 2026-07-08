@@ -177,7 +177,7 @@ public sealed class ThumbnailItemsControl : ListBox
         }
 
         // Update bound properties
-        SetCurrentValue(RealisedThumbnailsProperty, new Range(firstRealisedIndex + 1, lastRealisedIndex + 1));
+        SetCurrentValue(RealisedThumbnailsProperty, VirtualizedVisibilityTracker.GetPageRange(firstRealisedIndex, lastRealisedIndex));
 
         Range? currentVisibleThumbnails = null;
         if (firstVisibleIndex != -1 && lastVisibleIndex != -1) // No visible pages
