@@ -62,8 +62,6 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
     [NotifyPropertyChangedFor(nameof(ThumbnailSize))]
     [NotifyPropertyChangedFor(nameof(DisplayWidth))]
     [NotifyPropertyChangedFor(nameof(DisplayHeight))]
-    [NotifyPropertyChangedFor(nameof(ProgressRingSize))]
-    [NotifyPropertyChangedFor(nameof(ProgressRingMargin))]
     private Size _size;
 
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(IsThumbnailRendering))]
@@ -75,8 +73,6 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsPageVisible))]
-    [NotifyPropertyChangedFor(nameof(ProgressRingSize))]
-    [NotifyPropertyChangedFor(nameof(ProgressRingMargin))]
     private Rect? _visibleArea;
 
     [ObservableProperty]
@@ -113,32 +109,6 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
     public double DisplayWidth => IsPortrait ? Size.Width : Size.Height;
 
     public double DisplayHeight => IsPortrait ? Size.Height : Size.Width;
-
-    /// <summary>
-    /// Diameter of the loading progress ring, scaled to the visible area of the page.
-    /// </summary>
-    public double ProgressRingSize
-    {
-        get
-        {
-            Rect area = VisibleArea ?? new Rect(default, Size);
-            double size = 0.10 * Math.Min(area.Width, area.Height);
-            return size < 5 ? 5 : size;
-        }
-    }
-
-    /// <summary>
-    /// Margin that positions the loading progress ring at the center of the visible area of the page.
-    /// </summary>
-    public Thickness ProgressRingMargin
-    {
-        get
-        {
-            Point center = (VisibleArea ?? new Rect(default, Size)).Center;
-            double half = ProgressRingSize / 2.0;
-            return new Thickness(center.X - half, center.Y - half, 0, 0);
-        }
-    }
 
     public bool IsThumbnailRendering => Thumbnail is null;
 
@@ -232,12 +202,27 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
         TextSelection.TextSelectionReset += _onTextSelectionReset;
     }
 
+    /// <summary>
+    /// Assigns <see cref="SelectedWords"/> on the UI thread without blocking the
+    /// caller. Always posted (never inline) so UI-thread and background callers are
+    /// serialized in FIFO order; the generated setter ignores no-op assignments.
+    /// </summary>
+    private void SetSelectedWords(IReadOnlyList<PdfRectangle>? value)
+    {
+        Dispatcher.UIThread.Post(() => SelectedWords = value);
+    }
+
+    /// <summary>
+    /// Same dispatch strategy as <see cref="SetSelectedWords"/>, for <see cref="SearchResults"/>.
+    /// </summary>
+    private void SetSearchResults(IReadOnlyList<PdfRectangle>? value)
+    {
+        Dispatcher.UIThread.Post(() => SearchResults = value);
+    }
+
     private void _onTextSelectionReset(object? sender, EventArgs e)
     {
-        if (SelectedWords is not null)
-        {
-            Dispatcher.UIThread.Invoke(() => SelectedWords = null);
-        }
+        SetSelectedWords(null);
     }
 
     private void _onTextSelectionFocusPageChanged(object? sender, TextSelectionFocusPageChangedEventArgs e)
@@ -282,12 +267,12 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
     {
         if (_searchResultsRanges is null || _searchResultsRanges.Count == 0)
         {
-            Dispatcher.UIThread.Invoke(() => SearchResults = null);
+            SetSearchResults(null);
             return;
         }
 
         System.Diagnostics.Debug.Assert(PdfTextLayer is not null);
-        
+
         var results = new List<PdfRectangle>(_searchResultsRanges.Count);
         foreach (var range in _searchResultsRanges)
         {
@@ -297,27 +282,16 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
                 .Select(x => x.BoundingBox));
         }
 
-        if (results.Count > 0)
-        {
-            Dispatcher.UIThread.Invoke(() => SearchResults = results);
-        }
-        else
-        {
-            Dispatcher.UIThread.Invoke(() => SearchResults = null);
-        }
+        SetSearchResults(results.Count > 0 ? results : null);
     }
 
     private void RefreshTextSelection()
     {
         System.Diagnostics.Debug.Assert(PdfTextLayer is not null);
-        
+
         if (!TextSelection.IsPageInSelection(PageNumber))
         {
-            if (SelectedWords is not null)
-            {
-                Dispatcher.UIThread.Invoke(() => SelectedWords = null);
-            }
-
+            SetSelectedWords(null);
             return;
         }
 
@@ -325,10 +299,7 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
 
         if (selectedWords.Length == 0)
         {
-            if (SelectedWords is not null)
-            {
-                Dispatcher.UIThread.Invoke(() => SelectedWords = null);  // TODO - Check if we should do that here
-            }
+            SetSelectedWords(null);  // TODO - Check if we should do that here
         }
         else
         {
@@ -336,7 +307,7 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
                     selectedWords, PageNumber,
                     PdfWordHelpers.GetRectangle, PdfWordHelpers.GetRectangle)
                 .ToArray();
-            Dispatcher.UIThread.Invoke(() => SelectedWords = selectedWordRects);
+            SetSelectedWords(selectedWordRects);
         }
     }
 

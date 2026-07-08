@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2025 BobLd
+﻿// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -26,7 +26,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls.Notifications;
-using Avalonia.Data.Core.Plugins;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Markup.Xaml;
@@ -87,12 +86,17 @@ public partial class App : Application
         // Initialise dependencies
         var services = new ServiceCollection();
 
+        // Single app-level states, shared between the MainViewModel (created before
+        // the service provider is built) and every DI-scoped DocumentViewModel.
+        var appStates = new ApplicationStates();
+        services.AddSingleton(appStates);
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
             desktop.MainWindow = new MainWindow
             {
-                DataContext = new MainViewModel()
+                DataContext = new MainViewModel(appStates)
             };
 
             services.AddSingleton<Visual>(_ => desktop.MainWindow);
@@ -108,7 +112,7 @@ public partial class App : Application
             MainView? mainView = null;
             activityLifetime.MainViewFactory = () => mainView = new MainView
             {
-                DataContext = new MainViewModel()
+                DataContext = new MainViewModel(appStates)
             };
             services.AddSingleton<Visual>(_ => mainView ??
                 throw new InvalidOperationException("MainView has not been created yet."));
@@ -123,7 +127,7 @@ public partial class App : Application
         {
             singleViewPlatform.MainView = new MainView
             {
-                DataContext = new MainViewModel()
+                DataContext = new MainViewModel(appStates)
             };
             services.AddSingleton<Visual>(_ => singleViewPlatform.MainView);
             services.AddSingleton<IStorageProvider>(_ =>
@@ -136,7 +140,7 @@ public partial class App : Application
 #if DEBUG
         else if (ApplicationLifetime is null && Avalonia.Controls.Design.IsDesignMode)
         {
-            var mainView = new MainView { DataContext = new MainViewModel() };
+            var mainView = new MainView { DataContext = new MainViewModel(appStates) };
             services.AddSingleton<Visual>(_ => mainView);
             services.AddSingleton<IStorageProvider>(_ => TopLevel.GetTopLevel(mainView)?.StorageProvider);
             services.AddSingleton<IClipboard>(_ => TopLevel.GetTopLevel(mainView)?.Clipboard);
@@ -214,14 +218,15 @@ public partial class App : Application
                 desktop.Startup -= Desktop_Startup;
             }
 
-            _listeningToFiles = Task.Run(ListenToIncomingFiles); // Start listening
+            _listeningToFiles = Task.Run(ListenToIncomingFiles, CancellationToken.None); // Start listening
 
             if (e.Args.Length == 0)
             {
                 return;
             }
 
-            await Task.Run(() => OpenDoc(e.Args[0], CancellationToken.None));
+            // Open current document
+            await Task.Run(() => OpenDoc(e.Args[0], CancellationToken.None), CancellationToken.None);
         }
         catch (Exception ex)
         {
