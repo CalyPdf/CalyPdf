@@ -82,7 +82,7 @@ internal sealed class SearchValuesTextSearchService : ITextSearchService
         });
     }
 
-    private static string CleanText(string text, out int count)
+    private static string CleanText(string text)
     {
         bool hasPunctuation = false;
         for (int i = 0; i < text.Length; ++i)
@@ -123,19 +123,6 @@ internal sealed class SearchValuesTextSearchService : ITextSearchService
             text = sb.ToString();
         }
 
-        var span = text.AsSpan();
-        count = span.Count(WordSeparator) + 1;
-
-        if (span.StartsWith(WordSeparator))
-        {
-            count--;
-        }
-
-        if (span.EndsWith(WordSeparator))
-        {
-            count--;
-        }
-
         if (text.Contains(' '))
         {
             text = text.Replace(' ', WhiteSpaceProxy);
@@ -166,22 +153,8 @@ internal sealed class SearchValuesTextSearchService : ITextSearchService
         }
 
         // TODO - Move the below out of here as it reruns while indexing
-        text = CleanText(text, out int count);
+        TextQuery query = PrepareQuery(text);
         // END TODO
-
-        int indexAdj = text.StartsWith(WhiteSpaceProxy) ? 1 : 0;
-
-        string[] searchValues;
-        if (text.Contains(WhiteSpaceProxy))
-        {
-            searchValues = [text, text.Replace(WhiteSpaceProxy.ToString(), SpaceInText)];
-        }
-        else
-        {
-            searchValues = [text];
-        }
-        
-        var searchValue = SearchValues.Create(searchValues, StringComparison.OrdinalIgnoreCase);
 
         for (int i = 0; i < _index.Length; ++i)
         {
@@ -198,8 +171,6 @@ internal sealed class SearchValuesTextSearchService : ITextSearchService
                 continue;
             }
 
-            int lastSpanIndex = 0;
-
             var pageResults = new HashSet<TextSearchResult>(); // Ensure results are unique
 
             /*
@@ -207,33 +178,9 @@ internal sealed class SearchValuesTextSearchService : ITextSearchService
              * The search won't be pick up
              */
 
-            while (lastSpanIndex < pageText.Length)
+            foreach (TextSearchResult result in SearchPage(query, pageText, pageNumber, token))
             {
-                token.ThrowIfCancellationRequested();
-
-                int currentSpanIndex = pageText.AsSpan(lastSpanIndex).IndexOfAny(searchValue);
-                if (currentSpanIndex == -1)
-                {
-                    break;
-                }
-
-                currentSpanIndex += indexAdj;
-
-                lastSpanIndex += currentSpanIndex;
-
-                var wordIndex = pageText.AsSpan(0, lastSpanIndex).Count(WordSeparator);
-                
-                int k = lastSpanIndex;
-                pageResults.Add(new TextSearchResult()
-                {
-                    PageNumber = pageNumber,
-                    ItemType = SearchResultItemType.Word,
-                    WordIndex = wordIndex,
-                    WordCount = count,
-                    SampleText = () => GetSampleText(pageText, k, 20)
-                });
-
-                lastSpanIndex += text.Length;
+                pageResults.Add(result);
             }
 
             if (pageResults.Count > 0)
@@ -246,5 +193,114 @@ internal sealed class SearchValuesTextSearchService : ITextSearchService
                 };
             }
         }
+    }
+
+    /// <summary>
+    /// A prepared search query: the cleaned query text, its match variants (with and
+    /// without spaces expanded to <see cref="SpaceInText"/>) and the pre-built matcher.
+    /// Built once per search via <see cref="PrepareQuery"/>, then applied to each page's
+    /// index text by <see cref="SearchPage"/>.
+    /// </summary>
+    internal sealed class TextQuery
+    {
+        public required string Text { get; init; }
+
+        public required string[] Values { get; init; }
+
+        public required SearchValues<string> Matcher { get; init; }
+
+        public required int IndexAdjustment { get; init; }
+    }
+
+    internal static TextQuery PrepareQuery(string text)
+    {
+        text = CleanText(text);
+
+        int indexAdj = text.StartsWith(WhiteSpaceProxy) ? 1 : 0;
+
+        string[] searchValues;
+        if (text.Contains(WhiteSpaceProxy))
+        {
+            searchValues = [text, text.Replace(WhiteSpaceProxy.ToString(), SpaceInText)];
+        }
+        else
+        {
+            searchValues = [text];
+        }
+
+        return new TextQuery()
+        {
+            Text = text,
+            Values = searchValues,
+            Matcher = SearchValues.Create(searchValues, StringComparison.OrdinalIgnoreCase),
+            IndexAdjustment = indexAdj
+        };
+    }
+
+    /// <summary>
+    /// Finds every match of the query in a single page's index text. Pure logic with no
+    /// UI dependency so it is unit-testable (same approach as TextSelectionLogic).
+    /// </summary>
+    internal static IEnumerable<TextSearchResult> SearchPage(TextQuery query, string pageText, int pageNumber, CancellationToken token)
+    {
+        int lastSpanIndex = 0;
+        while (lastSpanIndex < pageText.Length)
+        {
+            token.ThrowIfCancellationRequested();
+
+            int currentSpanIndex = pageText.AsSpan(lastSpanIndex).IndexOfAny(query.Matcher);
+            if (currentSpanIndex == -1)
+            {
+                yield break;
+            }
+
+            int matchStart = lastSpanIndex + currentSpanIndex;
+            int matchLength = GetMatchLength(pageText.AsSpan(matchStart), query.Values);
+            int highlightStart = matchStart + query.IndexAdjustment;
+
+            var wordIndex = pageText.AsSpan(0, highlightStart).Count(WordSeparator);
+
+            // The number of page words the match spans can only be derived from the
+            // matched text itself: the query's spaces match across word boundaries
+            // (see SpaceInText), so a match may cover more words than the query's
+            // punctuation-split token count. Separators bounding the span do not
+            // introduce a following/preceding word, hence the trim.
+            ReadOnlySpan<char> matched = pageText
+                .AsSpan(highlightStart, matchStart + matchLength - highlightStart)
+                .Trim(WordSeparator);
+            int wordCount = matched.Count(WordSeparator) + 1;
+
+            int k = highlightStart;
+            yield return new TextSearchResult()
+            {
+                PageNumber = pageNumber,
+                ItemType = SearchResultItemType.Word,
+                WordIndex = wordIndex,
+                WordCount = wordCount,
+                SampleText = () => GetSampleText(pageText, k, 20)
+            };
+
+            lastSpanIndex = matchStart + matchLength;
+        }
+    }
+
+    /// <summary>
+    /// Length of the query variant that matched at the given position. The matcher
+    /// found one of <paramref name="searchValues"/> here, so at least one comparison
+    /// succeeds; when both variants match (no spaces expanded) they are identical.
+    /// </summary>
+    private static int GetMatchLength(ReadOnlySpan<char> matchText, string[] searchValues)
+    {
+        int length = 0;
+        foreach (string value in searchValues)
+        {
+            if (value.Length > length && matchText.StartsWith(value, StringComparison.OrdinalIgnoreCase))
+            {
+                length = value.Length;
+            }
+        }
+
+        System.Diagnostics.Debug.Assert(length > 0);
+        return length;
     }
 }
