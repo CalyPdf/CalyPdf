@@ -111,6 +111,22 @@ internal sealed class VirtualizedVisibilityTracker
         return _owner.ItemCount;
     }
 
+    /// <summary>
+    /// Converts a realized-index pair — 0-based first index (<see cref="GetFirstRealizedIndex"/>)
+    /// and 0-based exclusive end (<see cref="GetLastRealizedIndex"/>) — to the 1-based,
+    /// exclusive-end item-number <see cref="Range"/> bound to the owner's
+    /// RealisedPages/RealisedThumbnails property. Returns <c>null</c> when nothing is realized.
+    /// </summary>
+    public static Range? GetPageRange(int firstRealizedIndex, int lastRealizedIndexExclusive)
+    {
+        if (firstRealizedIndex == -1 || lastRealizedIndexExclusive == -1)
+        {
+            return null;
+        }
+
+        return new Range(firstRealizedIndex + 1, lastRealizedIndexExclusive + 1);
+    }
+
     public bool HasRealizedItems()
     {
         return _owner.ItemsPanelRoot is VirtualizingStackPanel vsp &&

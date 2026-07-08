@@ -1069,7 +1069,7 @@ public sealed class PageItemsControl : ItemsControl
         }
 
         // Update bound properties
-        SetCurrentValue(RealisedPagesProperty, new Range(firstRealisedIndex + 1, lastRealisedIndex + 2));
+        SetCurrentValue(RealisedPagesProperty, VirtualizedVisibilityTracker.GetPageRange(firstRealisedIndex, lastRealisedIndex));
 
         Range? currentVisiblePages = null;
         if (firstVisibleIndex != -1 && lastVisibleIndex != -1) // No visible pages
