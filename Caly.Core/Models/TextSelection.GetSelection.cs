@@ -34,7 +34,7 @@ public partial class TextSelection
     {
         System.Diagnostics.Debug.Assert(pdfTextLayer is not null);
 
-        if (!IsPageInSelection(pageNumber))
+        if (pdfTextLayer.Count == 0 || !IsPageInSelection(pageNumber))
         {
             yield break;
         }

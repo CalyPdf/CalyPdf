@@ -1,3 +1,4 @@
+using Caly.Core.Models;
 using Caly.Core.Utilities;
 using Caly.Pdf.Models;
 using UglyToad.PdfPig.Core;
@@ -161,4 +162,18 @@ public class TextSelectionLogicTests
     }
 
     #endregion
+
+    [Fact]
+    public void CanSelectOverEmptyPage()
+    {
+        var fakeWord = new PdfWord([new PdfLetter("a", new PdfRectangle(), 0, 0)]);
+        // Forge a selection spanning pages 1 -> 3 (anchor/focus words don't matter for page 2).
+        var sel = new TextSelection(4);
+        sel.Start(1, fakeWord);
+        sel.Extend(3, fakeWord);
+
+        // Empty text layer, exactly what an image-only page gets (PdfTextLayer.Empty).
+        var words = sel.GetSelectedWords(2, PdfTextLayer.Empty).ToArray();
+        Assert.Empty(words); // Page 2 is empty
+    }
 }
