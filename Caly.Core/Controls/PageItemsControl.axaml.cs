@@ -26,7 +26,6 @@ using Avalonia.Controls.Templates;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.LogicalTree;
 using Caly.Core.Models;
 using Caly.Core.Utilities;
 using System;
@@ -210,6 +209,7 @@ public sealed class PageItemsControl : ItemsControl
         AddHandler(PointerReleasedEvent, OnInteractiveLayerPointerReleased, RoutingStrategies.Tunnel);
         AddHandler(PointerMovedEvent, OnInteractiveLayerPointerMoved, RoutingStrategies.Tunnel);
         AddHandler(PointerWheelChangedEvent, OnInteractiveLayerPointerMoved, RoutingStrategies.Tunnel);
+        AddHandler(PageItem.BeforeRotationEvent, OnBeforePageRotation);
 
         ResetState();
     }
@@ -512,53 +512,39 @@ public sealed class PageItemsControl : ItemsControl
         pageItem.SetCurrentValue(PageItem.VisibleAreaProperty, null);
     }
 
+    /*
+     * Container event wiring. The Loaded/Unloaded subscriptions live for the whole
+     * container lifetime (in PrepareContainerForItemOverride), and every
+     * Loaded/Unloaded cycle re-wires the per-container PointerExited handler.
+     * This keeps the wiring alive when the control is detached and reattached without
+     * its containers being re-prepared (e.g. a Tabalonia tab torn off into another window);
+     * the virtualizing panel keeps its realized containers across that cycle.
+     */
+
     private void PageItem_Unloaded(object? sender, RoutedEventArgs e)
     {
-        if (sender is not PageItem pageItem)
-        {
-            return;
-        }
-
-        pageItem.Loaded -= PageItem_Loaded;
-        pageItem.Unloaded -= PageItem_Unloaded;
-
-        if (pageItem.InteractiveLayer is null)
+        if (sender is not PageItem { InteractiveLayer: not null } pageItem)
         {
             return;
         }
 
         pageItem.InteractiveLayer.PointerExited -= _textSelectionHandler.OnPointerExited;
-        pageItem.BeforeRotation -= OnBeforePageRotation;
     }
 
     private void PageItem_Loaded(object? sender, RoutedEventArgs e)
     {
-        if (sender is not PageItem pageItem)
+        if (sender is not PageItem { InteractiveLayer: not null } pageItem)
         {
             return;
         }
 
-        pageItem.Loaded -= PageItem_Loaded;
-
-        if (pageItem.InteractiveLayer is null)
-        {
-            return;
-        }
-
-        // Pressed/Released/Moved/Wheel are handled through routed tunnel handlers on
-        // this control (see the constructor); only PointerExited needs a per-container
-        // subscription as it does not route through ancestors.
-        
-        // Make sure we unsubscribe first
+        // Make sure we unsubscribe first (a recycled container that stayed loaded
+        // keeps its subscription from its previous item)
         pageItem.InteractiveLayer.PointerExited -= _textSelectionHandler.OnPointerExited;
-        pageItem.BeforeRotation -= OnBeforePageRotation;
-
-        // Then subscribe to events
         pageItem.InteractiveLayer.PointerExited += _textSelectionHandler.OnPointerExited;
-        pageItem.BeforeRotation += OnBeforePageRotation;
     }
 
-    private void OnBeforePageRotation(object? sender, EventArgs e)
+    private void OnBeforePageRotation(object? sender, RoutedEventArgs e)
     {
         int? savedPage = VisiblePages?.Start.GetOffset(PageCount);
         double? savedOffset = GetCurrentPageRelativeYOffset(savedPage);
@@ -606,6 +592,11 @@ public sealed class PageItemsControl : ItemsControl
 
         pageItem.Loaded -= PageItem_Loaded;
         pageItem.Unloaded -= PageItem_Unloaded;
+
+        // PointerExited is deliberately left subscribed: a container recycled while
+        // it stays loaded gets no new Loaded event, so removing the (item-agnostic)
+        // handler here would leave the recycled container without one.
+
         pageItem.SetCurrentValue(PageItem.VisibleAreaProperty, null);
     }
 
@@ -739,30 +730,10 @@ public sealed class PageItemsControl : ItemsControl
         }
     }
 
-    protected override void OnDetachedFromLogicalTree(LogicalTreeAttachmentEventArgs e)
-    {
-        base.OnDetachedFromLogicalTree(e);
-
-        if (Scroll is not null)
-        {
-            Scroll.RemoveHandler(ScrollViewer.ScrollChangedEvent, _scrollChangedHandler);
-            Scroll.RemoveHandler(SizeChangedEvent, _sizeChangedHandler);
-        }
-
-        if (LayoutTransform is not null)
-        {
-            LayoutTransform.RemoveHandler(PointerPressedEvent, _zoomPanController.OnPointerPressed);
-            LayoutTransform.RemoveHandler(PointerMovedEvent, _zoomPanController.OnPointerMoved);
-            LayoutTransform.RemoveHandler(PointerReleasedEvent, _zoomPanController.OnPointerReleased);
-
-            if (CalyExtensions.IsMobilePlatform())
-            {
-                LayoutTransform.RemoveHandler(PinchEvent, _zoomPanController.OnPinchChanged);
-                LayoutTransform.RemoveHandler(PinchEndedEvent, _zoomPanController.OnPinchEnded);
-                LayoutTransform.RemoveHandler(HoldingEvent, _zoomPanController.OnHolding);
-            }
-        }
-    }
+    // NB: the handlers added to the template parts in OnApplyTemplate are intentionally
+    // never removed. They live on this control's own template subtree (no leak beyond
+    // the control's lifetime), and removing them on detach would leave the control dead
+    // after a detach/reattach cycle because OnApplyTemplate does not run again.
 
     protected override void OnLoaded(RoutedEventArgs e)
     {
