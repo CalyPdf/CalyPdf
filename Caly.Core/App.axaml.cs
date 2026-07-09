@@ -28,6 +28,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls.Notifications;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
+using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
@@ -110,9 +111,15 @@ public partial class App : Application
         else if (ApplicationLifetime is IActivityApplicationLifetime activityLifetime)
         {
             MainView? mainView = null;
-            activityLifetime.MainViewFactory = () => mainView = new MainView
+            activityLifetime.MainViewFactory = () =>
             {
-                DataContext = new MainViewModel(appStates)
+                mainView = new MainView
+                {
+                    DataContext = new MainViewModel(appStates)
+                };
+
+                mainView.Loaded += MainView_Loaded;
+                return mainView;
             };
             services.AddSingleton<Visual>(_ => mainView ??
                 throw new InvalidOperationException("MainView has not been created yet."));
@@ -162,13 +169,38 @@ public partial class App : Application
 
         Services = services.BuildServiceProvider();
 
+        if (ApplicationLifetime is not IActivityApplicationLifetime)
+        {
+            // Only for desktop / single-view lifetimes. For Android activity lifetime
+            // the MainView does not exist yet. Deferred to MainView_Loaded.
+            InitializeVisualDependentServices();
+        }
+
+        base.OnFrameworkInitializationCompleted();
+    }
+
+    private void MainView_Loaded(object? sender, RoutedEventArgs e)
+    {
+        if (sender is MainView mainView)
+        {
+            mainView.Loaded -= MainView_Loaded;
+        }
+
+        InitializeVisualDependentServices();
+    }
+
+    private void InitializeVisualDependentServices()
+    {
+        if (Services is null)
+        {
+            return;
+        }
+
         // Load settings
         Services.GetRequiredService<ISettingsService>().Load();
 
         // We need to make sure IPdfDocumentsService singleton is initiated in UI thread
         _pdfDocumentsService = Services.GetRequiredService<IPdfDocumentsManagerService>();
-
-        base.OnFrameworkInitializationCompleted();
     }
 
     protected virtual void OverrideRegisteredServices(IServiceCollection services)
