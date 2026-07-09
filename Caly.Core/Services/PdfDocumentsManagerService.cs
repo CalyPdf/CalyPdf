@@ -263,8 +263,6 @@ internal sealed partial class PdfDocumentsManagerService : IPdfDocumentsManagerS
             catch (Exception ex)
             {
                 Debug.WriteExceptionToFile(ex);
-                Dispatcher.UIThread.Post(() => _mainViewModel.PdfDocuments.Remove(documentViewModel));
-                _openedFiles.TryRemove(storageFile.Path.LocalPath, out _);
             }
 
             if (pageCount > 0)
@@ -273,8 +271,9 @@ internal sealed partial class PdfDocumentsManagerService : IPdfDocumentsManagerS
                 return;
             }
 
-            // Document is not valid
-            Dispatcher.UIThread.Post(() => _mainViewModel.PdfDocuments.Remove(documentViewModel));
+            // Document is not valid (or opening failed). Remove it from the UI and
+            // wait for the removal to complete before disposing the scope below.
+            await Dispatcher.UIThread.InvokeAsync(() => _mainViewModel.PdfDocuments.Remove(documentViewModel));
             _openedFiles.TryRemove(storageFile.Path.LocalPath, out _);
         }
 
