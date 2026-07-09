@@ -137,7 +137,16 @@ public sealed class TileRenderService : IAsyncDisposable
     {
     }
 
-    public TileRenderService(TileCache cache)
+    public TileRenderService(TileCache cache) : this(cache, startProcessingLoop: true)
+    {
+    }
+
+    /// <summary>
+    /// Used by tests: with <paramref name="startProcessingLoop"/> set to <c>false</c>,
+    /// queued requests are never consumed, deterministically reproducing disposal
+    /// racing ahead of the render workers.
+    /// </summary>
+    internal TileRenderService(TileCache cache, bool startProcessingLoop)
     {
         _mainToken = _mainCts.Token;
         Cache = cache;
@@ -152,7 +161,7 @@ public sealed class TileRenderService : IAsyncDisposable
         _requestWriter = channel.Writer;
         _requestReader = channel.Reader;
 
-        _processingLoopTask = Task.Run(ProcessingLoop);
+        _processingLoopTask = startProcessingLoop ? Task.Run(ProcessingLoop) : Task.CompletedTask;
     }
 
     private async Task ProcessingLoop()
@@ -495,6 +504,9 @@ public sealed class TileRenderService : IAsyncDisposable
     {
         await _mainCts.CancelAsync();
 
+        // No new requests can be queued once the writer is completed.
+        _requestWriter.TryComplete();
+
         try
         {
             await _processingLoopTask;
@@ -502,6 +514,13 @@ public sealed class TileRenderService : IAsyncDisposable
         catch
         {
             // No op
+        }
+
+        // Release the picture clones of requests still queued when the processing
+        // loop stopped.
+        while (_requestReader.TryRead(out var request))
+        {
+            request.Picture.Dispose();
         }
 
         foreach (var kvp in _pageTokens)
