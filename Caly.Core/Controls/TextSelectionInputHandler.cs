@@ -183,27 +183,25 @@ internal sealed class TextSelectionInputHandler
             // Annotation
             PdfAnnotation? annotation = control.PdfTextLayer.FindAnnotationOver(point.X, point.Y);
 
-            if (HandleAnnotationAction(_owner, annotation))
+            if (!HandleAnnotationAction(_owner, annotation))
             {
-                // Annotation found and action handled, no further processing.
-                return;
-            }
-            
-            // Words
-            PdfWord? word = control.PdfTextLayer.FindWordOver(point.X, point.Y);
-            if (word is not null && control.PdfTextLayer.GetLine(word) is { IsInteractive: true } line)
-            {
-                /*
-                 * TODO - Use TopLevel.GetTopLevel(source)?.Launcher
-                 *  if (e.Source is Control source && TopLevel.GetTopLevel(source)?.Launcher is {}
-                 *  launcher && word is not null && control.PdfTextLayer.GetLine(word) is { IsInteractive: true } line)
-                 *  ...
-                 *  launcher.LaunchUriAsync(new Uri(match.ToString()))
-                 */
-
-                if (!string.IsNullOrEmpty(line.InteractiveLink))
+                // Annotation not found or action not handled, we check for words.
+                // Words
+                PdfWord? word = control.PdfTextLayer.FindWordOver(point.X, point.Y);
+                if (word is not null && control.PdfTextLayer.GetLine(word) is { IsInteractive: true } line)
                 {
-                    CalyExtensions.OpenUriAsync(line.InteractiveLink);
+                    /*
+                     * TODO - Use TopLevel.GetTopLevel(source)?.Launcher
+                     *  if (e.Source is Control source && TopLevel.GetTopLevel(source)?.Launcher is {}
+                     *  launcher && word is not null && control.PdfTextLayer.GetLine(word) is { IsInteractive: true } line)
+                     *  ...
+                     *  launcher.LaunchUriAsync(new Uri(match.ToString()))
+                     */
+
+                    if (!string.IsNullOrEmpty(line.InteractiveLink))
+                    {
+                        CalyExtensions.OpenUriAsync(line.InteractiveLink);
+                    }
                 }
             }
         }
