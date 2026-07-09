@@ -40,6 +40,7 @@
 
 						<!-- Toggle sidebar -->
 						<ToggleButton DockPanel.Dock="Left"
+                                      Focusable="False"
                                       VerticalAlignment="Stretch"
                                       Background="Transparent"
                                       IsChecked="{Binding AppStates.IsDocumentPaneOpen}">
@@ -62,6 +63,7 @@
 
 						<!-- Page navigation -->
                         <Button DockPanel.Dock="Left"
+                                Focusable="False"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Stretch"
                                 Background="Transparent"
@@ -74,6 +76,7 @@
                         </Button>
 
                         <Button DockPanel.Dock="Left"
+                                Focusable="False"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Stretch"
                                 Background="Transparent"
@@ -86,6 +89,7 @@
                         </Button>
 
 						<TextBox Name="PART_TextBoxPageNumber"
+                                 Focusable="False"
                                  MinWidth="50"
                                  MaxWidth="50"
                                  TextAlignment="Center"
@@ -109,6 +113,7 @@
                         </TextBox>
 
 						<TextBlock DockPanel.Dock="Left"
+                                   Focusable="False"
 								   VerticalAlignment="Center"
 								   HorizontalAlignment="Center"
 								   TextAlignment="Center"
@@ -121,6 +126,7 @@
 
 						<!-- Rotate pages -->
 						<Button DockPanel.Dock="Left"
+                                Focusable="False"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Stretch"
                                 Background="Transparent"
@@ -133,6 +139,7 @@
 						</Button>
 
 						<Button DockPanel.Dock="Left"
+                                Focusable="False"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Stretch"
                                 Background="Transparent"
@@ -148,6 +155,7 @@
 
 						<!-- Zoom in / out -->
 						<Button DockPanel.Dock="Left"
+                                Focusable="False"
 								HorizontalAlignment="Center"
 								VerticalAlignment="Stretch"
 								Background="Transparent"
@@ -160,6 +168,7 @@
 						</Button>
 
 						<Button DockPanel.Dock="Left"
+                                Focusable="False"
 								HorizontalAlignment="Center"
 								VerticalAlignment="Stretch"
 								Background="Transparent"
@@ -172,6 +181,7 @@
 						</Button>
 
 						<TextBlock DockPanel.Dock="Left"
+                                   Focusable="False"
 								   Margin="5,0"
 								   Text="{Binding ZoomLevel, StringFormat={}{0:0.#%}}"
 								   VerticalAlignment="Center"
@@ -181,6 +191,7 @@
 
 						<!-- Print -->
 						<Button DockPanel.Dock="Right"
+                                Focusable="False"
                                 Margin="0,0,5,0"
 								HorizontalAlignment="Center"
 								VerticalAlignment="Stretch"
@@ -225,6 +236,7 @@
 
 										<!-- Thumbnails tab -->
 										<TabItem MinHeight="40"
+                                                 Focusable="False"
 												 IsSelected="True">
 											<TabItem.Header>
 												<PathIcon Width="17"
@@ -289,6 +301,7 @@
 
 										<!-- Bookmarks tab -->
 										<TabItem MinHeight="40"
+                                                 Focusable="False"
                                                  IsVisible="{Binding BookmarksSource^, Converter={x:Static ObjectConverters.IsNotNull}}"
                                                  IsEnabled="{Binding BookmarksSource^, Converter={x:Static ObjectConverters.IsNotNull}}">
 											<TabItem.Header>
@@ -308,7 +321,8 @@
 										</TabItem>
 
 										<!-- Search tab -->
-										<TabItem MinHeight="40">
+										<TabItem MinHeight="40"
+                                                 Focusable="False">
 											<TabItem.Header>
 												<PathIcon Width="17"
 														  Height="17"
@@ -321,7 +335,8 @@
 										</TabItem>
 
 										<!-- Doc information tab -->
-										<TabItem MinHeight="40">
+										<TabItem MinHeight="40"
+                                                 Focusable="False">
 											<TabItem.Header>
 												<PathIcon Width="17"
 														  Height="17"
@@ -336,6 +351,7 @@
 
                                         <!-- Embedded files tab -->
                                         <TabItem MinHeight="40"
+                                                 Focusable="False"
                                                  IsVisible="{Binding !!EmbeddedFiles^.Count}"
                                                  IsEnabled="{Binding !!EmbeddedFiles^.Count}">
                                             <TabItem.Header>

@@ -47,6 +47,7 @@
 
 		<DockPanel Grid.Row="1" Margin="0">
 			<ToggleButton DockPanel.Dock="Left"
+                          Focusable="False"
                           VerticalAlignment="Stretch"
                           Background="Transparent"
                           IsChecked="{Binding IsSettingsPaneOpen}">

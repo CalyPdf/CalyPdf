@@ -116,6 +116,7 @@
                                                                VerticalAlignment="Stretch"/>
 
 								<controls:PageInteractiveLayerControl Name="PART_PageInteractiveLayerControl"
+																	  Focusable="False"
                                                                       VisibleArea="{Binding VisibleArea}"
                                                                       PdfTextLayer="{Binding PdfTextLayer}"
                                                                       PageNumber="{Binding PageNumber}"

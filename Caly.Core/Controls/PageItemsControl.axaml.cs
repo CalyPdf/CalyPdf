@@ -216,6 +216,10 @@ public sealed class PageItemsControl : ItemsControl
 
     private void OnInteractiveLayerPointerPressed(object? sender, PointerPressedEventArgs e)
     {
+        // Ensure the control gets focus as it seats below the PageInteractiveLayerControl,
+        // and hence can never directly get focus on click
+        Focus(NavigationMethod.Pointer);
+        
         if (e.Source is PageInteractiveLayerControl layer)
         {
             _textSelectionHandler.OnPointerPressed(layer, e);
