@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2025 BobLd
+﻿// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -93,31 +93,27 @@ public partial class DocumentViewModel
 
             if (previousCts is not null)
             {
-                // cancel the previous session and wait for its termination
-                System.Diagnostics.Debug.WriteLine("cancel the previous session and wait for its termination");
+                // Cancel the previous session and wait for its termination
                 await previousCts.CancelAsync();
+
                 try
                 {
-                    if (_pendingSearchTask is null)
+                    if (_pendingSearchTask is not null)
                     {
-                        throw new Exception("No existing pending search task.");
+                        await _pendingSearchTask;
                     }
-
-                    await _pendingSearchTask;
-                }
-                catch (OperationCanceledException e)
-                {
-                    System.Diagnostics.Debug.WriteLine(e);
-                    throw;
                 }
                 catch
                 {
-                    /* Ignore */
+                    /* Ignore - the previous session's failure is not ours to report */
                 }
-                finally
-                {
-                    previousCts.Dispose();
-                }
+
+                // NB: previousCts is deliberately NOT disposed here. The session that
+                // created it may still be between its awaits and about to read its
+                // Token, and disposing a source while it is in use throws
+                // ObjectDisposedException under rapid restarts. Superseded sources are
+                // released together when _mainCts is cancelled/disposed at document
+                // close (the linked registrations die with it).
             }
 
             newCts.Token.ThrowIfCancellationRequested();
@@ -205,18 +201,36 @@ public partial class DocumentViewModel
                 } while (!indexBuildTaskComplete);
             }, token);
 
+            Exception? indexException = null;
             if (!indexBuildTask.IsCompleted)
             {
                 await Task.WhenAny(indexBuildTask, searchTask);
-                if (indexBuildTask is { IsCompleted: true, Exception: not null })
-                {
-                    throw new Exception("Something wrong happened while indexing the document.",
-                        indexBuildTask.Exception);
-                }
+                indexException = indexBuildTask.Exception;
             }
-            else
+
+            // Always run the search task to completion before returning: an orphaned
+            // task would keep using the linked token after the caller disposes it
+            // (ObjectDisposedException in its Task.Delay), and the final status below
+            // would be computed while results are still arriving. It cannot hang: the
+            // task's loop exits once the index build task has completed (including
+            // faulted), on cancellation, or on error.
+            try
             {
                 await searchTask;
+            }
+            catch (OperationCanceledException)
+            {
+                throw; // Superseded or closing: skip the final status update.
+            }
+            catch
+            {
+                // Inspected via searchTask.Exception below — query errors are
+                // reported through the search status, not the exception dialog.
+            }
+
+            if (indexException is not null)
+            {
+                throw new Exception("Something wrong happened while indexing the document.", indexException);
             }
 
             _isSearchQueryError = searchTask is { IsCompleted: true, Exception: not null };
