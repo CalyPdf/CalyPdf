@@ -260,7 +260,7 @@ internal static class CalyExtensions
             var index = uri.IndexOf(':');
             if (index == -1)
             {
-                if (!uri.StartsWith("http"))
+                if (!uri.StartsWith("http", StringComparison.OrdinalIgnoreCase))
                 {
                     // We only want to open http / https uris in this method.
                     // We force 'http'.
