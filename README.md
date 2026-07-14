@@ -70,14 +70,18 @@ git submodule update --init --recursive
 ### Publishing
 Caly Pdf Reader is a net10.0 application with Native AOT enabled.
 
-To publish the application (`AOT`), run the following (example for Windows):
-```
-dotnet publish -r win-x64 -c AOT -f net10.0
-```
-
-To publish the application (`Release`), run the following (example for Windows):
+#### Release (AOT)
+To publish the application, run the following (example for Windows):
 ```
 dotnet publish -r win-x64 -c Release -f net10.0
+```
+
+#### Portable
+The `Portable` configuration publishes Caly as a single file, using `AOT` and linking skia static libraries (see https://github.com/CalyPdf/SkiaSharp.Static). `Portable` configuration is only available for `win-x64` and `linux-x64` for the moment.
+
+To publish the application (`Portable`), run the following (example for Windows):
+```
+dotnet publish -r win-x64 -c Portable -f net10.0
 ```
 
 ## Contributing
