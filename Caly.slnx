@@ -1,44 +1,44 @@
 <Solution>
   <Configurations>
-    <BuildType Name="AOT" />
     <BuildType Name="Debug" />
+    <BuildType Name="Portable" />
     <BuildType Name="Release" />
   </Configurations>
   <Folder Name="/Caly.Printing/">
     <Project Path="Caly.Printing/Caly.Printing.Core/Caly.Printing.Core.csproj">
-      <BuildType Solution="AOT|*" Project="Release" />
+      <BuildType Solution="Portable|*" Project="Release" />
     </Project>
     <Project Path="Caly.Printing/Caly.Printing.Unix/Caly.Printing.Unix.csproj">
-      <BuildType Solution="AOT|*" Project="Release" />
+      <BuildType Solution="Portable|*" Project="Release" />
     </Project>
     <Project Path="Caly.Printing/Caly.Printing.Windows/Caly.Printing.Windows.csproj">
-      <BuildType Solution="AOT|*" Project="Release" />
+      <BuildType Solution="Portable|*" Project="Release" />
     </Project>
   </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
   </Folder>
   <Project Path="Caly.Android/Caly.Android.csproj">
-    <BuildType Solution="AOT|*" Project="Release" />
+    <BuildType Solution="Portable|*" Project="Release" />
     <Deploy />
   </Project>
   <Project Path="Caly.Benchmarks/Caly.Benchmarks.csproj">
-    <BuildType Solution="AOT|*" Project="Release" />
+    <BuildType Solution="Portable|*" Project="Release" />
   </Project>
   <Project Path="Caly.Core/Caly.Core.csproj">
-    <BuildType Solution="AOT|*" Project="Release" />
+    <BuildType Solution="Portable|*" Project="Release" />
   </Project>
-  <Project Path="Caly.Desktop/Caly.Desktop.csproj" />
+  <Project Path="Caly.Desktop/Caly.Desktop.csproj"/>
   <Project Path="Caly.iOS/Caly.iOS.csproj">
-    <BuildType Solution="AOT|*" Project="Release" />
-    <Build Solution="AOT|*" Project="false" />
+    <BuildType Solution="Portable|*" Project="Release" />
+    <Build Solution="Portable|*" Project="false" />
     <Deploy Solution="Debug|*" />
     <Deploy Solution="Release|*" />
   </Project>
   <Project Path="Caly.Pdf/Caly.Pdf.csproj">
-    <BuildType Solution="AOT|*" Project="Release" />
+    <BuildType Solution="Portable|*" Project="Release" />
   </Project>
   <Project Path="Caly.Tests/Caly.Tests.csproj">
-    <BuildType Solution="AOT|*" Project="Release" />
+    <BuildType Solution="Portable|*" Project="Release" />
   </Project>
 </Solution>

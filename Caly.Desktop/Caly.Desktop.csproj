@@ -11,13 +11,13 @@
 		<Version>0.3.0.0</Version>
 		<JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
 		<Deterministic>true</Deterministic>
-		<Configurations>Debug;Release;AOT</Configurations>
+		<Configurations>Debug;Release;Portable</Configurations>
 		<SignAssembly>True</SignAssembly>
 		<AssemblyOriginatorKeyFile>..\Caly.snk</AssemblyOriginatorKeyFile>
 	</PropertyGroup>
 
 	<!-- Begin AOT publish -->
-	<PropertyGroup Condition="'$(Configuration)'=='AOT'">
+	<PropertyGroup Condition="'$(Configuration)'!='Debug'">
 		<PublishAot>true</PublishAot>
 		<Optimize>True</Optimize>
 		<OptimizationPreference>Speed</OptimizationPreference>
@@ -34,8 +34,9 @@
 		<CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
 		<MetricsSupport>false</MetricsSupport>
 		<XmlResolverIsNetworkingEnabledByDefault>false</XmlResolverIsNetworkingEnabledByDefault>
+		<StripSymbols>true</StripSymbols>
 
-		<!--<StripSymbols>true</StripSymbols>
+		<!--
 		<DebugSymbols>false</DebugSymbols>
 		<UseSystemResourceKeys>true</UseSystemResourceKeys>
 		<DebuggerSupport>false</DebuggerSupport>
@@ -44,7 +45,7 @@
 	</PropertyGroup>
 
 	<!-- Begin Link Static libs -->
-	<ItemGroup Condition="'$(Configuration)'=='AOT' And $(RuntimeIdentifier) == 'win-x64'">
+	<ItemGroup Condition="'$(Configuration)'=='Portable' And $(RuntimeIdentifier) == 'win-x64'">
 		<DirectPInvoke Include="libSkiaSharp" />
 		<NativeLibrary Include="..\native\skia.lib" />
 		<NativeLibrary Include="..\native\SkiaSharp.lib" />
@@ -53,7 +54,7 @@
 		<NativeLibrary Include="..\native\libHarfBuzzSharp.lib" />
 	</ItemGroup>
 
-	<ItemGroup Condition="'$(Configuration)'=='AOT' And $(RuntimeIdentifier) == 'linux-x64'">
+	<ItemGroup Condition="'$(Configuration)'=='Portable' And $(RuntimeIdentifier) == 'linux-x64'">
 		<DirectPInvoke Include="libSkiaSharp" />
 		<NativeLibrary Include="..\native\libskia.a" />
 		<NativeLibrary Include="..\native\libSkiaSharp.a" />
@@ -66,7 +67,7 @@
 		<LinkerArg Include="-lfreetype" />
 	</ItemGroup>
 
-	<Target Condition="'$(Configuration)'=='AOT' And $(RuntimeIdentifier.StartsWith('win'))" Name="DeleteLinkedLibAfterPublish" AfterTargets="Publish">
+	<Target Condition="'$(Configuration)'=='Portable' And $(RuntimeIdentifier.StartsWith('win'))" Name="DeleteLinkedLibAfterPublish" AfterTargets="Publish">
 		<ItemGroup>
 			<FilesToDelete Include="$(PublishDir)libHarfBuzzSharp.dll;$(PublishDir)libSkiaSharp.dll;$(PublishDir)av_libglesv2.dll;" />
 		</ItemGroup>
@@ -74,7 +75,7 @@
 		<Message Text="Deleted Linked dlls" Importance="high" />
 	</Target>
 
-	<Target Condition="'$(Configuration)'=='AOT' And $(RuntimeIdentifier.StartsWith('linux'))" Name="DeleteLinkedLibAfterPublishLinux" AfterTargets="Publish">
+	<Target Condition="'$(Configuration)'=='Portable' And $(RuntimeIdentifier.StartsWith('linux'))" Name="DeleteLinkedLibAfterPublishLinux" AfterTargets="Publish">
 		<ItemGroup>
 			<FilesToDelete Include="$(PublishDir)libHarfBuzzSharp.so;$(PublishDir)libSkiaSharp.so;" />
 		</ItemGroup>
