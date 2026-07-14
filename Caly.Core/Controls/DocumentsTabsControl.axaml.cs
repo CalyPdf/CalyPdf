@@ -175,6 +175,9 @@ public sealed partial class DocumentsTabsControl : UserControl
         }
 
         BindingOperations.GetBindingExpressionBase(textBox, TextBox.TextProperty)?.UpdateSource();
+
+        // Try send back focus to the PageItemsControl
+        this.FindDescendantOfType<PageItemsControl>()?.Focus();
     }
 
     private void OnSizeChanged(object? sender, SizeChangedEventArgs e)

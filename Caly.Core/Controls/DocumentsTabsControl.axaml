@@ -89,7 +89,6 @@
                         </Button>
 
 						<TextBox Name="PART_TextBoxPageNumber"
-                                 Focusable="False"
                                  MinWidth="50"
                                  MaxWidth="50"
                                  TextAlignment="Center"
