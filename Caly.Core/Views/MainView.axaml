@@ -40,7 +40,38 @@
 			</SplitView.Pane>
 
 			<SplitView.Content>
-				<controls:DocumentsTabsControl/>
+                <Grid>
+                    <!-- When no document -> 'Splash Screen' -->
+                    <StackPanel Orientation="Vertical"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Opacity="200"
+                                IsVisible="{Binding !PdfDocuments.Count}"
+                                IsEnabled="{Binding !PdfDocuments.Count}">
+
+                        <Label Content="Caly Pdf Reader"
+                               FontSize="15"
+                               HorizontalAlignment="Center"
+                               HorizontalContentAlignment="Center"/>
+                        <Label Content="{Binding Version}"
+                               FontSize="15"
+                               HorizontalAlignment="Center"
+                               HorizontalContentAlignment="Center" Padding="0,0,0,40"/>
+
+                        <PathIcon Width="50"
+                                  Height="50"
+                                  Data="{StaticResource document_add_regular}"
+                                  VerticalAlignment="Center"/>
+                        <Label Content="DROP PDF DOCUMENT HERE"
+                               FontSize="13"
+                               HorizontalAlignment="Center"
+                               HorizontalContentAlignment="Center" Padding="0,15,0,0"/>
+                    </StackPanel>
+          
+                    <!-- Main Pdf Documents Control-->
+                    <controls:DocumentsTabsControl/>
+                </Grid>
+                
 			</SplitView.Content>
 
 		</SplitView>
