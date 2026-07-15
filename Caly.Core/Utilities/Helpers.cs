@@ -19,8 +19,10 @@
 // SOFTWARE.
 
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
+using System.Threading;
 
 namespace Caly.Core.Utilities;
 
@@ -67,13 +69,66 @@ internal static class Helpers
         return string.Format("{0:n" + decimalPlaces + "} {1}", adjustedSize, SizeSuffixes[mag]);
     }
 
+    #region GC request
+    private static readonly Lock GcLock = new();
+    private static readonly Timer GcDebounceTimer = new(GcTimerCallback);
+    private static readonly TimeSpan DebounceWindow = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan MaxWait = TimeSpan.FromSeconds(10);
+    private static long _gcFirstRequestTimestamp = -1;
+    private static bool _gcScheduledMaxWait;
+    
+    public static void RequestGcCollect()
+    {
+        lock (GcLock)
+        {
+            var now = Stopwatch.GetTimestamp();
+            if (_gcFirstRequestTimestamp == -1)
+            {
+                _gcFirstRequestTimestamp = now;
+            }
+
+            var elapsed = Stopwatch.GetElapsedTime(_gcFirstRequestTimestamp, now);
+            if (elapsed >= MaxWait)
+            {
+                if (_gcScheduledMaxWait)
+                {
+                    return;
+                }
+
+                // Worst case will run at MaxWait + DebounceWindow
+                _gcScheduledMaxWait = true;
+                GcDebounceTimer.Change(TimeSpan.Zero, Timeout.InfiniteTimeSpan);
+            }
+            else if (!_gcScheduledMaxWait)
+            {
+                GcDebounceTimer.Change(DebounceWindow, Timeout.InfiniteTimeSpan);
+            }
+        }
+    }
+
+    private static void GcTimerCallback(object? state)
+    {
+        // Timer.Change doesn't cancel a callback that has already fired and is queued.
+        // A request landing in that gap re-arms the timer, but the queued callback still runs,
+        // so occasionally get one collect slightly early plus one extra collect ~2s later.
+        lock (GcLock)
+        {
+            _gcScheduledMaxWait = false;
+            _gcFirstRequestTimestamp = -1;
+        }
+
+        System.Diagnostics.Debug.WriteLine($"-> RequestGcCollect({DateTime.UtcNow})");
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
+    }
+    #endregion
+
     public static string? SanitiseFileName(string? fileName, char? substitute = '_')
     {
         if (string.IsNullOrEmpty(fileName))
         {
             return fileName;
         }
-        
+
         char[] invalidChars = Path.GetInvalidFileNameChars();
 
         if (fileName.IndexOfAny(invalidChars) == -1)
@@ -89,7 +144,7 @@ internal static class Helpers
                 throw new ArgumentException($"Substitute character '{substitute.Value}' is invalid for file names.", nameof(substitute));
             }
         }
-        
+
         var builder = new StringBuilder(fileName.Length);
         foreach (char c in fileName)
         {
