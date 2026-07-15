@@ -497,10 +497,19 @@ public sealed class PageItemsControl : ItemsControl
         }
 
         double scale = LayoutTransform.LayoutTransform?.Value.M11 ?? 1.0;
+
+        // We round value to avoid precision issues when close to 0, and 
+        // checks like ScrollOffset.Y < 0
         SetCurrentValue(ScrollOffsetProperty, new Vector(
-            Scroll.Offset.X / scale,
-            Scroll.Offset.Y / scale - pageItem.Bounds.Top));
+            Math.Round(Scroll.Offset.X / scale, DecimalsAfterRound),
+            Math.Round(Scroll.Offset.Y / scale - pageItem.Bounds.Top, DecimalsAfterRound)));
     }
+
+    /// <summary>
+    /// Number of decimals to round the ScrollOffset to.
+    /// <see cref="LayoutTransformControl"/> uses DecimalsAfterRound = 8 to round the matrix.
+    /// </summary>
+    private const int DecimalsAfterRound = 8 + 1;
 
     protected override void PrepareContainerForItemOverride(Control container, object? item, int index)
     {
