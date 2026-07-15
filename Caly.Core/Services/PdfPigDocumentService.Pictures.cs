@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2025 BobLd
+﻿// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -26,6 +26,7 @@ using Caly.Core.Utilities;
 using CommunityToolkit.Mvvm.Messaging;
 using SkiaSharp;
 using SkiaSharp.HarfBuzz;
+using UglyToad.PdfPig;
 using UglyToad.PdfPig.Rendering.Skia;
 
 namespace Caly.Core.Services;
@@ -40,13 +41,20 @@ internal sealed partial class PdfPigDocumentService
 
         SKPicture? pic = await GuardDispose(async guardCt =>
         {
+            await WaitForDocumentToOpen(guardCt);
+            var document = _document;
+            if (document is null)
+            {
+                return null;
+            }
+
             return await ExecuteWithLockAsync(lockCt =>
                 {
                     try
                     {
                         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(lockCt);
                         linkedCts.CancelAfter(PageTimeOut);
-                        return _document?.GetPageAsSKPicture(pageNumber, linkedCts.Token);
+                        return document?.GetPageAsSKPicture(pageNumber, linkedCts.Token);
                     }
                     catch (OperationCanceledException)
                     {
@@ -55,7 +63,7 @@ internal sealed partial class PdfPigDocumentService
                             App.Messenger.Send(new ShowNotificationMessage(NotificationType.Error,
                                 $"Error in page {pageNumber}",
                                 $"Could not display page after {PageTimeOut.TotalSeconds} seconds."));
-                            return GetTimeOutPicture(pageNumber, lockCt);
+                            return GetTimeOutPicture(document, pageNumber, lockCt);
                         }
 
                         return null;
@@ -63,7 +71,7 @@ internal sealed partial class PdfPigDocumentService
                     catch (Exception e)
                     {
                         Debug.WriteExceptionToFile(e);
-                        return GetErrorPicture(pageNumber, e, lockCt);
+                        return GetErrorPicture(document, pageNumber, e, lockCt);
                     }
                 }, guardCt)
                 .ConfigureAwait(false);
@@ -72,17 +80,17 @@ internal sealed partial class PdfPigDocumentService
         return pic is null ? null : RefCountable.Create(pic);
     }
 
-    private SKPicture? GetTimeOutPicture(int pageNumber, CancellationToken token)
+    private static SKPicture? GetTimeOutPicture(PdfDocument document, int pageNumber, CancellationToken token)
     {
-        return GetCalyStatusPicture(pageNumber, $"Could not display page after {PageTimeOut.TotalSeconds:0.##} seconds.", token);
+        return GetCalyStatusPicture(document, pageNumber, $"Could not display page after {PageTimeOut.TotalSeconds:0.##} seconds.", token);
     }
 
-    private SKPicture? GetErrorPicture(int pageNumber, Exception ex, CancellationToken token)
+    private static SKPicture? GetErrorPicture(PdfDocument document, int pageNumber, Exception ex, CancellationToken token)
     {
-        return GetCalyStatusPicture(pageNumber, ex.ToString(), token);
+        return GetCalyStatusPicture(document, pageNumber, ex.ToString(), token);
     }
     
-    private SKPicture? GetCalyStatusPicture(int pageNumber, string text, CancellationToken token)
+    private static SKPicture? GetCalyStatusPicture(PdfDocument document, int pageNumber, string text, CancellationToken token)
     {
         if (token.IsCancellationRequested)
         {
@@ -96,7 +104,7 @@ internal sealed partial class PdfPigDocumentService
 
             try
             {
-                info = _document?.GetPage<PdfPageSize>(pageNumber) ?? throw new NullReferenceException();
+                info = document.GetPage<PdfPageSize>(pageNumber);
             }
             catch (Exception)
             {

@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2025 BobLd
+﻿// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -90,14 +90,19 @@ internal partial class PdfPigDocumentService
         }
     }
 
-    private async Task<T?> GuardDispose<T>(Func<CancellationToken, Task<T>> action, CancellationToken token)
+    private Task<T?> GuardDispose<T>(Func<CancellationToken, Task<T>> action, CancellationToken token)
+    {
+        return GuardDispose<T>(action, () => default!, () => default!, token);
+    }
+
+    private async Task<T?> GuardDispose<T>(Func<CancellationToken, Task<T>> action, Func<T> disposed, Func<T> canceled, CancellationToken token)
     {
         Interlocked.Increment(ref _activeOperations);
         try
         {
             if (IsDisposed())
             {
-                return default;
+                return disposed();
             }
 
             using (var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(token, _mainToken))
@@ -113,7 +118,7 @@ internal partial class PdfPigDocumentService
             Interlocked.Decrement(ref _activeOperations);
         }
 
-        return default;
+        return canceled();
     }
 
     private bool IsDisposed()

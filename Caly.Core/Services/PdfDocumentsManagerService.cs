@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2025 BobLd
+﻿// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,6 +18,14 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using Avalonia;
+using Avalonia.Controls.Notifications;
+using Avalonia.Platform.Storage;
+using Avalonia.Threading;
+using Caly.Core.Services.Interfaces;
+using Caly.Core.ViewModels;
+using CommunityToolkit.Mvvm.Messaging;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -25,13 +33,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
-using Avalonia;
-using Avalonia.Platform.Storage;
-using Avalonia.Threading;
-using Caly.Core.Services.Interfaces;
 using Caly.Core.Utilities;
-using Caly.Core.ViewModels;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Caly.Core.Services;
 
@@ -232,46 +234,57 @@ internal sealed partial class PdfDocumentsManagerService : IPdfDocumentsManagerS
 
         var scope = App.Current!.Services!.CreateAsyncScope();
 
-        var documentViewModel = scope.ServiceProvider.GetRequiredService<DocumentViewModel>();
-        documentViewModel.FileName = $"Opening '{Path.GetFileNameWithoutExtension(storageFile.Path.LocalPath)}'...";
+        var document = scope.ServiceProvider.GetRequiredService<DocumentViewModel>();
+        document.FileName = $"Opening '{Path.GetFileNameWithoutExtension(storageFile.Path.LocalPath)}'...";
 
         var docRecord = new PdfDocumentRecord()
         {
             Scope = scope,
-            Document = documentViewModel
+            Document = document
         };
 
         if (_openedFiles.TryAdd(storageFile.Path.LocalPath, docRecord))
         {
             // Do not await just yet - We need the WaitOpenAsync() to be created but we also
             // want to add the document to PdfDocuments before opening it.
-            Task<int> openDocTask = documentViewModel.OpenDocument(storageFile, password, cancellationToken);
+            var openDocTask = document.LoadDocument(storageFile, password, cancellationToken);
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                _mainViewModel.PdfDocuments.Add(documentViewModel);
+                _mainViewModel.PdfDocuments.Add(document);
                 _mainViewModel.SelectedDocumentIndex = Math.Max(0, _mainViewModel.PdfDocuments.Count - 1);
             });
 
-            int pageCount = 0;
+            var state = DocumentOpeningState.Error;
             try
             {
-                pageCount = await openDocTask;
+                state = await openDocTask;
             }
             catch (Exception ex)
             {
                 Debug.WriteExceptionToFile(ex);
             }
 
-            if (pageCount > 0)
+            if (state == DocumentOpeningState.Success)
             {
-                // Document opened successfully
+                // Document opened successfully (we don't dispose the scope)
                 return;
             }
-
+            
+            if (document.IsPasswordProtected && state == DocumentOpeningState.Password)
+            {
+                App.Messenger.Send(new ShowNotificationMessage(NotificationType.Error, "Critical error",
+                    "Could not open password protected document."));
+            }
+            else if (state != DocumentOpeningState.Canceled)
+            {
+                App.Messenger.Send(new ShowNotificationMessage(NotificationType.Error, "Critical error",
+                    "Cannot load pages because something wrong happened while opening the document."));
+            }
+            
             // Document is not valid (or opening failed). Remove it from the UI and
             // wait for the removal to complete before disposing the scope below.
-            await Dispatcher.UIThread.InvokeAsync(() => _mainViewModel.PdfDocuments.Remove(documentViewModel));
+            await Dispatcher.UIThread.InvokeAsync(() => _mainViewModel.PdfDocuments.Remove(document));
             _openedFiles.TryRemove(storageFile.Path.LocalPath, out _);
         }
 
