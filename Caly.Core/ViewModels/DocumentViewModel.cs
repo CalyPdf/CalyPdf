@@ -119,6 +119,7 @@ public sealed partial class DocumentViewModel : ViewModelBase
             OnPropertyChanged(nameof(SelectedPageIndex));
             GoToPreviousPageCommand.NotifyCanExecuteChanged();
             GoToNextPageCommand.NotifyCanExecuteChanged();
+            QueueActiveBookmarkUpdate();
         }
     } = 1;
 
