@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
@@ -130,6 +131,68 @@ public class DocumentViewModelBookmarkSyncTests
         // Viewport-driven sync only highlights the row; SelectedBookmark stays untouched
         // because setting it would navigate (DocumentControl calls GoToPage on change).
         Assert.Null(doc.SelectedBookmark);
+    }
+
+    [AvaloniaFact]
+    public async Task ClickedBookmark_AmongBookmarksWithoutLocation_IsNotStolenByViewportSync()
+    {
+        // Three bookmarks on page 1 with no location at all: they all resolve to the same
+        // viewport target, so after click-navigation the sync must not steal the selection
+        // back to the first of the tied bookmarks.
+        var doc = NewDocumentWithBookmarks(
+        [
+            new PdfBookmarkNode("A", 1, null, null),
+            new PdfBookmarkNode("B", 1, null, null),
+            new PdfBookmarkNode("C", 1, null, null),
+            new PdfBookmarkNode("Next", 2, null, null)
+        ], pageCount: 2);
+
+        var source = await doc.BookmarksSource;
+        Assert.NotNull(source);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("A", source!.RowSelection!.SelectedItem?.Title);
+
+        // User clicks the third bookmark in the tree.
+        source.RowSelection.Select(new IndexPath(2));
+        Assert.Equal("C", doc.SelectedBookmark?.Title);
+
+        // The resulting navigation nudges the persisted scroll position, queuing a sync.
+        doc.ScrollOffset = new Vector(0, 1);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("C", source.RowSelection.SelectedItem?.Title);
+
+        // The tie must not trap the selection either: moving to another page still re-syncs.
+        doc.SelectedPageNumber = 2;
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("Next", source.RowSelection.SelectedItem?.Title);
+    }
+
+    [AvaloniaFact]
+    public async Task ClickedBookmark_AmongSameLocationBookmarks_IsNotStolenByViewportSync()
+    {
+        // Same as above, but the tied bookmarks share an explicit location (PDF coordinates,
+        // bottom = 0): navigation scrolls the viewport exactly to that shared target.
+        var doc = NewDocumentWithBookmarks(
+        [
+            new PdfBookmarkNode("A", 1, 500, null),
+            new PdfBookmarkNode("B", 1, 500, null),
+            new PdfBookmarkNode("C", 1, 500, null)
+        ], pageCount: 1);
+
+        var source = await doc.BookmarksSource;
+        Assert.NotNull(source);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("A", source!.RowSelection!.SelectedItem?.Title);
+
+        source.RowSelection.Select(new IndexPath(2));
+        Assert.Equal("C", doc.SelectedBookmark?.Title);
+
+        // Viewport lands on the shared target: 1000 (page height) - 500 (PDF offset) = 500.
+        doc.ScrollOffset = new Vector(0, 500);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("C", source.RowSelection.SelectedItem?.Title);
     }
 
     [AvaloniaFact]
