@@ -29,6 +29,7 @@ using Avalonia;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Caly.Core.Services.Interfaces;
+using Caly.Core.Utilities;
 using Caly.Core.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -198,10 +199,7 @@ internal sealed partial class PdfDocumentsManagerService : IPdfDocumentsManagerS
             // TODO - Log error
         }
 
-        // Attempt to collect garbage as much as possible
-        GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, true, true);
-        GC.WaitForPendingFinalizers();
-        GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, true, true);
+        Helpers.RequestGcCollect();
     }
 
     private async Task OpenLoadDocumentInternal(IStorageFile? storageFile, string? password, CancellationToken cancellationToken)
