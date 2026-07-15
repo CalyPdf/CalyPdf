@@ -163,7 +163,7 @@ public partial class DocumentViewModel
         PdfBookmarkLocation? active = null;
         if (locations.TryGetValue(activePage, out var pageLocations))
         {
-            active = SelectClosestOnPage(pages[activePage - 1], pageLocations, offsetY);
+            active = SelectClosestOnPage(pages[activePage - 1], pageLocations, offsetY, currentPath);
         }
         else
         {
@@ -174,6 +174,18 @@ public partial class DocumentViewModel
                 if (locations.TryGetValue(p, out var prevLocations))
                 {
                     active = prevLocations[^1];
+
+                    // Several trailing bookmarks can share that location; keep the current
+                    // selection when it is one of them.
+                    foreach (var loc in prevLocations)
+                    {
+                        if (loc.Path == currentPath && loc.Node.OffsetY == active.Node.OffsetY)
+                        {
+                            active = loc;
+                            break;
+                        }
+                    }
+
                     break;
                 }
             }
@@ -196,17 +208,26 @@ public partial class DocumentViewModel
 
         return;
 
-        static PdfBookmarkLocation? SelectClosestOnPage(PageViewModel page, IReadOnlyList<PdfBookmarkLocation> pageLocations, double offsetY)
+        static PdfBookmarkLocation? SelectClosestOnPage(PageViewModel page, IReadOnlyList<PdfBookmarkLocation> pageLocations, double offsetY, IndexPath currentPath)
         {
             if (pageLocations.Count == 1)
             {
                 return pageLocations[0];
             }
 
-            // A 90 or 270 rotation lays the bookmarks out along the horizontal axis, for which we have no
-            // X offset, so fall back to the first (top) bookmark on the page.
+            // A 90 or 270 rotation lays the bookmarks out along the horizontal axis, for which we
+            // have no X offset: every bookmark on the page is an equally good match, so keep the
+            // current selection when it is one of them, and fall back to the first one otherwise.
             if (!page.IsPortrait)
             {
+                foreach (var loc in pageLocations)
+                {
+                    if (loc.Path == currentPath)
+                    {
+                        return loc;
+                    }
+                }
+
                 return pageLocations[0];
             }
 
@@ -219,7 +240,11 @@ public partial class DocumentViewModel
                 double offset = loc.Node.OffsetY ?? 0;
                 double target = page.Rotation == 180 ? offset : height - offset;
                 double dist = Math.Abs(offsetY - target);
-                if (dist < minDist)
+
+                // Several bookmarks can share a location (or have none at all): on a distance tie,
+                // prefer the current selection so the viewport sync does not steal it from the
+                // bookmark the user clicked.
+                if (dist < minDist || (dist == minDist && loc.Path == currentPath))
                 {
                     minDist = dist;
                     best = loc;
