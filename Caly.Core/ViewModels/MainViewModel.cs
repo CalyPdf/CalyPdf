@@ -46,8 +46,7 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
     public ObservableCollection<DocumentViewModel> PdfDocuments { get; } = new();
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(SelectedDocument))]
-    private int _selectedDocumentIndex;
+    public partial int SelectedDocumentIndex { get; set; }
 
     [ObservableProperty] private bool _isSettingsPaneOpen;
 
@@ -109,9 +108,14 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
             }
 
             _lastAnnouncedSelectedDocument = selected;
+
+            // Raise here (not via [NotifyPropertyChangedFor] on SelectedDocumentIndex) so it also
+            // triggers when the index is unchanged but a different document has shifted into it.
+            OnPropertyChanged(nameof(SelectedDocument));
+
             if (selected is not null)
             {
-                Core.App.Messenger.Send(new SelectedDocumentChangedMessage(selected));
+                App.Messenger.Send(new SelectedDocumentChangedMessage(selected));
             }
         });
     }
