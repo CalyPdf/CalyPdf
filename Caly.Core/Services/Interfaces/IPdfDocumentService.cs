@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2025 BobLd
+﻿// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -32,6 +32,34 @@ using UglyToad.PdfPig.Rendering.Skia;
 
 namespace Caly.Core.Services.Interfaces;
 
+public enum DocumentOpeningState : byte
+{
+    /// <summary>
+    /// Failed due to generic error (default state).
+    /// </summary>
+    Error = 0,
+    
+    /// <summary>
+    /// Successfully opened.
+    /// </summary>
+    Success = 1,
+
+    /// <summary>
+    /// Failed because the file was not found.
+    /// </summary>
+    FileNotFound = 2,
+
+    /// <summary>
+    /// Failed because opening was canceled.
+    /// </summary>
+    Canceled = 3,
+
+    /// <summary>
+    /// Failed because of password.
+    /// </summary>
+    Password = 4,
+}
+
 public interface IPdfDocumentService : IAsyncDisposable
 {
     double PpiScale { get; }
@@ -47,12 +75,12 @@ public interface IPdfDocumentService : IAsyncDisposable
     string? LocalPath { get; }
 
     bool IsPasswordProtected { get; }
-
+    
     /// <summary>
     /// Open the pdf document.
+    /// <para>Can only be called once per instance.</para>
     /// </summary>
-    /// <returns>The number of pages in the opened document. <c>0</c> if the document was not opened.</returns>
-    Task<int> OpenDocument(IStorageFile? storageFile, string? password, CancellationToken token);
+    Task<DocumentOpeningState> OpenDocument(IStorageFile? storageFile, string? password, CancellationToken token);
 
     Task<DocumentPropertiesViewModel?> GetDocumentPropertiesAsync(CancellationToken token);
 

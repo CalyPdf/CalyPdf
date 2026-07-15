@@ -154,12 +154,6 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
                     {
                         foreach (var newDoc in e.NewItems.OfType<DocumentViewModel>())
                         {
-                            if (newDoc.WaitOpenAsync is null)
-                            {
-                                throw new Exception("WaitOpenAsync is null");
-                            }
-
-                            await newDoc.WaitOpenAsync; // Make sure the doc is open before proceeding
                             await newDoc.LoadPagesTask;
                         }
                     }

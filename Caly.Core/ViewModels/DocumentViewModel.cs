@@ -156,12 +156,7 @@ public sealed partial class DocumentViewModel : ViewModelBase
     
     private readonly Lazy<Task> _loadPagesTask;
     public Task LoadPagesTask => _loadPagesTask.Value;
-
-    /// <summary>
-    /// The task that opens the document. Can be awaited to make sure the document is done opening.
-    /// </summary>
-    public Task<int>? WaitOpenAsync { get; private set; }
-
+    
     private readonly IDisposable _searchResultsDisposable;
 
     private readonly ITextSearchService _textSearchService;
@@ -318,24 +313,35 @@ public sealed partial class DocumentViewModel : ViewModelBase
         _pdfService.IsActive = false;
     }
 
+    private Task<DocumentOpeningState>? _loadDocumentTask;
+    private readonly Lock _loadDocumentLock = new();
+
     /// <summary>
     /// Open the pdf document.
     /// </summary>
-    /// <returns>The number of pages in the opened document. <c>0</c> if the document was not opened.</returns>
-    public Task<int> OpenDocument(IStorageFile? storageFile, string? password, CancellationToken token)
+    public Task<DocumentOpeningState> LoadDocument(IStorageFile? storageFile, string? password, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(storageFile, nameof(storageFile));
-        LocalPath = storageFile.Path.LocalPath;
 
-        WaitOpenAsync = OpenDocumentCore(storageFile, password, token);
-        return WaitOpenAsync;
+        // Ensure method is called only once (one instance per document)
+        lock (_loadDocumentLock)
+        {
+            if (_loadDocumentTask is not null)
+            {
+                throw new InvalidOperationException("Attempt to load a pdf document more than once with the same DocumentViewModel.");
+            }
+
+            LocalPath = storageFile.Path.LocalPath;
+            _loadDocumentTask = LoadDocumentCore(storageFile, password, token);
+            return _loadDocumentTask;
+        }
     }
 
-    private async Task<int> OpenDocumentCore(IStorageFile? storageFile, string? password, CancellationToken token)
+    private async Task<DocumentOpeningState> LoadDocumentCore(IStorageFile? storageFile, string? password, CancellationToken token)
     {
         using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(_mainToken, token);
 
-        int pageCount = await _pdfService.OpenDocument(storageFile, password, combinedCts.Token).ConfigureAwait(false);
+        var state = await _pdfService.OpenDocument(storageFile, password, combinedCts.Token).ConfigureAwait(false);
 
         System.Diagnostics.Debug.Assert(_pdfService.LocalPath == LocalPath);
 
@@ -348,38 +354,50 @@ public sealed partial class DocumentViewModel : ViewModelBase
             IsPasswordProtected = isPasswordProtected;
             FileName = fileName;
 
-            if (pageCount > 0)
+            if (state == DocumentOpeningState.Success)
             {
                 PageCount = numberOfPages;
                 TextSelection = new TextSelection(numberOfPages);
             }
         });
 
-        if (pageCount > 0)
+        if (state == DocumentOpeningState.Success)
         {
             _pdfPageService.Initialise();
         }
 
-        return pageCount;
+        return state;
     }
-    
+
+    /// <summary>
+    /// Wait for document to finish loading, or being cancelled.
+    /// </summary>
+    private async Task WaitForDocumentToLoad()
+    {
+        if (_loadDocumentTask is null)
+        {
+            // This should not happen, as LoadDocument should be called before any operation that requires it.
+            throw new InvalidOperationException("Document has not been loaded yet.");
+        }
+
+        var state = await _loadDocumentTask;
+        if (state != DocumentOpeningState.Success)
+        {
+            // We consider the operation was cancelled because we don't want to re-throw.
+            throw new OperationCanceledException("WaitForDocumentToLoad");
+        }
+    }
+
     private async Task LoadPages()
     {
         Debug.ThrowOnUiThread();
-        
-        await Dispatcher.UIThread.InvokeAsync(() => IsPagesLoading = true);
 
         try
         {
-            if (PageCount == 0)
-            {
-                if (IsPasswordProtected)
-                {
-                    throw new Exception("Could not open password protected document.");
-                }
+            await Dispatcher.UIThread.InvokeAsync(() => IsPagesLoading = true);
 
-                throw new Exception("Cannot load pages because document has 0 pages.");
-            }
+            // Make sure the doc is open before proceeding because we need TextSelection
+            await WaitForDocumentToLoad();
 
             System.Diagnostics.Debug.Assert(TextSelection is not null);
 

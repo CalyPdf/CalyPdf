@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2025 BobLd
+﻿// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using Avalonia.Controls.Notifications;
 using Avalonia.Platform.Storage;
 using Caly.Core.Models;
 using Caly.Core.Services.Interfaces;
@@ -34,7 +35,6 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Avalonia.Controls.Notifications;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Exceptions;
 using UglyToad.PdfPig.Outline;
@@ -89,12 +89,28 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
         _mainToken = _mainCts.Token;
         _settingsService = settingsService;
     }
+    
+    private Task<DocumentOpeningState>? _openDocumentTask;
+    private readonly Lock _openDocumentLock = new();
 
-    public async Task<int> OpenDocument(IStorageFile? storageFile, string? password, CancellationToken token)
+    public Task<DocumentOpeningState> OpenDocument(IStorageFile? storageFile, string? password, CancellationToken token)
+    {
+        // Ensure method is called only once (one instance per document)
+        lock (_openDocumentLock)
+        {
+            if (_openDocumentTask is not null)
+            {
+                throw new InvalidOperationException("Attempt to open a pdf document more than once with the same IPdfDocumentService.");
+            }
+
+            _openDocumentTask = OpenDocumentInternal(storageFile, password, token);
+            return _openDocumentTask;
+        }
+    }
+
+    private async Task<DocumentOpeningState> OpenDocumentInternal(IStorageFile? storageFile, string? password, CancellationToken token)
     {
         Debug.ThrowOnUiThread();
-
-        // TODO - Ensure method is called only once (one instance per document)
 
         return await GuardDispose(async ct =>
         {
@@ -102,13 +118,14 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
             {
                 if (storageFile is null)
                 {
-                    return 0; // no pdf loaded
+                    return DocumentOpeningState.FileNotFound;
                 }
 
                 if (!storageFile.Path.LocalPath.IsPdf() && !Globals.IsMobilePlatform())
                 {
                     // TODO - Need to handle Mobile
-                    throw new ArgumentOutOfRangeException($"The loaded file '{Path.GetFileName(storageFile.Path.LocalPath)}' is not a pdf document.");
+                    throw new ArgumentOutOfRangeException(
+                        $"The loaded file '{Path.GetFileName(storageFile.Path.LocalPath)}' is not a pdf document.");
                 }
 
                 _storageFile = storageFile;
@@ -146,11 +163,14 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
 
                     _document = PdfDocument.Open(_fileStream, pdfParsingOptions);
 
+                    token.ThrowIfCancellationRequested();
+
                     // We store the PPI as an indirect object so that it can be accessed in the TextLayerFactory.
                     // This is very hacky but PdfPig does not provide a better way to pass such information
                     // to the PageFactory for the moment.
                     // TODO - to remove.
-                    _document.Advanced.ReplaceIndirectObject(CalyPdfHelper.FakePpiReference, new NumericToken(PpiScale));
+                    _document.Advanced.ReplaceIndirectObject(CalyPdfHelper.FakePpiReference,
+                        new NumericToken(PpiScale));
 
                     _document.AddPageFactory<PdfPageSize, PageSizeFactory>();
                     _document.AddPageFactory<SKPicture, SkiaPageFactory>();
@@ -158,7 +178,7 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
 
                     NumberOfPages = _document.NumberOfPages;
 
-                    return NumberOfPages;
+                    return DocumentOpeningState.Success;
                 }, ct);
             }
             catch (PdfDocumentEncryptedException)
@@ -168,7 +188,7 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
                 if (!string.IsNullOrEmpty(password))
                 {
                     // Only stay at first level, do not recurse: If password is NOT null, this is recursion
-                    return 0;
+                    return DocumentOpeningState.Password;
                 }
 
                 bool shouldContinue = true;
@@ -183,42 +203,75 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
                         continue;
                     }
 
-                    var pageCount = await OpenDocument(_storageFile, pw, ct).ConfigureAwait(false);
-                    if (pageCount > 0)
+                    var state = await OpenDocumentInternal(_storageFile, pw, ct).ConfigureAwait(false);
+                    if (state == DocumentOpeningState.Success)
                     {
                         // Password OK and document opened
-                        return pageCount;
+                        return state;
                     }
                 }
 
-                return 0;
+                return DocumentOpeningState.Password;
             }
             catch (OperationCanceledException)
             {
-                return 0;
+                return DocumentOpeningState.Canceled;
             }
             finally
             {
                 // Only release on first pass
-                if (string.IsNullOrEmpty(password))
+                if (string.IsNullOrEmpty(password) && !IsDisposed())
                 {
                     // The _semaphore starts with initial count set to 0 and maxCount to 1.
                     // By releasing here we allow _semaphore.Wait() in other methods.
-                    _semaphore.Release();
+                    try
+                    {
+                        _semaphore.Release();
+                    }
+                    catch (ObjectDisposedException)
+                    { }
                 }
             }
-        }, token);
+        }, () => DocumentOpeningState.Error, () => DocumentOpeningState.Canceled, token);
+    }
+
+    /// <summary>
+    /// Wait for document to finish opening, or being cancelled.
+    /// </summary>
+    private async Task WaitForDocumentToOpen(CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+
+        if (_openDocumentTask is null)
+        {
+            // This should not happen, as OpenDocument should be called before any operation that requires it.
+            throw new InvalidOperationException("Document has not been opened yet.");
+        }
+
+        var state = await _openDocumentTask.WaitAsync(token).ConfigureAwait(false);
+        if (state != DocumentOpeningState.Success)
+        {
+            // We consider the operation was cancelled because we don't want to throw.
+            throw new OperationCanceledException("WaitForDocumentToOpen");
+        }
     }
     
     public async Task<PdfPageSize?> GetPageSizeAsync(int pageNumber, CancellationToken token)
     {
         Debug.ThrowOnUiThread();
 
-        return await GuardDispose(async ct =>
+        return await GuardDispose<PdfPageSize?>(async guardCt =>
         {
+            await WaitForDocumentToOpen(guardCt);
+            var document = _document;
+            if (document is null)
+            {
+                return null;
+            }
+
             return await ExecuteWithLockAsync(
-                _ => _document?.GetPage<PdfPageSize>(pageNumber),
-                ct);
+                _ => document.GetPage<PdfPageSize>(pageNumber),
+                guardCt);
         }, token);
     }
 
@@ -228,13 +281,20 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
 
         return await GuardDispose(async guardCt =>
         {
+            await WaitForDocumentToOpen(guardCt);
+            var document = _document;
+            if (document is null)
+            {
+                return null;
+            }
+
             var pageTextLayer = await ExecuteWithLockAsync(lockCt =>
                     {
                         try
                         {
                             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(lockCt);
                             linkedCts.CancelAfter(PageTimeOut);
-                            return _document?.GetPageTextLayerContent(pageNumber, linkedCts.Token);
+                            return document.GetPageTextLayerContent(pageNumber, linkedCts.Token);
                         }
                         catch (OperationCanceledException)
                         {
@@ -263,13 +323,20 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
     {
         Debug.ThrowOnUiThread();
 
-        return await GuardDispose(async ct =>
+        return await GuardDispose(async guardCt =>
         {
-            var files = await ExecuteWithLockAsync(
-                _ => _document?.Advanced.TryGetEmbeddedFiles(out var files) == true ? files : null,
-                ct);
+            await WaitForDocumentToOpen(guardCt);
+            var document = _document;
+            if (document is null)
+            {
+                return null;
+            }
 
-            if (files is null || files.Count == 0 || ct.IsCancellationRequested)
+            var files = await ExecuteWithLockAsync(
+                _ => document.Advanced.TryGetEmbeddedFiles(out var files) ? files : null,
+                guardCt);
+
+            if (files is null || files.Count == 0 || guardCt.IsCancellationRequested)
             {
                 return null;
             }
@@ -289,19 +356,11 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
     {
         Debug.ThrowOnUiThread();
 
-        return GuardDispose(async ct =>
+        return GuardDispose(async guardCt =>
         {
-            await Task.Yield();
-
-            var info = _document?.Information;
-
-            var others =
-                _document?.Information.DocumentInformationDictionary?.Data?
-                    .Where(x => x.Value is not null)
-                    .ToDictionary(x => x.Key,
-                        x => x.Value.ToString()!);
-
-            if (info is null || others is null || ct.IsCancellationRequested)
+            await WaitForDocumentToOpen(guardCt);
+            var document = _document;
+            if (document is null)
             {
                 return null;
             }
@@ -315,47 +374,37 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
             {
                 throw new InvalidOperationException("FileSize should have a value at this stage.");
             }
+
+            var info = document.Information;
+
+            var others =
+                document.Information.DocumentInformationDictionary?.Data?
+                    .Where(x => x.Value is not null)
+                    .ToDictionary(x => x.Key,
+                        x => x.Value.ToString()!);
+
+            if (guardCt.IsCancellationRequested)
+            {
+                return null;
+            }
             
             return new DocumentPropertiesViewModel()
             {
                 FileName = FileName,
                 FileSize = Helpers.FormatSizeBytes(FileSize.Value),
                 PageCount = NumberOfPages,
-                PdfVersion = _document?.Version.ToString(PdfVersionFormat) ?? string.Empty,
-                Title = info.Title,
-                Author = info.Author,
-                CreationDate = FormatPdfDate(info.CreationDate),
-                Creator = info.Creator,
-                Keywords = info.Keywords,
-                ModifiedDate = FormatPdfDate(info.ModifiedDate),
-                Producer = info.Producer,
-                Subject = info.Subject,
-                Others = others
+                PdfVersion = document.Version.ToString(PdfVersionFormat),
+                Title = info?.Title,
+                Author = info?.Author,
+                CreationDate = FormatPdfDate(info?.CreationDate),
+                Creator = info?.Creator,
+                Keywords = info?.Keywords,
+                ModifiedDate = FormatPdfDate(info?.ModifiedDate),
+                Producer = info?.Producer,
+                Subject = info?.Subject,
+                Others = others ?? []
             };
         }, token);
-    }
-
-    public string? GetLogFileName()
-    {
-        const int length = 15;
-
-        string? v = FileName;
-        if (string.IsNullOrEmpty(v))
-        {
-            return v;
-        }
-
-        if (v.Length == length)
-        {
-            return v;
-        }
-
-        if (v.Length > length)
-        {
-            return v[..length];
-        }
-
-        return v.PadRight(length);
     }
 
     private static string? FormatPdfDate(string? rawDate)
@@ -381,19 +430,26 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
     public async Task<IReadOnlyList<PdfBookmarkNode>?> GetPdfBookmark(CancellationToken token)
     {
         Debug.ThrowOnUiThread();
-        return await GuardDispose(async ct =>
+        return await GuardDispose(async guardCt =>
         {
+            await WaitForDocumentToOpen(guardCt);
+            var document = _document;
+            if (document is null)
+            {
+                return null;
+            }
+
             Bookmarks? bookmarks = await ExecuteWithLockAsync(_ =>
             {
-                if (_document?.TryGetBookmarks(out var b, true) == true)
+                if (document.TryGetBookmarks(out var b, true))
                 {
                     return b;
                 }
 
                 return null;
-            }, ct);
+            }, guardCt);
 
-            if (bookmarks is null || bookmarks.Roots.Count == 0 || ct.IsCancellationRequested)
+            if (bookmarks is null || bookmarks.Roots.Count == 0 || guardCt.IsCancellationRequested)
             {
                 return null;
             }
@@ -401,7 +457,7 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
             var bookmarksItems = new List<PdfBookmarkNode>();
             foreach (BookmarkNode node in bookmarks.Roots)
             {
-                var n = BuildPdfBookmarkNode(node, ct);
+                var n = BuildPdfBookmarkNode(node, guardCt);
                 if (n is not null)
                 {
                     bookmarksItems.Add(n);
@@ -446,16 +502,14 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
 
         try
         {
-            if (IsDisposed())
+            if (Interlocked.CompareExchange(ref _isDisposed, 1, 0) != 0)
             {
                 System.Diagnostics.Debug.WriteLine($"[WARN] Trying to dispose but already disposed for {FileName}.");
                 return;
             }
 
             System.Diagnostics.Debug.WriteLine($"[INFO] Disposing document async for {FileName}.");
-
-            Interlocked.Increment(ref _isDisposed); // Flag as disposed
-
+            
             await _mainCts.CancelAsync();
 
             // Wait for in-flight operations (with timeout)
