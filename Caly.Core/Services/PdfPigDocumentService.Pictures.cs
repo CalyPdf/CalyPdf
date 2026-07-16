@@ -61,7 +61,7 @@ internal sealed partial class PdfPigDocumentService
                         if (!lockCt.IsCancellationRequested)
                         {
                             App.Messenger.Send(new ShowNotificationMessage(NotificationType.Error,
-                                $"Error in page {pageNumber}",
+                                $"Error in '{FileName}.pdf', Page {pageNumber}",
                                 $"Could not display page after {PageTimeOut.TotalSeconds} seconds."));
                             return GetTimeOutPicture(document, pageNumber, lockCt);
                         }

@@ -39,6 +39,7 @@ public class MainViewModelSelectedDocumentTests
         public string? LocalPath => throw new NotImplementedException();
         public bool IsPasswordProtected => throw new NotImplementedException();
 
+        public bool IsPortfolio => throw new NotImplementedException();
         public Task<DocumentOpeningState> OpenDocument(IStorageFile? storageFile, string? password, CancellationToken token)
             => throw new NotImplementedException();
 
@@ -48,7 +49,7 @@ public class MainViewModelSelectedDocumentTests
         public Task<IReadOnlyList<PdfBookmarkNode>?> GetPdfBookmark(CancellationToken token)
             => throw new NotImplementedException();
 
-        public Task<IReadOnlyList<PdfEmbeddedFileViewModel>?> GetEmbeddedFileAsync(CancellationToken token)
+        public Task<IReadOnlyList<PdfEmbeddedFileViewModel>?> GetEmbeddedFilesAsync(CancellationToken token)
             => throw new NotImplementedException();
 
         public Task<UglyToad.PdfPig.Rendering.Skia.PdfPageSize?> GetPageSizeAsync(int pageNumber, CancellationToken token)

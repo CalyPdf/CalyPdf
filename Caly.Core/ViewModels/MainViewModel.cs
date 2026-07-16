@@ -257,8 +257,15 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void ActivateSearchTextTab()
     {
+        var vm = SelectedDocument;
+        if (vm is null || vm.IsPortfolio)
+        {
+            // Cannot search a portfolio pdf
+            return;
+        }
+        
         AppStates.IsDocumentPaneOpen = true;
-        SelectedDocument?.SelectedTabIndex = 2;
+        vm.SelectedTabIndex = 2;
     }
 
     [RelayCommand]

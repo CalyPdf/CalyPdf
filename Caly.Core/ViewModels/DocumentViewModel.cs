@@ -71,7 +71,7 @@ public sealed partial class DocumentViewModel : ViewModelBase
 
     [ObservableProperty] private ObservableCollection<PageViewModel> _pages = [];
 
-    [ObservableProperty] private int _selectedTabIndex;
+    [ObservableProperty] public partial int SelectedTabIndex { get; set; }
 
     [ObservableProperty] private bool _isPasswordProtected;
 
@@ -89,6 +89,8 @@ public sealed partial class DocumentViewModel : ViewModelBase
 
     [ObservableProperty] private bool _isPagesLoading = true; // Start state is true, even if pages have not started loading just yet
 
+    [ObservableProperty] public partial bool IsPortfolio { get; set; }
+    
     /// <summary>
     /// Starts at <c>1</c>, ends at <see cref="PageCount"/>.
     /// <para><c>null</c> if not selected.</para>
@@ -346,12 +348,14 @@ public sealed partial class DocumentViewModel : ViewModelBase
         System.Diagnostics.Debug.Assert(_pdfService.LocalPath == LocalPath);
 
         bool isPasswordProtected = _pdfService.IsPasswordProtected;
+        bool isPortfolio = _pdfService.IsPortfolio;
         string? fileName = _pdfService.FileName;
         int numberOfPages = _pdfService.NumberOfPages;
 
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
             IsPasswordProtected = isPasswordProtected;
+            IsPortfolio = isPortfolio;
             FileName = fileName;
 
             if (state == DocumentOpeningState.Success)
@@ -398,6 +402,12 @@ public sealed partial class DocumentViewModel : ViewModelBase
 
             // Make sure the doc is open before proceeding because we need TextSelection
             await WaitForDocumentToLoad();
+
+            if (IsPortfolio)
+            {
+                // This is a portfolio pdf file, navigation is done through embedded files
+                return;
+            }
 
             System.Diagnostics.Debug.Assert(TextSelection is not null);
 

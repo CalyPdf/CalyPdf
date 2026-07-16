@@ -21,6 +21,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Avalonia.Threading;
 
 namespace Caly.Core.ViewModels;
 
@@ -50,9 +51,17 @@ public partial class DocumentViewModel
         try
         {
             _mainToken.ThrowIfCancellationRequested();
-            var items = await Task.Run(() => _pdfService.GetEmbeddedFileAsync(_mainToken), _mainToken);
+            var items = await Task.Run(() => _pdfService.GetEmbeddedFilesAsync(_mainToken), _mainToken);
             if (items is not null && items.Count > 0)
             {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (IsPortfolio)
+                    {
+                        // Select 'Embedded Files' tab
+                        SelectedTabIndex = 4;
+                    }
+                });
                 return items;
             }
         }

@@ -66,7 +66,9 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
 
     public int NumberOfPages { get; private set; }
 
-    public bool IsPasswordProtected { get; private set; } = false;
+    public bool IsPasswordProtected { get; private set; }
+
+    public bool IsPortfolio { get; private set; }
 
     private long _isActive = 0;
     public bool IsActive
@@ -177,6 +179,7 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
                     _document.AddPageFactory<PageTextLayerContent, TextLayerFactory>();
 
                     NumberOfPages = _document.NumberOfPages;
+                    IsPortfolio = _document.IsPortfolio();
 
                     return DocumentOpeningState.Success;
                 }, ct);
@@ -301,7 +304,7 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
                             if (!lockCt.IsCancellationRequested)
                             {
                                 App.Messenger.Send(new ShowNotificationMessage(NotificationType.Error,
-                                    $"Error in page {pageNumber}",
+                                    $"Error in '{FileName}.pdf', Page {pageNumber}",
                                     $"Could not get text after {PageTimeOut.TotalSeconds} seconds."));
                             }
                             
@@ -319,7 +322,7 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
         }, token);
     }
 
-    public async Task<IReadOnlyList<PdfEmbeddedFileViewModel>?> GetEmbeddedFileAsync(CancellationToken token)
+    public async Task<IReadOnlyList<PdfEmbeddedFileViewModel>?> GetEmbeddedFilesAsync(CancellationToken token)
     {
         Debug.ThrowOnUiThread();
 
