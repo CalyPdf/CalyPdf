@@ -38,7 +38,7 @@ public sealed partial class ApplicationStates : ObservableObject
     /// Whether the document side pane is open.
     /// </summary>
     [ObservableProperty]
-    public partial bool IsDocumentPaneOpen { get; set; } = !CalyExtensions.IsMobilePlatform();
+    public partial bool IsDocumentPaneOpen { get; set; } = !Globals.IsMobilePlatform();
 
     /// <summary>
     /// Width of the document side pane, persisted to settings.

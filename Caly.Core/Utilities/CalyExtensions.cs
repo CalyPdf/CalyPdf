@@ -21,7 +21,6 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Avalonia;
@@ -36,23 +35,8 @@ namespace Caly.Core.Utilities;
 
 internal static class CalyExtensions
 {
-    public static readonly string CalyVersion;
-
     private static ReadOnlySpan<char> PdfExtension => ['.', 'p', 'd', 'f'];
-
-    static CalyExtensions()
-    {
-        var assembly = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
-
-        string? version = assembly.GetName().Version?.ToString().Trim();
-        CalyVersion = !string.IsNullOrEmpty(version) ? version : @"n/a";
-    }
-
-    public static bool IsMobilePlatform()
-    {
-        return OperatingSystem.IsAndroid() || OperatingSystem.IsIOS();
-    }
-
+    
     /// <summary>
     /// Get the Viewport Rect to check if elements are visible or not.
     /// </summary>

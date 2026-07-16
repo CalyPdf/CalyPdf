@@ -734,7 +734,7 @@ public sealed class PageItemsControl : ItemsControl
         LayoutTransform.AddHandler(PointerMovedEvent, _zoomPanController.OnPointerMoved);
         LayoutTransform.AddHandler(PointerReleasedEvent, _zoomPanController.OnPointerReleased);
 
-        if (CalyExtensions.IsMobilePlatform())
+        if (Globals.IsMobilePlatform())
         {
             LayoutTransform.GestureRecognizers.Add(new PinchGestureRecognizer());
             LayoutTransform.AddHandler(PinchEvent, _zoomPanController.OnPinchChanged);

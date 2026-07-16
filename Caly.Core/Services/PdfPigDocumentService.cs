@@ -105,7 +105,7 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
                     return 0; // no pdf loaded
                 }
 
-                if (!storageFile.Path.LocalPath.IsPdf() && !CalyExtensions.IsMobilePlatform())
+                if (!storageFile.Path.LocalPath.IsPdf() && !Globals.IsMobilePlatform())
                 {
                     // TODO - Need to handle Mobile
                     throw new ArgumentOutOfRangeException($"The loaded file '{Path.GetFileName(storageFile.Path.LocalPath)}' is not a pdf document.");
