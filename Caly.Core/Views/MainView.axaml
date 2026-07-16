@@ -49,7 +49,7 @@
                                 IsVisible="{Binding !PdfDocuments.Count}"
                                 IsEnabled="{Binding !PdfDocuments.Count}">
 
-                        <Label Content="Caly Pdf Reader"
+                        <Label Content="{Binding AppName}"
                                FontSize="15"
                                HorizontalAlignment="Center"
                                HorizontalContentAlignment="Center"/>

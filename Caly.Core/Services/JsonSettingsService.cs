@@ -55,7 +55,7 @@ internal sealed class JsonSettingsService : ISettingsService
 
     public JsonSettingsService(Visual target)
     {
-        if (CalyExtensions.IsMobilePlatform())
+        if (Globals.IsMobilePlatform())
         {
             SetDefaultSettings(); // TODO - Create proper mobile class
             return;
@@ -326,7 +326,7 @@ internal sealed class JsonSettingsService : ISettingsService
 
     public void Load()
     {
-        if (CalyExtensions.IsMobilePlatform())
+        if (Globals.IsMobilePlatform())
         {
             return; // TODO - Create proper mobile class
         }
@@ -366,7 +366,7 @@ internal sealed class JsonSettingsService : ISettingsService
     {
         Debug.ThrowOnUiThread();
 
-        if (CalyExtensions.IsMobilePlatform())
+        if (Globals.IsMobilePlatform())
         {
             return; // TODO - Create proper mobile class
         }
@@ -405,7 +405,7 @@ internal sealed class JsonSettingsService : ISettingsService
 
     public void Save()
     {
-        if (CalyExtensions.IsMobilePlatform())
+        if (Globals.IsMobilePlatform())
         {
             return; // TODO - Create proper mobile class
         }
@@ -435,7 +435,7 @@ internal sealed class JsonSettingsService : ISettingsService
     {
         Debug.ThrowOnUiThread();
 
-        if (CalyExtensions.IsMobilePlatform())
+        if (Globals.IsMobilePlatform())
         {
             return; // TODO - Create proper mobile class
         }

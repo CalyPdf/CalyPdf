@@ -33,9 +33,7 @@ namespace Caly.Desktop
 {
     internal class Program
     {
-        private const string _appName = "Caly Pdf Reader";
-
-        private static readonly CalyFileMutex mutex = new(true, _appName);
+        private static readonly CalyFileMutex mutex = new(true, Globals.AppName);
 
         private static bool _isRestart = false;
         
@@ -207,7 +205,7 @@ namespace Caly.Desktop
                     .With(new X11PlatformOptions
                     {
                         RenderingMode = [X11RenderingMode.Software],
-                        WmClass = _appName,
+                        WmClass = Globals.AppName,
                         ExternalGLibMainLoopExceptionLogger = ShowExceptionSafely,
 #pragma warning disable AVALONIA_X11_CSD
                         EnableDrawnDecorations = true,

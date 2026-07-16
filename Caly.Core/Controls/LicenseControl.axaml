@@ -22,7 +22,7 @@
                 <DockPanel Margin="5">
 
                     <TextBlock DockPanel.Dock="Top"
-                               Text="Caly Pdf Reader"
+                               Text="{Binding AppName}"
                                HorizontalAlignment="Left" />
 
                     <TextBlock DockPanel.Dock="Top">

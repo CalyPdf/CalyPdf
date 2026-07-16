@@ -64,8 +64,10 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
         }
     }
 
-    public string Version => CalyExtensions.CalyVersion;
+    public string Version => Globals.CalyVersion;
 
+    public string AppName => Globals.AppName;
+    
     /// <summary>
     /// The document the last <see cref="SelectedDocumentChangedMessage"/> was sent for,
     /// so switching between index/collection updates that resolve to the same document
