@@ -1,8 +1,6 @@
 {
     "GeneralSettings": {
         "NetProjectPath": "Caly.Desktop.csproj",
-        "ApplicationName": "Caly Pdf Reader (Portable)",
-        "Version": "0.3.0.0",
         "PackageName": {
             "$type": "msbuild",
             "property": "AssemblyName"
@@ -10,13 +8,18 @@
         "AssemblyName": {
             "$type": "msbuild",
             "property": "AssemblyName"
+        },
+        "ApplicationName": "Caly Pdf Reader (Portable)",
+        "Version": {
+            "$type": "msbuild",
+            "property": "Version"
         }
     },
     "LinuxSettings": {
         "AppIcon": "../Logo/Favicon Transparent_2.png",
-        "CreateBinSymlink": "True",
+        "CopyrightFile": "../LICENSE",
         "DesktopCategory": "Viewer",
-        "CopyrightFile": "../LICENSE"
+        "CreateBinSymlink": "True"
     },
     "Win32Settings": {
         "InstallerIcon": "../Logo/Favicon Transparent_2.ico",
