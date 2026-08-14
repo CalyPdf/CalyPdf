@@ -3,12 +3,11 @@
 		<OutputType>WinExe</OutputType>
 		<!--If you are willing to use Windows/MacOS native APIs you will need to create 3 projects.
     One for Windows with net7.0-windows TFM, one for MacOS with net7.0-macos and one with net7.0 TFM for Linux.-->
-		<TargetFrameworks>net9.0;net10.0</TargetFrameworks>
+		<TargetFramework>net10.0</TargetFramework>
 		<Nullable>enable</Nullable>
-		<BuiltInComInteropSupport>true</BuiltInComInteropSupport>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
 		<AssemblyName>Caly</AssemblyName>
-		<Version>0.3.0.0</Version>
+		<Version>0.3.2.0</Version>
 		<JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
 		<Deterministic>true</Deterministic>
 		<Configurations>Debug;Release;Portable</Configurations>
@@ -107,7 +106,7 @@
 	</Target>
 
 	<ItemGroup>
-		<PackageReference Include="Avalonia.Desktop" Version="12.1.0" />
+		<PackageReference Include="Avalonia.Desktop" Version="12.1.1" />
 		<PackageReference Condition="'$(Configuration)'=='Debug'" Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3" />
 	</ItemGroup>
 
