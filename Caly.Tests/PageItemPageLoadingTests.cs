@@ -82,7 +82,7 @@ public class PageItemPageLoadingTests
     {
         var item = ShowPageItem(out _);
 
-        item.SetValue(PageItem.IsPageRenderingProperty, true);
+        item.SetValue(PageItem.IsPageLoadingProperty, true);
 
         Assert.Single(Host(item).Children);
         Assert.IsAssignableFrom<Control>(Host(item).Children[0]);
@@ -93,10 +93,10 @@ public class PageItemPageLoadingTests
     {
         var item = ShowPageItem(out _);
 
-        item.SetValue(PageItem.IsPageRenderingProperty, true);
+        item.SetValue(PageItem.IsPageLoadingProperty, true);
         Assert.Single(Host(item).Children);
 
-        item.SetValue(PageItem.IsPageRenderingProperty, false);
+        item.SetValue(PageItem.IsPageLoadingProperty, false);
 
         Assert.Empty(Host(item).Children);
     }
@@ -106,7 +106,7 @@ public class PageItemPageLoadingTests
     {
         var item = ShowPageItem(out var parent);
 
-        item.SetValue(PageItem.IsPageRenderingProperty, true);
+        item.SetValue(PageItem.IsPageLoadingProperty, true);
         var original = Host(item).Children[0];
 
         // Recycle the container while the page is still rendering.

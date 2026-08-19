@@ -39,10 +39,10 @@ namespace Caly.Core.Controls;
 public sealed class PageItem : ContentControl
 {
     /// <summary>
-    /// Defines the <see cref="IsPageRendering"/> property.
+    /// Defines the <see cref="IsPageLoading"/> property.
     /// </summary>
-    public static readonly StyledProperty<bool> IsPageRenderingProperty =
-        AvaloniaProperty.Register<PageItem, bool>(nameof(IsPageRendering));
+    public static readonly StyledProperty<bool> IsPageLoadingProperty =
+        AvaloniaProperty.Register<PageItem, bool>(nameof(IsPageLoading));
 
     /// <summary>
     /// Defines the <see cref="Picture"/> property.
@@ -119,10 +119,10 @@ public sealed class PageItem : ContentControl
         set => SetValue(IsRotatingProperty, value);
     }
 
-    public bool IsPageRendering
+    public bool IsPageLoading
     {
-        get => GetValue(IsPageRenderingProperty);
-        set => SetValue(IsPageRenderingProperty, value);
+        get => GetValue(IsPageLoadingProperty);
+        set => SetValue(IsPageLoadingProperty, value);
     }
 
     public IRef<SKPicture>? Picture
@@ -186,7 +186,7 @@ public sealed class PageItem : ContentControl
     {
         base.OnPropertyChanged(change);
 
-        if (change.Property == IsPageRenderingProperty)
+        if (change.Property == IsPageLoadingProperty)
         {
             SyncPageLoadingSkeleton();
         }
@@ -204,8 +204,8 @@ public sealed class PageItem : ContentControl
     {
         base.OnAttachedToVisualTree(e);
 
-        // A pooled container can come back while its page is already rendering, in which
-        // case there is no IsPageRendering change left to build the skeleton off.
+        // A pooled container can come back while its page is already loading, in which
+        // case there is no IsPageLoading change left to build the skeleton off.
         SyncPageLoadingSkeleton();
     }
 
@@ -241,7 +241,7 @@ public sealed class PageItem : ContentControl
             return;
         }
 
-        if (!IsPageRendering)
+        if (!IsPageLoading)
         {
             DisposePageLoadingSkeleton();
             return;

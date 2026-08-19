@@ -335,11 +335,6 @@ namespace Caly.Core.Services
             IRef<SKPicture>? picture = null;
             try
             {
-                Dispatcher.UIThread.Invoke(() =>
-                {
-                    renderRequest.Page.IsPageRendering = true;
-                });
-
                 picture = await GetPicture(renderRequest.Page.PageNumber, renderRequest.Token)
                     .ConfigureAwait(false);
 
@@ -368,11 +363,6 @@ namespace Caly.Core.Services
             finally
             {
                 picture?.Dispose();
-
-                Dispatcher.UIThread.Invoke(() =>
-                {
-                    renderRequest.Page.IsPageRendering = false;
-                });
             }
         }
 
