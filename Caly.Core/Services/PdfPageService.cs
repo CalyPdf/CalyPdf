@@ -40,66 +40,6 @@ namespace Caly.Core.Services
 {
     public class PdfPageService : IAsyncDisposable
     {
-        private enum RenderRequestTypes : byte
-        {
-            PageSize = 0,
-            Picture = 1,
-            Thumbnail = 2,
-            TextLayer = 3
-        }
-
-        private sealed class RenderRequestComparer : IComparer<RenderRequest>
-        {
-            public static readonly RenderRequestComparer Instance = new();
-
-            public int Compare(RenderRequest? x, RenderRequest? y)
-            {
-                if (ReferenceEquals(x, y)) return 0;
-                if (y is null) return 1;
-                if (x is null) return -1;
-
-                if (x.Page.PageNumber.Equals(y.Page.PageNumber))
-                {
-                    return x.Type.CompareTo(y.Type);
-                }
-
-                return x.Page.PageNumber.CompareTo(y.Page.PageNumber);
-            }
-        }
-
-        private sealed class RenderRequest : IEquatable<RenderRequest>
-        {
-            public PageViewModel Page { get; }
-
-            public RenderRequestTypes Type { get; }
-
-            public CancellationToken Token { get; }
-
-            public RenderRequest(PageViewModel page, RenderRequestTypes type, CancellationToken token)
-            {
-                Page = page;
-                Type = type;
-                Token = token;
-            }
-
-            public bool Equals(RenderRequest? other)
-            {
-                if (other is null) return false;
-                if (ReferenceEquals(this, other)) return true;
-                return Page.Equals(other.Page) && Type == other.Type;
-            }
-
-            public override bool Equals(object? obj)
-            {
-                return ReferenceEquals(this, obj) || obj is RenderRequest other && Equals(other);
-            }
-
-            public override int GetHashCode()
-            {
-                return HashCode.Combine(Page, (byte)Type);
-            }
-        }
-
         private readonly Task _processingLoopTask;
 
         private readonly IPdfDocumentService _pdfDocumentService;
