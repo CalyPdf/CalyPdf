@@ -10,7 +10,7 @@
 		<StackPanel Width="400" Height="400">
 			<controls:PageItem x:DataType="vm:PageViewModel"
                                Picture="{Binding PdfPicture}"
-                               IsPageRendering="{Binding IsPageRendering}"/>
+                               IsPageLoading="{Binding IsPageLoading}"/>
 		</StackPanel>
 	</Design.PreviewWith>
 
@@ -26,7 +26,7 @@
         <Setter Property="Rotation" Value="{Binding Rotation}"/>
 		<Setter Property="Picture" Value="{Binding PdfPicture}"/>
 		<Setter Property="VisibleArea" Value="{Binding VisibleArea}"/>
-		<Setter Property="IsPageRendering" Value="{Binding IsPageRendering}"/>
+		<Setter Property="IsPageLoading" Value="{Binding IsPageLoading}"/>
 		<Setter Property="IsPageVisible" Value="{Binding IsPageVisible}"/>
 
 		<!-- ContextFlyout -->
@@ -79,7 +79,7 @@
 
 								<!-- Host for the page-loading skeleton, filled in on demand by PageItem -->
 								<Panel Name="PART_PageLoadingHost"
-								       IsVisible="{Binding IsPageRendering}"
+								       IsVisible="{Binding IsPageLoading}"
 								       IsHitTestVisible="False"/>
 
 								<rendering:TiledPdfPageControl TileRenderService="{Binding TileRenderService}"

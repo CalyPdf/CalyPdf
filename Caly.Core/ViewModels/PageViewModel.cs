@@ -52,7 +52,7 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty] private PdfTextLayer? _pdfTextLayer;
 
-    [ObservableProperty] [NotifyPropertyChangedFor(nameof(IsPageRendering))]
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(IsPageLoading))]
     private IRef<SKPicture>? _pdfPicture;
 
     /// <summary>
@@ -73,6 +73,7 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsPageVisible))]
+    [NotifyPropertyChangedFor(nameof(IsPageLoading))]
     private Rect? _visibleArea;
 
     [ObservableProperty]
@@ -85,8 +86,6 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
 
     private IReadOnlyList<Range>? _searchResultsRanges; // Needed as the text layer might not be available when we set search results
     [ObservableProperty] private IReadOnlyList<PdfRectangle>? _searchResults;
-
-    [ObservableProperty] private bool _isPageRendering;
 
     public TextSelection TextSelection { get; }
 
@@ -102,6 +101,11 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
     public ICommand CopyTextCommand { get; }
 
     public bool IsPageVisible => VisibleArea.HasValue;
+
+    /// <summary>
+    /// Whether this page has nothing to show yet, and so should display the loading skeleton.
+    /// </summary>
+    public bool IsPageLoading => IsPageVisible && PdfPicture is null;
 
     private const int ThumbnailHeight = 135;
     public PixelSize ThumbnailSize => new PixelSize(Math.Max(1, (int)(Size.AspectRatio * ThumbnailHeight)), ThumbnailHeight);
