@@ -1,14 +1,10 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:controls="using:Caly.Core.Controls"
-                    xmlns:converters="using:Caly.Core.Converters"
                     xmlns:vm="clr-namespace:Caly.Core.ViewModels"
-                    xmlns:progRing="clr-namespace:AvaloniaProgressRing;assembly=AvaloniaProgressRing"
                     xmlns:utilities="clr-namespace:Caly.Core.Utilities"
                     xmlns:rendering="clr-namespace:Caly.Core.Controls.Rendering">
 
-    <converters:ProgressRingSizeConverter x:Key="ProgressRingSizeConverter"/>
-    <converters:ProgressRingMarginConverter x:Key="ProgressRingMarginConverter"/>
 
     <Design.PreviewWith>
 		<StackPanel Width="400" Height="400">
@@ -81,28 +77,10 @@
 								  Width="{Binding Size.Width}"
 								  Height="{Binding Size.Height}">
 
-								<Viewbox IsVisible="{Binding IsPageRendering}"
-										 IsEnabled="{Binding IsPageRendering}"
-										 HorizontalAlignment="Left"
-										 VerticalAlignment="Top">
-									<Viewbox.Width>
-										<!-- No Height binding: Viewbox stretches uniformly, so Height follows Width-->
-                                        <MultiBinding Converter="{StaticResource ProgressRingSizeConverter}">
-											<Binding Path="VisibleArea"/>
-											<Binding Path="Size"/>
-										</MultiBinding>
-									</Viewbox.Width>
-									<Viewbox.Margin>
-										<MultiBinding Converter="{StaticResource ProgressRingMarginConverter}">
-											<Binding Path="VisibleArea"/>
-											<Binding Path="Size"/>
-										</MultiBinding>
-									</Viewbox.Margin>
-									<progRing:ProgressRing Width="50"
-														   Height="50"
-														   IsActive="{Binding IsPageRendering}"
-														   Foreground="{DynamicResource SystemAccentColor}"/>
-								</Viewbox>
+								<!-- Host for the page-loading skeleton, filled in on demand by PageItem -->
+								<Panel Name="PART_PageLoadingHost"
+								       IsVisible="{Binding IsPageRendering}"
+								       IsHitTestVisible="False"/>
 
 								<rendering:TiledPdfPageControl TileRenderService="{Binding TileRenderService}"
                                                                Picture="{Binding PdfPicture}"
