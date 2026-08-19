@@ -145,10 +145,16 @@ internal sealed class PageLoadingSkeleton : Control
     /// <summary>Half-width of the highlight band, as a fraction of the page width.</summary>
     private const double HalfBand = 0.12;
 
+    /// <summary>
+    /// Seconds taken to fade from invisible to fully drawn.
+    /// </summary>
+    private const double FadeInSeconds = 0.5;
+
     private GeometryGroup? _geometry;
     private Size _geometrySize;
     private TimeSpan? _firstFrame;
     private double _phase;
+    private double _fade;
     private bool _running;
 
     public PageLoadingSkeleton()
@@ -185,8 +191,10 @@ internal sealed class PageLoadingSkeleton : Control
 
         _firstFrame ??= now;
 
-        double elapsed = (now - _firstFrame.Value).TotalSeconds;
+        var elapsedTime = now - _firstFrame.Value;
+        double elapsed = elapsedTime.TotalSeconds;
         _phase = (elapsed % SweepSeconds) / SweepSeconds;
+        _fade = FadeInOpacity(elapsedTime);
 
         InvalidateVisual();
         RequestFrame();
@@ -197,7 +205,7 @@ internal sealed class PageLoadingSkeleton : Control
         base.Render(context);
 
         var size = Bounds.Size;
-        if (size.Width <= 0 || size.Height <= 0)
+        if (size.Width <= 0 || size.Height <= 0 || _fade <= 0.0)
         {
             return;
         }
@@ -212,6 +220,11 @@ internal sealed class PageLoadingSkeleton : Control
         {
             context.FillRectangle(CreateShimmerBrush(), new Rect(size));
         }
+    }
+
+    private Color Faded(Color colour)
+    {
+        return Color.FromArgb((byte)Math.Round(colour.A * _fade), colour.R, colour.G, colour.B);
     }
 
     private GeometryGroup? GetGeometry(Size size)
@@ -240,6 +253,18 @@ internal sealed class PageLoadingSkeleton : Control
         return group;
     }
 
+    /// <summary>
+    /// How opaque the skeleton should be, given how long it has been on screen.
+    /// </summary>
+    /// <remarks>
+    /// A page that renders quickly should never flash a fully drawn skeleton, so the blocks ramp up
+    /// from invisible instead of appearing at once.
+    /// </remarks>
+    internal static double FadeInOpacity(TimeSpan elapsed)
+    {
+        return Math.Clamp(elapsed.TotalSeconds / FadeInSeconds, 0.0, 1.0);
+    }
+
     private LinearGradientBrush CreateShimmerBrush()
     {
         // Sweep the band in from off the left edge and out past the right one.
@@ -248,17 +273,20 @@ internal sealed class PageLoadingSkeleton : Control
         double to = Math.Clamp(centre + HalfBand, 0.0, 1.0);
         double peak = Math.Clamp(centre, from, to);
 
+        Color b = Faded(BaseColour);
+        Color h = Faded(HighlightColour);
+
         return new LinearGradientBrush
         {
             StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
             EndPoint = new RelativePoint(1, 0, RelativeUnit.Relative),
             GradientStops =
             {
-                new GradientStop(BaseColour, 0.0),
-                new GradientStop(BaseColour, from),
-                new GradientStop(HighlightColour, peak),
-                new GradientStop(BaseColour, to),
-                new GradientStop(BaseColour, 1.0)
+                new GradientStop(b, 0.0),
+                new GradientStop(b, from),
+                new GradientStop(h, peak),
+                new GradientStop(b, to),
+                new GradientStop(b, 1.0)
             }
         };
     }
