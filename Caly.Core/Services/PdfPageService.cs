@@ -108,8 +108,8 @@ namespace Caly.Core.Services
         private readonly ChannelReader<RenderRequest> _requestsReader;
         private readonly CancellationTokenSource _mainCts = new();
         private readonly CancellationToken _mainToken;
-        private CancellationTokenSource _thumbnailsCts = new();
-        private CancellationTokenSource _pagesCts = new();
+        private readonly CancellationGenerations _thumbnailsGenerations;
+        private readonly CancellationGenerations _pagesGenerations;
 
         private async Task ProcessingLoop()
         {
@@ -185,6 +185,8 @@ namespace Caly.Core.Services
             _requestsReader = channel.Reader;
 
             _mainToken = _mainCts.Token;
+            _pagesGenerations = new CancellationGenerations(_mainToken);
+            _thumbnailsGenerations = new CancellationGenerations(_mainToken);
             _processingLoopTask = Task.Run(ProcessingLoop, _mainToken);
         }
 
@@ -485,15 +487,15 @@ namespace Caly.Core.Services
 
             _mainToken.ThrowIfCancellationRequested();
 
-            var currentCts = CancellationTokenSource.CreateLinkedTokenSource(_mainToken);
-            var token = currentCts.Token;
-            var oldCts = Interlocked.Exchange(ref _thumbnailsCts, currentCts);
-
-            await oldCts.CancelAsync();
-            oldCts.Dispose();
+            var token = await _thumbnailsGenerations.BeginAsync();
 
             await Task.Run(async () =>
             {
+                if (token.IsCancellationRequested)
+                {
+                    return;
+                }
+
                 var document = m.Document;
 
                 if (!m.VisibleThumbnails.HasValue || !m.RealisedThumbnails.HasValue)
@@ -668,15 +670,15 @@ namespace Caly.Core.Services
 
             _mainToken.ThrowIfCancellationRequested();
 
-            var currentCts = CancellationTokenSource.CreateLinkedTokenSource(_mainToken);
-            var token = currentCts.Token;
-            var oldCts = Interlocked.Exchange(ref _pagesCts, currentCts);
-
-            await oldCts.CancelAsync();
-            oldCts.Dispose();
+            var token = await _pagesGenerations.BeginAsync();
 
             await Task.Run(async () =>
             {
+                if (token.IsCancellationRequested)
+                {
+                    return;
+                }
+
                 if (!m.VisiblePages.HasValue || !m.RealisedPages.HasValue)
                 {
                     // clear all pages
@@ -720,6 +722,8 @@ namespace Caly.Core.Services
                         (textLayersToClear ??= []).Add(page);
                     }
                 }
+
+                token.ThrowIfCancellationRequested();
 
                 if (picturesToClear is not null || textLayersToClear is not null)
                 {
@@ -831,23 +835,8 @@ namespace Caly.Core.Services
 
         public async Task CancelAndClear()
         {
-            try
-            {
-                await _pagesCts.CancelAsync();
-            }
-            catch (ObjectDisposedException)
-            {
-                // No op
-            }
-
-            try
-            {
-                await _thumbnailsCts.CancelAsync();
-            }
-            catch (ObjectDisposedException)
-            {
-                // No op
-            }
+            await _pagesGenerations.CancelCurrentAsync();
+            await _thumbnailsGenerations.CancelCurrentAsync();
 
             // Picture Cache
             UpdatePictureCache(Empty, null);
@@ -860,11 +849,11 @@ namespace Caly.Core.Services
         {
             await _mainCts.CancelAsync();
 
-            await _pagesCts.CancelAsync();
-            _pagesCts.Dispose();
-            
-            await _thumbnailsCts.CancelAsync();
-            _thumbnailsCts.Dispose();
+            await _pagesGenerations.CancelCurrentAsync();
+            await _thumbnailsGenerations.CancelCurrentAsync();
+
+            _pagesGenerations.Dispose();
+            _thumbnailsGenerations.Dispose();
 
             try
             {
