@@ -1082,6 +1082,8 @@ public sealed class PageItemsControl : ItemsControl
         }
 
 #if DEBUG
+        /*
+        // The below code snippet slows down debug mode greatly - only enable if required
         if (VisiblePages.HasValue)
         {
             foreach (var item in Items.OfType<ViewModels.PageViewModel>())
@@ -1096,6 +1098,7 @@ public sealed class PageItemsControl : ItemsControl
                 }
             }
         }
+        */
 #endif
 
 
