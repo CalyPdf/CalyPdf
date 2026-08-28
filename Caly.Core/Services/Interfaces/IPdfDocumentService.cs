@@ -75,7 +75,9 @@ public interface IPdfDocumentService : IAsyncDisposable
     string? LocalPath { get; }
 
     bool IsPasswordProtected { get; }
-    
+
+    bool IsPortfolio { get; }
+
     /// <summary>
     /// Open the pdf document.
     /// <para>Can only be called once per instance.</para>
@@ -86,7 +88,7 @@ public interface IPdfDocumentService : IAsyncDisposable
 
     Task<IReadOnlyList<PdfBookmarkNode>?> GetPdfBookmark(CancellationToken token);
 
-    Task<IReadOnlyList<PdfEmbeddedFileViewModel>?> GetEmbeddedFileAsync(CancellationToken token);
+    Task<IReadOnlyList<PdfEmbeddedFileViewModel>?> GetEmbeddedFilesAsync(CancellationToken token);
 
     Task<PdfPageSize?> GetPageSizeAsync(int pageNumber, CancellationToken token);
 

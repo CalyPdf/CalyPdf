@@ -235,8 +235,8 @@ internal sealed partial class PdfDocumentsManagerService : IPdfDocumentsManagerS
         var scope = App.Current!.Services!.CreateAsyncScope();
 
         var document = scope.ServiceProvider.GetRequiredService<DocumentViewModel>();
-        document.FileName = $"Opening '{Path.GetFileNameWithoutExtension(storageFile.Path.LocalPath)}'...";
-
+        string fileName = Path.GetFileNameWithoutExtension(storageFile.Path.LocalPath);
+        
         var docRecord = new PdfDocumentRecord()
         {
             Scope = scope,
@@ -251,6 +251,7 @@ internal sealed partial class PdfDocumentsManagerService : IPdfDocumentsManagerS
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
+                document.FileName = $"Opening '{fileName}'...";
                 _mainViewModel.PdfDocuments.Add(document);
                 _mainViewModel.SelectedDocumentIndex = Math.Max(0, _mainViewModel.PdfDocuments.Count - 1);
             });
@@ -267,18 +268,26 @@ internal sealed partial class PdfDocumentsManagerService : IPdfDocumentsManagerS
 
             if (state == DocumentOpeningState.Success)
             {
+                if (document.IsPortfolio)
+                {
+                    App.Messenger.Send(new ShowNotificationMessage(NotificationType.Information, $"Info for '{fileName}.pdf'",
+                        "This is a portfolio file. Navigate the document via the 'Embedded Files' tab on the left."));
+                }
+                
                 // Document opened successfully (we don't dispose the scope)
                 return;
             }
             
             if (document.IsPasswordProtected && state == DocumentOpeningState.Password)
             {
-                App.Messenger.Send(new ShowNotificationMessage(NotificationType.Error, "Critical error",
+                App.Messenger.Send(new ShowNotificationMessage(NotificationType.Error,
+                    $"Critical Error in '{fileName}.pdf'",
                     "Could not open password protected document."));
             }
             else if (state != DocumentOpeningState.Canceled)
             {
-                App.Messenger.Send(new ShowNotificationMessage(NotificationType.Error, "Critical error",
+                App.Messenger.Send(new ShowNotificationMessage(NotificationType.Error,
+                    $"Critical Error in '{fileName}.pdf'",
                     "Cannot load pages because something wrong happened while opening the document."));
             }
             

@@ -89,6 +89,7 @@
                         </Button>
 
 						<TextBox Name="PART_TextBoxPageNumber"
+                                 IsEnabled="{Binding !IsPortfolio, Mode=OneWay}"
                                  MinWidth="50"
                                  MaxWidth="50"
                                  TextAlignment="Center"
@@ -125,6 +126,7 @@
 
 						<!-- Rotate pages -->
 						<Button DockPanel.Dock="Left"
+                                IsEnabled="{Binding !IsPortfolio, Mode=OneWay}"
                                 Focusable="False"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Stretch"
@@ -138,6 +140,7 @@
 						</Button>
 
 						<Button DockPanel.Dock="Left"
+                                IsEnabled="{Binding !IsPortfolio, Mode=OneWay}"
                                 Focusable="False"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Stretch"
@@ -154,6 +157,7 @@
 
 						<!-- Zoom in / out -->
 						<Button DockPanel.Dock="Left"
+                                IsEnabled="{Binding !IsPortfolio, Mode=OneWay}"
                                 Focusable="False"
 								HorizontalAlignment="Center"
 								VerticalAlignment="Stretch"
@@ -167,6 +171,7 @@
 						</Button>
 
 						<Button DockPanel.Dock="Left"
+                                IsEnabled="{Binding !IsPortfolio, Mode=OneWay}"
                                 Focusable="False"
 								HorizontalAlignment="Center"
 								VerticalAlignment="Stretch"
@@ -190,6 +195,7 @@
 
 						<!-- Print -->
 						<Button DockPanel.Dock="Right"
+                                IsEnabled="{Binding !IsPortfolio, Mode=OneWay}"
                                 Focusable="False"
                                 Margin="0,0,5,0"
 								HorizontalAlignment="Center"
@@ -236,7 +242,8 @@
 										<!-- Thumbnails tab -->
 										<TabItem MinHeight="40"
                                                  Focusable="False"
-												 IsSelected="True">
+                                                 IsVisible="{Binding !IsPortfolio, Mode=OneWay}"
+                                                 IsEnabled="{Binding !IsPortfolio, Mode=OneWay}">
 											<TabItem.Header>
 												<PathIcon Width="17"
 														  Height="17"
@@ -321,7 +328,9 @@
 
 										<!-- Search tab -->
 										<TabItem MinHeight="40"
-                                                 Focusable="False">
+                                                 Focusable="False"
+                                                 IsVisible="{Binding !IsPortfolio, Mode=OneWay}"
+                                                 IsEnabled="{Binding !IsPortfolio, Mode=OneWay}">
 											<TabItem.Header>
 												<PathIcon Width="17"
 														  Height="17"
@@ -361,6 +370,16 @@
                                                 </PathIcon>
                                             </TabItem.Header>
 											
+                                        <StackPanel Orientation="Vertical">
+
+                                            <TextBlock IsVisible="{Binding IsPortfolio, Mode=OneWay}"
+                                                       IsEnabled="{Binding IsPortfolio, Mode=OneWay}"
+                                                       Padding="0,0,0,5"
+                                                       TextWrapping="Wrap"
+                                                       FontWeight="Bold">
+                                                This is a portfolio document, navigate by opening the embedded pdf documents below
+                                            </TextBlock>
+
                                             <ListBox ItemsSource="{Binding EmbeddedFiles^}"
                                                      Background="Transparent">
                                                 <ListBox.Styles>
@@ -368,7 +387,6 @@
                                                         <Setter Property="Padding" Value="5,0" />
                                                     </Style>
                                                 </ListBox.Styles>
-
 
                                                 <ListBox.ItemTemplate>
                                                     <DataTemplate>
@@ -409,6 +427,9 @@
                                                     </DataTemplate>
                                                 </ListBox.ItemTemplate>
                                             </ListBox>
+
+                                        </StackPanel>
+
                                         </TabItem>
 
 									</TabControl>
