@@ -39,6 +39,7 @@ using UglyToad.PdfPig;
 using UglyToad.PdfPig.Exceptions;
 using UglyToad.PdfPig.Outline;
 using UglyToad.PdfPig.Rendering.Skia;
+using UglyToad.PdfPig.Rendering.Skia.Icc.Unicolour;
 using UglyToad.PdfPig.Tokens;
 
 namespace Caly.Core.Services;
@@ -148,7 +149,8 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
                     var pdfParsingOptions = new ParsingOptions()
                     {
                         SkipMissingFonts = true,
-                        FilterProvider = SkiaRenderingFilterProvider.Instance
+                        FilterProvider = SkiaRenderingFilterProvider.Instance,
+                        IccProfileService = UnicolourIccProfileService.Instance
                     };
 
                     if (_settingsService.GetSettings().ShowPdfLogs)

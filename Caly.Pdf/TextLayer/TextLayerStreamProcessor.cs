@@ -26,6 +26,7 @@ using UglyToad.PdfPig.Core;
 using UglyToad.PdfPig.Filters;
 using UglyToad.PdfPig.Geometry;
 using UglyToad.PdfPig.Graphics;
+using UglyToad.PdfPig.Graphics.Colors.Icc;
 using UglyToad.PdfPig.Graphics.Core;
 using UglyToad.PdfPig.Graphics.Operations;
 using UglyToad.PdfPig.Graphics.Operations.TextState;
@@ -79,11 +80,11 @@ namespace Caly.Pdf.TextLayer
             double pageWidth,
             double pageHeight,
             double ppiScale,
-            ParsingOptions parsingOptions,
             AnnotationProvider annotationProvider,
+            ParsingOptions parsingOptions,
             CancellationToken token)
             : base(pageNumber, resourceStore, pdfScanner, pageContentParser, filterProvider, cropBox, userSpaceUnit,
-                rotation, initialMatrix, parsingOptions)
+                rotation, initialMatrix, null, parsingOptions)
         {
             _token = token;
 
