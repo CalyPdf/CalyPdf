@@ -7,7 +7,7 @@
 		<Nullable>enable</Nullable>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
 		<AssemblyName>Caly</AssemblyName>
-		<Version>0.3.2.0</Version>
+		<Version>0.4.0.0</Version>
 		<JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
 		<Deterministic>true</Deterministic>
 		<Configurations>Debug;Release;Portable</Configurations>

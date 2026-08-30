@@ -90,7 +90,7 @@ namespace Caly.Pdf.PageFactories
             var context = new TextLayerStreamProcessor(pageNumber, ResourceStore, PdfScanner, PageContentParser,
                 FilterProvider, cropBox, userSpaceUnit, rotation, initialMatrix,
                 effectiveCropBox.Width, effectiveCropBox.Height, _ppiScale,
-                ParsingOptions, annotationProvider, CurrentToken);
+                annotationProvider, ParsingOptions, CurrentToken);
 
             return context.Process(pageNumber, operations);
         }
