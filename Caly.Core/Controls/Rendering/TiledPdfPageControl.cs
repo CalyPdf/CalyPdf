@@ -445,6 +445,11 @@ public sealed partial class TiledPdfPageControl : Control
             TileRenderService.TileReady -= OnTileReady;
             TileRenderService.TileReady += OnTileReady;
         }
+
+        // A detached control ignores Picture/VisibleArea/ZoomLevel changes, and detaching
+        // cancels the page's in-flight tile renders.
+        _lastRenderedTileRangeValid = false;
+        RequestVisibleTiles();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
