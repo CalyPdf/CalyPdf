@@ -77,7 +77,7 @@ public class MainViewModelSelectedDocumentTests
     private static DocumentViewModel NewDocument()
     {
         var pdfService = new UnopenedPdfDocumentService();
-        return new DocumentViewModel(pdfService, new PdfPageService(pdfService), new NoopTextSearchService(), new ApplicationStates());
+        return new DocumentViewModel(pdfService, new PdfPageService(pdfService), new NoopTextSearchService());
     }
 
     /// <summary>
@@ -88,7 +88,7 @@ public class MainViewModelSelectedDocumentTests
     /// </summary>
     private static MainViewModel NewMainViewModel()
     {
-        var vm = new MainViewModel(new ApplicationStates());
+        var vm = new MainViewModel();
         vm.Dispose();
         return vm;
     }

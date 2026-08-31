@@ -84,7 +84,7 @@ public class DocumentViewModelBookmarkSyncTests
     {
         var pdfService = new BookmarkedPdfDocumentService(bookmarks);
         var pageService = new PdfPageService(pdfService);
-        var doc = new DocumentViewModel(pdfService, pageService, new NoopTextSearchService(), new ApplicationStates())
+        var doc = new DocumentViewModel(pdfService, pageService, new NoopTextSearchService())
         {
             PageCount = pageCount,
             TextSelection = new TextSelection(pageCount)

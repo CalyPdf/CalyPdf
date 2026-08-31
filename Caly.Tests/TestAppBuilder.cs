@@ -24,5 +24,9 @@ public class TestApp : Application
     public override void Initialize()
     {
         Styles.Add(new FluentTheme());
+
+        // Tabalonia's theme supplies the TabsControl template, including the
+        // PART_SelectedContentHost that tab content is hosted in.
+        Styles.Add(new Tabalonia.Themes.Fluent.FluentTheme());
     }
 }
