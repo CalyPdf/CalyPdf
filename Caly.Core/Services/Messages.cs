@@ -11,14 +11,26 @@ namespace Caly.Core.Services;
 
 internal sealed class SelectedDocumentChangedMessage(DocumentViewModel value) : ValueChangedMessage<DocumentViewModel>(value);
 
-internal sealed class ShowNotificationMessage(CalyNotification value) : ValueChangedMessage<CalyNotification>(value)
+internal sealed class ShowNotificationMessage(CalyNotification value, MainViewModel? target = null)
+    : ValueChangedMessage<CalyNotification>(value)
 {
-    public ShowNotificationMessage(NotificationType type, string? title = null, string? message = null) : this(new CalyNotification()
+    /// <summary>
+    /// The window this notification is about, or <c>null</c> for the active one.
+    /// <para>
+    /// A failure that belongs to one window - a file that would not open in it - has to be
+    /// reported there. The active window is not the same thing: a drop does not activate the
+    /// window it lands on, so its errors surfaced in whichever window had focus.
+    /// </para>
+    /// </summary>
+    public MainViewModel? Target { get; } = target;
+
+    public ShowNotificationMessage(NotificationType type, string? title = null, string? message = null,
+        MainViewModel? target = null) : this(new CalyNotification()
     {
         Title = title,
         Message = message,
         Type = type
-    }) { }
+    }, target) { }
 }
 
 internal sealed class CopyToClipboardRequestMessage : AsyncRequestMessage<bool>

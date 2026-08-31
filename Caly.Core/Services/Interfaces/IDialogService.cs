@@ -35,14 +35,18 @@ namespace Caly.Core.Services.Interfaces
         Task<string?> ShowPdfPasswordDialogAsync();
 
         /// <summary>
-        /// Show a notification.
+        /// Show a notification in <paramref name="target"/>, or in the active window when the
+        /// caller has no particular window in mind.
+        /// <para>
+        /// Callers that know which window the notification is about must say so: a drop, for
+        /// one, does not activate the window it lands on, so "the active window" would report
+        /// the failure in a window the user was not interacting with.
+        /// </para>
         /// </summary>
-        void ShowNotification(string? title, string? message, NotificationType type);
+        void ShowNotification(string? title, string? message, NotificationType type, MainViewModel? target = null);
 
-        /// <summary>
-        /// Show a notification.
-        /// </summary>
-        void ShowNotification(CalyNotification notification);
+        /// <inheritdoc cref="ShowNotification(string?, string?, NotificationType, MainViewModel?)" />
+        void ShowNotification(CalyNotification notification, MainViewModel? target = null);
 
         /// <summary>
         /// Show an exception in a popup window.

@@ -68,6 +68,9 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
             .SetProperty(CalySettings.CalySettingsProperty.PaneSize, newValue);
     }
 
+    /// <inheritdoc />
+    private protected override MainViewModel? NotificationTarget => this;
+
     public DocumentViewModel? SelectedDocument
     {
         get

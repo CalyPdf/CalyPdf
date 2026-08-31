@@ -29,14 +29,24 @@ public partial class ViewModelBase : ObservableObject
 {
     [ObservableProperty] private ExceptionViewModel? _exception;
 
+    /// <summary>
+    /// The window an error raised on this view model belongs to, or <c>null</c> when it cannot
+    /// be told - the notification then goes to the window the user is working in.
+    /// <para>
+    /// Without this an error about a document reported itself in whichever window happened to
+    /// be active, which is not the same window the document is in: a file dropped on an
+    /// unfocused window fails there, not where the focus is.
+    /// </para>
+    /// </summary>
+    private protected virtual MainViewModel? NotificationTarget => null;
+
     partial void OnExceptionChanging(ExceptionViewModel? value)
     {
-        if (value is null)
-        {
-            App.Messenger.Send(new ShowNotificationMessage(NotificationType.Error, "Critical error"));
-            return;
-        }
+        // Every caller assigns this from a dispatcher callback, so this runs on the UI thread -
+        // which is also the only thread the window registry may be read from.
+        MainViewModel? target = NotificationTarget;
 
-        App.Messenger.Send(new ShowNotificationMessage(NotificationType.Error, "Critical error", value.Message));
+        App.Messenger.Send(new ShowNotificationMessage(NotificationType.Error, "Critical error",
+            value?.Message, target));
     }
 }
