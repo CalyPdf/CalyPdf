@@ -69,7 +69,7 @@
                     </StackPanel>
           
                     <!-- Main Pdf Documents Control-->
-                    <controls:DocumentsTabsControl/>
+                    <controls:DocumentsTabsControl x:Name="PART_DocumentsTabsControl"/>
                 </Grid>
                 
 			</SplitView.Content>

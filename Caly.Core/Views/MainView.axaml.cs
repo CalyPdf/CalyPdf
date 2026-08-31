@@ -48,6 +48,9 @@ public partial class MainView : UserControl
         }
     }
 
+    /// <inheritdoc cref="Controls.DocumentsTabsControl.TabsControl" />
+    internal Tabalonia.Controls.TabsControl TabsControl => PART_DocumentsTabsControl.TabsControl;
+
     /// <summary>
     /// The window a file dropped on this view should open in: the one this view belongs to.
     /// <para>
