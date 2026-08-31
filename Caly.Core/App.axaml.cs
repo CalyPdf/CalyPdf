@@ -87,13 +87,27 @@ public partial class App : Application
         // Initialise dependencies
         var services = new ServiceCollection();
 
+        // Tracks every live window so documents, dialogs and notifications can be routed to
+        // the window the user is actually working in. Built eagerly: the primary window's
+        // context must be registered before any service resolves it.
+        var windowRegistry = new CalyWindowRegistry();
+        services.AddSingleton<ICalyWindowRegistry>(windowRegistry);
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
-            desktop.MainWindow = new MainWindow
+            // Peer windows: a torn-off tab's window is as real as the first one, and Caly
+            // exits only when the last of them closes.
+            desktop.ShutdownMode = ShutdownMode.OnLastWindowClose;
+
+            var mainViewModel = new MainViewModel();
+            desktop.MainWindow = new MainWindow { DataContext = mainViewModel };
+
+            windowRegistry.Register(new CalyWindowContext
             {
-                DataContext = new MainViewModel()
-            };
+                ViewModel = mainViewModel,
+                Window = desktop.MainWindow,
+                IsPrimary = true
+            });
 
             services.AddSingleton<Visual>(_ => desktop.MainWindow);
             services.AddSingleton<IStorageProvider>(_ => desktop.MainWindow.StorageProvider);
@@ -106,12 +120,34 @@ public partial class App : Application
         else if (ApplicationLifetime is IActivityApplicationLifetime activityLifetime)
         {
             MainView? mainView = null;
+            CalyWindowContext? activityContext = null;
             activityLifetime.MainViewFactory = () =>
             {
-                mainView = new MainView
+                // Android calls this again whenever it recreates the activity - a rotation or
+                // any other configuration change. The previous view and its view model are
+                // gone, and nothing unregisters them on their own: this lifetime has no Window,
+                // so the context carries no Closed event to hook. Leaving the old context
+                // registered would make Primary and Active resolve to a dead MainViewModel that
+                // no view is bound to, so documents would open into nothing - and the list
+                // would grow with every rotation.
+                if (activityContext is not null)
                 {
-                    DataContext = new MainViewModel()
+                    windowRegistry.Unregister(activityContext);
+                }
+
+                var activityViewModel = new MainViewModel();
+                mainView = new MainView { DataContext = activityViewModel };
+
+                // No Window on this lifetime: the context carries the view model only, so
+                // ownership lookups still work while detaching stays disabled.
+                activityContext = new CalyWindowContext
+                {
+                    ViewModel = activityViewModel,
+                    Window = null,
+                    IsPrimary = true
                 };
+
+                windowRegistry.Register(activityContext);
 
                 mainView.Loaded += MainView_Loaded;
                 return mainView;
@@ -127,10 +163,16 @@ public partial class App : Application
         }
         else if (ApplicationLifetime is ISingleViewApplicationLifetime singleViewPlatform)
         {
-            singleViewPlatform.MainView = new MainView
+            var singleViewModel = new MainViewModel();
+            singleViewPlatform.MainView = new MainView { DataContext = singleViewModel };
+
+            windowRegistry.Register(new CalyWindowContext
             {
-                DataContext = new MainViewModel()
-            };
+                ViewModel = singleViewModel,
+                Window = null,
+                IsPrimary = true
+            });
+
             services.AddSingleton<Visual>(_ => singleViewPlatform.MainView);
             services.AddSingleton<IStorageProvider>(_ =>
                 TopLevel.GetTopLevel(singleViewPlatform.MainView)?.StorageProvider ??
@@ -142,7 +184,16 @@ public partial class App : Application
 #if DEBUG
         else if (ApplicationLifetime is null && Avalonia.Controls.Design.IsDesignMode)
         {
-            var mainView = new MainView { DataContext = new MainViewModel() };
+            var designViewModel = new MainViewModel();
+            var mainView = new MainView { DataContext = designViewModel };
+
+            windowRegistry.Register(new CalyWindowContext
+            {
+                ViewModel = designViewModel,
+                Window = null,
+                IsPrimary = true
+            });
+
             services.AddSingleton<Visual>(_ => mainView);
             services.AddSingleton<IStorageProvider>(_ => TopLevel.GetTopLevel(mainView)?.StorageProvider);
             services.AddSingleton<IClipboard>(_ => TopLevel.GetTopLevel(mainView)?.Clipboard);
@@ -205,33 +256,50 @@ public partial class App : Application
 
     public bool TryBringToFront()
     {
-        if (ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
+        if (ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime)
         {
             return false;
         }
 
-        if (desktop.MainWindow is null)
+        // Resolving the service is thread-safe; reading the registry is not, so that happens
+        // inside BringToFront, on the UI thread.
+        return BringToFront(Services?.GetService<ICalyWindowRegistry>());
+    }
+
+    /// <summary>
+    /// Raises the window the user last worked in.
+    /// </summary>
+    internal static bool BringToFront(ICalyWindowRegistry? registry)
+    {
+        if (registry is null)
         {
             return false;
         }
 
         try
         {
-            desktop.MainWindow.Activate(); // Bring window to front
-
-            Dispatcher.UIThread.Invoke(() =>
+            return Dispatcher.UIThread.Invoke(() =>
             {
-                // Popup from taskbar
-                if (desktop.MainWindow.WindowState == WindowState.Minimized)
+                // Null once every window has closed
+                if (registry.Active?.Window is not { } window)
                 {
-                    desktop.MainWindow.WindowState = WindowState.Normal;
+                    return false;
                 }
-            });
 
-            return true;
+                window.Activate(); // Bring window to front
+
+                // Popup from taskbar
+                if (window.WindowState == WindowState.Minimized)
+                {
+                    window.WindowState = WindowState.Normal;
+                }
+
+                return true;
+            });
         }
         catch
         {
+            // Includes the dispatcher having shut down under a request that arrived during exit.
             return false;
         }
     }
