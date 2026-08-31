@@ -20,13 +20,18 @@
 
 using System;
 using System.Threading.Tasks;
+using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 
 namespace Caly.Core.Services.Interfaces;
 
 public interface IFilesService
 {
-    Task<IStorageFile?> OpenPdfFileAsync();
+    /// <summary>
+    /// Shows the open-PDF picker over <paramref name="owner"/>, or over the window the user is
+    /// working in when the caller has no particular window in mind.
+    /// </summary>
+    Task<IStorageFile?> OpenPdfFileAsync(Window? owner = null);
 
     Task<IStorageFile?> SaveFileAsync(ReadOnlyMemory<byte> data, string? fileName = null);
 
