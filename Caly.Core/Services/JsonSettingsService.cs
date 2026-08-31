@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -28,7 +29,6 @@ using Avalonia.Controls;
 using Avalonia.Threading;
 using Caly.Core.Models;
 using Caly.Core.Services.Interfaces;
-using Caly.Core.Utilities;
 using Caly.Core.ViewModels;
 using Caly.Core.Views;
 using static Caly.Core.Models.CalySettings;
@@ -43,7 +43,25 @@ internal sealed class JsonSettingsService : ISettingsService
 {
     private const string SettingsFileName = "caly_settings";
 
+    /// <summary>
+    /// The window created at startup. Only this one gets the persisted geometry applied to it:
+    /// a detached window is sized and positioned from the tab drag that created it, and
+    /// restoring a saved size over that would fight Tabalonia.
+    /// </summary>
     private readonly Visual? _target;
+
+    /// <summary>
+    /// Every live window, so the settings can be written by whichever one closes last.
+    /// <para>
+    /// Saving used to be hooked to <see cref="_target"/> alone, which was airtight while
+    /// closing the startup window meant exiting. It no longer does: with
+    /// <c>ShutdownMode.OnLastWindowClose</c> that window closes as soon as its last tab is
+    /// dragged elsewhere, and since <see cref="Save"/> is only ever called from the closing
+    /// handler, everything changed afterwards - the surviving window's geometry, and every
+    /// later <c>PaneSize</c> - was silently discarded at exit.
+    /// </para>
+    /// </summary>
+    private readonly ICalyWindowRegistry? _windowRegistry;
 
     private CalySettings? _current;
 
@@ -53,7 +71,7 @@ internal sealed class JsonSettingsService : ISettingsService
     
     private static readonly string SettingsFileFullPath = Path.Combine(SettingsFilePath, SettingsFileName);
 
-    public JsonSettingsService(Visual target)
+    public JsonSettingsService(Visual target, ICalyWindowRegistry? windowRegistry = null)
     {
         if (Globals.IsMobilePlatform())
         {
@@ -67,9 +85,66 @@ internal sealed class JsonSettingsService : ISettingsService
         if (_target is Window w)
         {
             w.Opened += _window_Opened;
-            w.Closing += _window_Closing;
             w.PropertyChanged += _window_PropertyChanged;
         }
+
+        _windowRegistry = windowRegistry;
+        if (_windowRegistry is not null)
+        {
+            // Windows registered before this service was resolved raise nothing, so the ones
+            // already up - the startup window - have to be picked up by hand.
+            foreach (CalyWindowContext context in _windowRegistry.Windows)
+            {
+                TrackForSaving(context);
+            }
+
+            _windowRegistry.WindowRegistered += OnWindowRegistered;
+        }
+        else if (_target is Window fallback)
+        {
+            // No registry (design surface, tests): behave as before and save from this window.
+            fallback.Closing += _window_Closing;
+        }
+    }
+
+    private void OnWindowRegistered(object? sender, CalyWindowContext context) => TrackForSaving(context);
+
+    private void TrackForSaving(CalyWindowContext context)
+    {
+        if (context.Window is not { } window)
+        {
+            return;
+        }
+
+        // Idempotent: Register is guarded against duplicates, but the constructor also sweeps
+        // Windows, so the startup window can be seen twice if it registers in between.
+        window.Closing -= _window_Closing;
+        window.Closing += _window_Closing;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="closing"/> is the only window left, and should therefore be the
+    /// one whose geometry is persisted.
+    /// <para>
+    /// A window is still registered while it is closing - the registry drops it on
+    /// <c>Closed</c> - so being the last one left means being the only entry.
+    /// </para>
+    /// <para>
+    /// Only the last window writes, rather than every window overwriting on its way out,
+    /// because a torn-off window's size and position come from wherever the drag happened to
+    /// end. Letting that win would replace the geometry the user deliberately set on the
+    /// window they kept working in.
+    /// </para>
+    /// </summary>
+    internal bool IsLastWindow(Window closing)
+    {
+        if (_windowRegistry is null)
+        {
+            return true;
+        }
+
+        IReadOnlyList<CalyWindowContext> windows = _windowRegistry.Windows;
+        return windows.Count <= 1 && (windows.Count == 0 || ReferenceEquals(windows[0].Window, closing));
     }
 
     private void _window_PropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
@@ -108,26 +183,41 @@ internal sealed class JsonSettingsService : ISettingsService
 
     private void _window_Closing(object? sender, WindowClosingEventArgs e)
     {
-        if (_target is Window w)
+        if (sender is not Window w)
         {
-            w.Opened -= _window_Opened;
-            w.Closing -= _window_Closing;
-            w.PropertyChanged -= _window_PropertyChanged;
+            return;
+        }
 
-            if (_current is not null)
+        w.Closing -= _window_Closing;
+
+        if (ReferenceEquals(w, _target))
+        {
+            // The startup window is the only one carrying these.
+            w.Opened -= _window_Opened;
+            w.PropertyChanged -= _window_PropertyChanged;
+        }
+
+        if (!IsLastWindow(w))
+        {
+            return;
+        }
+
+        if (_current is not null)
+        {
+            switch (w.WindowState)
             {
-                switch (w.WindowState)
-                {
-                    case WindowState.Normal:
+                case WindowState.Normal:
+                    if (double.IsFinite(w.Width) && double.IsFinite(w.Height))
+                    {
                         _current.IsMaximised = false;
                         _current.Width = (int)w.Width;
                         _current.Height = (int)w.Height;
-                        break;
+                    }
+                    break;
 
-                    case WindowState.Maximized:
-                        _current.IsMaximised = true;
-                        break;
-                }
+                case WindowState.Maximized:
+                    _current.IsMaximised = true;
+                    break;
             }
         }
 
