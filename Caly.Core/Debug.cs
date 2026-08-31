@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2025 BobLd
+﻿// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -28,10 +28,16 @@ namespace Caly.Core;
 
 public static class Debug
 {
+    /// <summary>
+    /// Whether <see cref="Avalonia.Threading.Dispatcher.UIThread"/> identifies a real, dedicated
+    /// UI thread. It does not hold under the headless unit-test host.
+    /// </summary>
+    private static bool HasDedicatedUiThread => Application.Current?.ApplicationLifetime is not null;
+
     [Conditional("DEBUG")]
     public static void ThrowOnUiThread()
     {
-        if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        if (HasDedicatedUiThread && Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
         {
             throw new InvalidOperationException("Call from UI thread");
         }
@@ -40,7 +46,7 @@ public static class Debug
     [Conditional("DEBUG")]
     public static void ThrowNotOnUiThread()
     {
-        if (!Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        if (HasDedicatedUiThread && !Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
         {
             throw new InvalidOperationException("Call from non-UI thread");
         }
