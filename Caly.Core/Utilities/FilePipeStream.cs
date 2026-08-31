@@ -66,6 +66,13 @@ public sealed class FilePipeStream : IDisposable, IAsyncDisposable
             pipeName = Guid.NewGuid().ToString();
         }
 #endif
+        // Unix maps a named pipe onto a Unix domain socket at '<temp>/CoreFxPipe_<pipeName>',
+        // and the whole path must fit in sun_path: 104 characters on macOS/BSD, 108 on Linux.
+        //
+        // A macOS temp path ('/var/folders/xx/<29 chars>/T/') takes about 49 of those and
+        // 'CoreFxPipe_' 11 more, leaving 44 for the name.
+        System.Diagnostics.Debug.Assert(pipeName.Length <= 44);
+
         _receiveTimeout = receiveTimeout ?? ReceiveTimeout;
         _pipeServer = new(pipeName, PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.CurrentUserOnly);
     }

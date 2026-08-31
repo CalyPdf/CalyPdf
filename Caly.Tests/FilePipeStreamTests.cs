@@ -14,8 +14,10 @@ public class FilePipeStreamTests
     /// <summary>
     /// Unique per-test pipe name: the production name is single-instance, so tests
     /// (and the concurrently running net9.0/net10.0 test processes) must not share it.
+    /// Kept short: Unix maps named pipes onto domain sockets under TMPDIR, and the full
+    /// socket path is capped at 104 characters (macOS TMPDIR alone eats about 60).
     /// </summary>
-    private static string NewPipeName() => $"caly_test_{Guid.NewGuid():N}.pipe";
+    private static string NewPipeName() => $"caly_t_{Guid.NewGuid():N}"[..23];
 
     /// <summary>
     /// Consumes <see cref="FilePipeStream.ReceivePathAsync"/> into <paramref name="received"/>
