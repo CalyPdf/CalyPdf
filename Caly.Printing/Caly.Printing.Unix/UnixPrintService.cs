@@ -187,7 +187,8 @@ public sealed class UnixPrintService : IPrintService, IDisposable
             bool supportsLandscape = attrs.OrientationRequestedSupported is { Length: > 0 } orient
                 && Array.Exists(orient, o => o == Orientation.Landscape);
 
-            // PrintColorModeSupported is PrintColorMode[] (enum: Color=3, Monochrome=5, etc.).
+            // PrintColorModeSupported is PrintColorMode[], a struct "smart enum" wrapping the
+            // RFC 8011 keyword strings ("color", "monochrome", ...).
             // ColorSupported (bool?) is a simpler fallback when the mode list is absent.
             var modes = attrs.PrintColorModeSupported;
             bool isColor;
@@ -195,11 +196,11 @@ public sealed class UnixPrintService : IPrintService, IDisposable
 
             if (modes is { Length: > 0 })
             {
-                isColor = Array.Exists(modes, m => m == SharpIpp.Protocol.Models.PrintColorMode.Color);
+                isColor = Array.Exists(modes, m => m == PrintColorMode.Color);
                 monoDirective = Array.Exists(modes, m =>
-                    m == SharpIpp.Protocol.Models.PrintColorMode.Monochrome ||
-                    m == SharpIpp.Protocol.Models.PrintColorMode.ProcessMonochrome ||
-                    m == SharpIpp.Protocol.Models.PrintColorMode.AutoMonochrome);
+                    m == PrintColorMode.Monochrome ||
+                    m == PrintColorMode.ProcessMonochrome ||
+                    m == PrintColorMode.AutoMonochrome);
             }
             else
             {
@@ -209,9 +210,12 @@ public sealed class UnixPrintService : IPrintService, IDisposable
                 monoDirective = true;
             }
 
-            // NumberUpSupported is not exposed by PrinterDescriptionAttributes in SharpIppNext 3.x.
-            // Fall back to the conventional N-up set {1, 2, 4} which CUPS supports by default.
-            IReadOnlyList<int> nUp = [1, 2, 4];
+            // NumberUpSupported is Range[] — IPP allows either a set of integers or a
+            // rangeOfInteger, and SharpIppNext models a plain integer as Lower == Upper.
+            var nUp = IppAttributeMapping.MapNumberUpSupported(
+                attrs.NumberUpSupported is { Length: > 0 } ranges
+                    ? Array.ConvertAll(ranges, r => (r.Lower, r.Upper))
+                    : null);
 
             return new PrinterCapabilities(
                 SupportsLandscape: supportsLandscape,
@@ -230,7 +234,7 @@ public sealed class UnixPrintService : IPrintService, IDisposable
         SupportsLandscape: true,
         IsColorDevice: true,
         SupportsMonochromeDirective: true,
-        SupportedNumberUp: [1, 2, 4]);
+        SupportedNumberUp: IppAttributeMapping.OfferedNumberUp);
 
     public Task PrintDocumentAsync(
         PrinterInfo printer,
@@ -285,22 +289,7 @@ public sealed class UnixPrintService : IPrintService, IDisposable
 
         try
         {
-            var ippScaling = IppAttributeMapping.MapFitMode(settings) switch
-            {
-                IppAttributeMapping.IppPrintScaling.Fit     => PrintScaling.Fit,
-                IppAttributeMapping.IppPrintScaling.None    => PrintScaling.None,
-                IppAttributeMapping.IppPrintScaling.AutoFit => PrintScaling.AutoFit,
-                _ => PrintScaling.Fit,
-            };
-
-            string? colorMode = IppAttributeMapping.MapColorMode(settings, caps);
-            var jobTemplate = new JobTemplateAttributes
-            {
-                OrientationRequested = (Orientation?)IppAttributeMapping.MapOrientation(settings, caps),
-                PrintColorMode = colorMode == null ? null : (PrintColorMode?)colorMode, // Careful with PrintColorMode implicit string operator
-                NumberUp = IppAttributeMapping.MapNumberUp(settings, caps),
-                PrintScaling = ippScaling,
-            };
+            var jobTemplate = IppJobTemplateFactory.Build(settings, caps);
 
             // Create-Job owns all pages in one queue entry and sets the job owner so
             // subsequent Send-Document requests pass the @OWNER policy check.

@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Collections.Generic;
 using System.Linq;
 using Caly.Core.Services.Interfaces;
 
@@ -70,6 +71,49 @@ public static class IppAttributeMapping
             return caps.SupportsMonochromeDirective ? "monochrome" : null;
         }
         return null;
+    }
+
+    /// <summary>
+    /// The N-up values the print dialog offers. Anything the printer supports outside this
+    /// set is irrelevant to Caly, and 1-up is always available.
+    /// </summary>
+    public static readonly IReadOnlyList<int> OfferedNumberUp = [1, 2, 4];
+
+    /// <summary>
+    /// Reduces the printer's <c>number-up-supported</c> spans to the values in
+    /// <see cref="OfferedNumberUp"/>.
+    /// <para>
+    /// IPP reports <c>number-up-supported</c> as either a set of integers or a
+    /// <c>rangeOfInteger</c>, so each entry is an inclusive <paramref name="supported"/> span —
+    /// a plain integer is simply a span of one. A <c>null</c> or empty sequence means the
+    /// printer did not report the attribute, in which case we keep the conventional set rather
+    /// than assume the printer can only do 1-up. 1 is always included: RFC 8011 requires it and
+    /// the dialog would otherwise have no valid selection.
+    /// </para>
+    /// </summary>
+    public static IReadOnlyList<int> MapNumberUpSupported(IEnumerable<(int Lower, int Upper)>? supported)
+    {
+        if (supported is null)
+        {
+            return OfferedNumberUp;
+        }
+
+        var spans = supported as IReadOnlyCollection<(int Lower, int Upper)> ?? supported.ToArray();
+        if (spans.Count == 0)
+        {
+            return OfferedNumberUp;
+        }
+
+        var result = new List<int>(OfferedNumberUp.Count);
+        foreach (int candidate in OfferedNumberUp)
+        {
+            if (candidate == 1 || spans.Any(s => candidate >= s.Lower && candidate <= s.Upper))
+            {
+                result.Add(candidate);
+            }
+        }
+
+        return result;
     }
 
     /// <summary>

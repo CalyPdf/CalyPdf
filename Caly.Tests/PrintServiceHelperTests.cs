@@ -55,4 +55,29 @@ public class PrintServiceHelperTests
         Assert.Equal(0, p.Green);
         Assert.Equal(0, p.Blue);
     }
+
+    // SharpIppNext >= 4.1.1 sends a Content-Length computed from the document stream
+    // (Length - the position captured when the request content was built) and 4.2.4 rewinds
+    // to that same position before every send. A stream handed to Send-Document must therefore
+    // be seekable and start at offset 0, or CUPS receives a truncated JPEG.
+    [Fact]
+    public void EncodeJpeg_ReturnsSeekableStreamAtOffsetZero()
+    {
+        using var bitmap = new SKBitmap(8, 8, SKColorType.Bgra8888, SKAlphaType.Premul);
+        bitmap.Erase(SKColors.Red);
+
+        using var stream = PrintServiceHelper.EncodeJpeg(bitmap);
+
+        Assert.True(stream.CanSeek);
+        Assert.Equal(0, stream.Position);
+        Assert.True(stream.Length > 0);
+
+        // The whole JPEG is readable from the returned position.
+        var bytes = new byte[stream.Length];
+        Assert.Equal(bytes.Length, stream.Read(bytes, 0, bytes.Length));
+
+        // JPEG SOI marker.
+        Assert.Equal(0xFF, bytes[0]);
+        Assert.Equal(0xD8, bytes[1]);
+    }
 }

@@ -90,4 +90,74 @@ public class IppAttributeMappingTests
         var settings = new PrintSettings(FitMode: fit);
         Assert.Equal(expected, IppAttributeMapping.MapFitMode(settings));
     }
+
+    // --- MapNumberUpSupported (number-up-supported, reported as Range[]) ---
+
+    [Fact]
+    public void MapNumberUpSupported_AttributeAbsent_KeepsConventionalSet()
+    {
+        // Null means the printer did not report number-up-supported: don't downgrade it to 1-up.
+        Assert.Equal(new[] { 1, 2, 4 }, IppAttributeMapping.MapNumberUpSupported(null));
+    }
+
+    [Fact]
+    public void MapNumberUpSupported_EmptySet_KeepsConventionalSet()
+    {
+        Assert.Equal(new[] { 1, 2, 4 }, IppAttributeMapping.MapNumberUpSupported([]));
+    }
+
+    [Fact]
+    public void MapNumberUpSupported_SetOfIntegers_KeepsOnlyOfferedValues()
+    {
+        // A plain 1setOf integer arrives as one-value spans; 6/9/16 are not offered by the dialog.
+        (int, int)[] reported = [(1, 1), (2, 2), (4, 4), (6, 6), (9, 9), (16, 16)];
+
+        Assert.Equal(new[] { 1, 2, 4 }, IppAttributeMapping.MapNumberUpSupported(reported));
+    }
+
+    [Fact]
+    public void MapNumberUpSupported_RangeOfInteger_ExpandsInclusively()
+    {
+        // rangeOfInteger 1..4 covers every value the dialog offers.
+        Assert.Equal(new[] { 1, 2, 4 }, IppAttributeMapping.MapNumberUpSupported([(1, 4)]));
+    }
+
+    [Fact]
+    public void MapNumberUpSupported_RangeStoppingBefore4_DropsFourUp()
+    {
+        Assert.Equal(new[] { 1, 2 }, IppAttributeMapping.MapNumberUpSupported([(1, 3)]));
+    }
+
+    [Fact]
+    public void MapNumberUpSupported_OneUpOnlyPrinter_DropsTwoAndFourUp()
+    {
+        Assert.Equal(new[] { 1 }, IppAttributeMapping.MapNumberUpSupported([(1, 1)]));
+    }
+
+    [Fact]
+    public void MapNumberUpSupported_SparseSet_SkipsGaps()
+    {
+        // Supports 1 and 4 but not 2.
+        Assert.Equal(new[] { 1, 4 }, IppAttributeMapping.MapNumberUpSupported([(1, 1), (4, 4)]));
+    }
+
+    [Fact]
+    public void MapNumberUpSupported_AlwaysIncludesOne()
+    {
+        // RFC 8011 requires 1 in number-up-supported; a printer omitting it must not leave the
+        // dialog with no valid selection.
+        Assert.Equal(new[] { 1, 2 }, IppAttributeMapping.MapNumberUpSupported([(2, 2)]));
+    }
+
+    [Fact]
+    public void MapNumberUpSupported_FeedsMapNumberUp()
+    {
+        // End to end: a 1-up-only printer forces PagesPerSheet back to 1.
+        var caps = AllSupported() with
+        {
+            SupportedNumberUp = IppAttributeMapping.MapNumberUpSupported([(1, 1)])
+        };
+
+        Assert.Equal(1, IppAttributeMapping.MapNumberUp(new PrintSettings(PagesPerSheet: 4), caps));
+    }
 }
