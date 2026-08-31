@@ -22,6 +22,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Caly.Core.Services.Interfaces;
@@ -33,10 +34,12 @@ namespace Caly.Core.Services;
 internal sealed class FilesService : IFilesService
 {
     private readonly IStorageProvider _storageProvider;
+    private readonly ICalyWindowRegistry? _windowRegistry;
     private readonly IReadOnlyList<FilePickerFileType> _pdfFileFilter = [FilePickerFileTypes.Pdf];
 
-    public FilesService(IStorageProvider? storageProvider)
+    public FilesService(IStorageProvider? storageProvider, ICalyWindowRegistry? windowRegistry = null)
     {
+        _windowRegistry = windowRegistry;
 #if DEBUG
         if (Avalonia.Controls.Design.IsDesignMode)
         {
@@ -48,13 +51,43 @@ internal sealed class FilesService : IFilesService
         // TODO - Validate CanOpen, CanSave, CanPickFolder
     }
 
-    public async Task<IStorageFile?> OpenPdfFileAsync()
+    /// <summary>
+    /// The storage provider a picker should be shown through: <paramref name="owner"/> when the
+    /// caller knows which window is asking, otherwise the window the user is working in, so
+    /// pickers open over that window rather than always over the one created at startup.
+    /// Falls back to the injected provider on lifetimes that have no
+    /// <see cref="Avalonia.Controls.Window"/>, and once every window has closed.
+    /// </summary>
+    private IStorageProvider GetStorageProvider(Window? owner = null)
+    {
+        try
+        {
+            IStorageProvider? provider = Dispatcher.UIThread.Invoke(() =>
+                // Need to run on UI thread because of window registry
+                (owner ?? _windowRegistry?.Active?.Window) is { } window
+                    ? TopLevel.GetTopLevel(window)?.StorageProvider
+                    : null);
+
+            if (provider is not null)
+            {
+                return provider;
+            }
+        }
+        catch
+        {
+            // Fall through to the injected provider.
+        }
+
+        return _storageProvider;
+    }
+
+    public async Task<IStorageFile?> OpenPdfFileAsync(Window? owner = null)
     {
         Debug.ThrowNotOnUiThread();
 
         try
         {
-            IReadOnlyList<IStorageFile> files = await _storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions()
+            IReadOnlyList<IStorageFile> files = await GetStorageProvider(owner).OpenFilePickerAsync(new FilePickerOpenOptions()
             {
                 Title = "Open",
                 AllowMultiple = false,
@@ -76,7 +109,7 @@ internal sealed class FilesService : IFilesService
         {
             fileName = Helpers.SanitiseFileName(fileName);
             
-            var file = await _storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions()
+            var file = await GetStorageProvider().SaveFilePickerAsync(new FilePickerSaveOptions()
             {
                 Title = "Save File",
                 SuggestedFileName = fileName,
@@ -139,7 +172,7 @@ internal sealed class FilesService : IFilesService
                 }
             }
 
-            using var tempFolder = await _storageProvider.TryGetFolderFromPathAsync(tempDirectory);
+            using var tempFolder = await GetStorageProvider().TryGetFolderFromPathAsync(tempDirectory);
             if (tempFolder is null)
             {
                 return null;
@@ -173,7 +206,7 @@ internal sealed class FilesService : IFilesService
         try
         {
             // UIThread needed for Avalonia.FreeDesktop.DBusSystemDialog
-            return await Dispatcher.UIThread.InvokeAsync(() => _storageProvider.TryGetFileFromPathAsync(path))
+            return await Dispatcher.UIThread.InvokeAsync(() => GetStorageProvider().TryGetFileFromPathAsync(path))
                 .ConfigureAwait(false);
         }
         catch (Exception e)
