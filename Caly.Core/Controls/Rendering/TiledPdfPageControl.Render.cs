@@ -145,96 +145,8 @@ public partial class TiledPdfPageControl
         _lastRenderedTileRange = new TileRange(tileLevel, startCol, startRow, endCol, endRow);
         _lastRenderedTileRangeValid = true;
 
-        int rangeCols = endCol - startCol + 1;
-        int rangeRows = endRow - startRow + 1;
-        int tileCount = rangeCols * rangeRows;
-
-        System.Diagnostics.Debug.Assert(tileCount >= 0);
-
-        _renderTileEntries.Clear();
-        _renderTileEntries.EnsureCapacity(tileCount);
-
-        bool allVisibleTilesCached = true;
-
-        // Batch the exact-level lookups under a single cache lock acquisition instead of N
-        // locked TryGet calls. With a background renderer concurrently adding tiles and a
-        // separate prefetch thread calling FindMissing, per-tile locking here was the main
-        // source of frame-time jitter during fast scrolling.
-        var exactLevelResults = ArrayPool<TileCacheResult>.Shared.Rent(tileCount);
-        try
-        {
-            service.Cache.TryGetRange(pageNumber, tileLevel,
-                startCol, startRow, endCol, endRow,
-                exactLevelResults.AsSpan(0, tileCount));
-
-            // Query cached higher levels once per render. Passed into the finer-level fallback
-            // search so it iterates only levels that actually have tiles — this avoids scanning
-            // large empty tile grids at finer levels (4x per level) while still finding fallbacks
-            // when the user zooms out past many levels (otherwise tiles from deeply zoomed-in
-            // views would be skipped, leaving the page blank until exact-level tiles render).
-            int[]? higherCachedLevels = null;
-            bool higherCachedLevelsFetched = false;
-
-            for (int r = 0; r < rangeRows; r++)
-            {
-                int row = startRow + r;
-                int flatRowIndex = r * rangeCols;
-
-                for (int c = 0; c < rangeCols; c++)
-                {
-                    int col = startCol + c;
-                    var result = exactLevelResults[flatRowIndex + c];
-
-                    if (result.Image is { } imageRef)
-                    {
-                        // Exact-level tile available — use full image as source.
-                        var destRect = TileGrid.GetTileDisplayRect(col, row, tileLevel, in pageDisplaySize).ToSKRect();
-                        var srcRect = new SKRect(0, 0, imageRef.Item.Width, imageRef.Item.Height);
-                        _renderTileEntries.Add(new TileDrawEntry(imageRef, srcRect, destRect));
-                    }
-                    else if (result.State == TileCacheState.Blank)
-                    {
-                        // Rendered and empty: nothing to draw, and no fallback can add pixels to
-                        // an area already known to be blank. It counts as cached, so it must not
-                        // hold back stale-level eviction either.
-                    }
-                    else
-                    {
-                        allVisibleTilesCached = false;
-
-                        // Try coarser (lower-level) fallback first — single upscaled tile.
-                        var fallbackEntry = TryGetFallbackTile(service.Cache, pageNumber, tileLevel, col, row, in pageDisplaySize, out bool coveredByBlankTile);
-                        if (fallbackEntry.HasValue)
-                        {
-                            _renderTileEntries.Add(fallbackEntry.Value);
-                        }
-                        else if (!coveredByBlankTile)
-                        {
-                            // Only ask for the finer-level set when we actually need it. In the
-                            // common case where every exact-level tile hits or a coarser fallback
-                            // is available, we skip this locked snapshot entirely.
-                            if (!higherCachedLevelsFetched)
-                            {
-                                higherCachedLevels = service.Cache.GetCachedLevelsAbove(pageNumber, tileLevel);
-                                higherCachedLevelsFetched = true;
-                            }
-
-                            // Try finer (higher-level) fallback — multiple cached tiles may cover this area.
-                            // This handles zoom-out: old higher-resolution tiles fill the gap until
-                            // coarser tiles are rendered.
-                            AddHigherLevelFallbackTiles(service.Cache, pageNumber, tileLevel, col, row, in pageDisplaySize, _renderTileEntries, higherCachedLevels);
-                        }
-                    }
-                }
-            }
-        }
-        finally
-        {
-            // Clear references before returning to the pool — the entries we handed to
-            // _renderTileEntries hold the clones we still need; any untransferred slots are null.
-            Array.Clear(exactLevelResults, 0, tileCount);
-            ArrayPool<TileCacheResult>.Shared.Return(exactLevelResults, clearArray: false);
-        }
+        bool allVisibleTilesCached = ComposeTileDrawEntries(service.Cache, pageNumber, tileLevel,
+            startCol, startRow, endCol, endRow, in pageDisplaySize, _renderTileEntries);
 
         // Evict stale tile levels only after all visible+margin tiles at the current level
         // are cached, so old tiles remain available as fallbacks during the transition.
@@ -270,6 +182,122 @@ public partial class TiledPdfPageControl
     }
 
     /// <summary>
+    /// Builds the list of tiles to draw for the given tile range, in draw order.
+    /// <para>
+    /// Each tile in the range resolves to one of three outcomes: an exact-level cached image is
+    /// drawn whole; a tile known to be blank contributes nothing; and a missing tile falls back to
+    /// a coarser tile if one covers it, or otherwise to whatever finer-level tiles are cached.
+    /// </para>
+    /// </summary>
+    /// <remarks>
+    /// Split out of <see cref="Render"/> so the composition can be exercised directly against a
+    /// <see cref="TileCache"/>, without a drawing context.
+    /// </remarks>
+    /// <param name="entries">Cleared, then filled with the entries to draw. Each entry owns an
+    /// image reference and must be disposed by the caller.</param>
+    /// <returns>
+    /// <see langword="true"/> when every tile in the range was resolved at the exact level (drawn
+    /// or known blank), meaning no fallback was needed and stale levels are safe to evict.
+    /// </returns>
+    internal static bool ComposeTileDrawEntries(TileCache cache, int pageNumber, int tileLevel,
+        int startCol, int startRow, int endCol, int endRow, in Size pageDisplaySize,
+        List<TileDrawEntry> entries)
+    {
+        int rangeCols = endCol - startCol + 1;
+        int rangeRows = endRow - startRow + 1;
+        int tileCount = rangeCols * rangeRows;
+
+        System.Diagnostics.Debug.Assert(tileCount >= 0);
+
+        entries.Clear();
+        entries.EnsureCapacity(tileCount);
+
+        bool allVisibleTilesCached = true;
+
+        // Batch the exact-level lookups under a single cache lock acquisition instead of N
+        // locked TryGet calls. With a background renderer concurrently adding tiles and a
+        // separate prefetch thread calling FindMissing, per-tile locking here was the main
+        // source of frame-time jitter during fast scrolling.
+        var exactLevelResults = ArrayPool<TileCacheResult>.Shared.Rent(tileCount);
+        try
+        {
+            cache.TryGetRange(pageNumber, tileLevel,
+                startCol, startRow, endCol, endRow,
+                exactLevelResults.AsSpan(0, tileCount));
+
+            // Query cached higher levels once per render. Passed into the finer-level fallback
+            // search so it iterates only levels that actually have tiles — this avoids scanning
+            // large empty tile grids at finer levels (4x per level) while still finding fallbacks
+            // when the user zooms out past many levels (otherwise tiles from deeply zoomed-in
+            // views would be skipped, leaving the page blank until exact-level tiles render).
+            int[]? higherCachedLevels = null;
+            bool higherCachedLevelsFetched = false;
+
+            for (int r = 0; r < rangeRows; r++)
+            {
+                int row = startRow + r;
+                int flatRowIndex = r * rangeCols;
+
+                for (int c = 0; c < rangeCols; c++)
+                {
+                    int col = startCol + c;
+                    var result = exactLevelResults[flatRowIndex + c];
+
+                    if (result.Image is { } imageRef)
+                    {
+                        // Exact-level tile available — use full image as source.
+                        var destRect = TileGrid.GetTileDisplayRect(col, row, tileLevel, in pageDisplaySize).ToSKRect();
+                        var srcRect = new SKRect(0, 0, imageRef.Item.Width, imageRef.Item.Height);
+                        entries.Add(new TileDrawEntry(imageRef, srcRect, destRect));
+                    }
+                    else if (result.State == TileCacheState.Blank)
+                    {
+                        // Rendered and empty: nothing to draw, and no fallback can add pixels to
+                        // an area already known to be blank. It counts as cached, so it must not
+                        // hold back stale-level eviction either.
+                    }
+                    else
+                    {
+                        allVisibleTilesCached = false;
+
+                        // Try coarser (lower-level) fallback first — single upscaled tile.
+                        var fallbackEntry = TryGetFallbackTile(cache, pageNumber, tileLevel, col, row, in pageDisplaySize, out bool coveredByBlankTile);
+                        if (fallbackEntry.HasValue)
+                        {
+                            entries.Add(fallbackEntry.Value);
+                        }
+                        else if (!coveredByBlankTile)
+                        {
+                            // Only ask for the finer-level set when we actually need it. In the
+                            // common case where every exact-level tile hits or a coarser fallback
+                            // is available, we skip this locked snapshot entirely.
+                            if (!higherCachedLevelsFetched)
+                            {
+                                higherCachedLevels = cache.GetCachedLevelsAbove(pageNumber, tileLevel);
+                                higherCachedLevelsFetched = true;
+                            }
+
+                            // Try finer (higher-level) fallback — multiple cached tiles may cover this area.
+                            // This handles zoom-out: old higher-resolution tiles fill the gap until
+                            // coarser tiles are rendered.
+                            AddHigherLevelFallbackTiles(cache, pageNumber, tileLevel, col, row, in pageDisplaySize, entries, higherCachedLevels);
+                        }
+                    }
+                }
+            }
+        }
+        finally
+        {
+            // Clear references before returning to the pool — the entries we handed to
+            // the list hold the clones we still need; any untransferred slots are null.
+            Array.Clear(exactLevelResults, 0, tileCount);
+            ArrayPool<TileCacheResult>.Shared.Return(exactLevelResults, clearArray: false);
+        }
+
+        return allVisibleTilesCached;
+    }
+
+    /// <summary>
     /// Searches cached lower tile levels for a coarser tile that covers the area of a missing tile.
     /// Returns a <see cref="TileDrawEntry"/> with the appropriate sub-region of the fallback image,
     /// or null if no fallback is available or the covering tile is blank.
@@ -285,7 +313,7 @@ public partial class TiledPdfPageControl
     /// caller must then skip the finer-level fallback search: there is nothing to draw here.
     /// </param>
     /// <returns>A fallback tile entry with upscaled source rect, or null.</returns>
-    private static TileDrawEntry? TryGetFallbackTile(TileCache cache, int pageNumber, int tileLevel, int col, int row, in Size pageDisplaySize, out bool isBlank)
+    internal static TileDrawEntry? TryGetFallbackTile(TileCache cache, int pageNumber, int tileLevel, int col, int row, in Size pageDisplaySize, out bool isBlank)
     {
         isBlank = false;
 
@@ -360,7 +388,7 @@ public partial class TiledPdfPageControl
     /// <param name="higherCachedLevels">The set of tile levels above <paramref name="tileLevel"/>
     /// that have any cached tiles for this page, sorted ascending (closest level first).
     /// Queried once per render to skip empty levels without iterating empty regions.</param>
-    private static void AddHigherLevelFallbackTiles(TileCache cache, int pageNumber, int tileLevel, int col, int row,
+    internal static void AddHigherLevelFallbackTiles(TileCache cache, int pageNumber, int tileLevel, int col, int row,
         in Size pageDisplaySize, List<TileDrawEntry> entries, int[]? higherCachedLevels)
     {
         if (higherCachedLevels is null)

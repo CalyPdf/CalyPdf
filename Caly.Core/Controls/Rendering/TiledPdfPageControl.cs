@@ -18,10 +18,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-using System;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
-using System.Threading;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
@@ -29,6 +25,10 @@ using Avalonia.VisualTree;
 using Caly.Core.Services.Rendering;
 using Caly.Core.Utilities;
 using SkiaSharp;
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace Caly.Core.Controls.Rendering;
 
@@ -48,7 +48,7 @@ public sealed partial class TiledPdfPageControl : Control
     /// A single tile entry for the draw operation, holding a cloned image reference,
     /// the source rect within the image, and its destination rect on the canvas.
     /// </summary>
-    private readonly struct TileDrawEntry : IDisposable
+    internal readonly struct TileDrawEntry : IDisposable
     {
         private readonly IRef<TileImage> _tileImageRef;
 

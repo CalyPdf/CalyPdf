@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Caly.Core.Services.Rendering;
 
 namespace Caly.Tests;
