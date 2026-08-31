@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2025 BobLd
+﻿// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -98,13 +98,7 @@ public partial class TiledPdfPageControl
             for (int i = 0; i < _tileCount; ++i)
             {
                 ref readonly var tile = ref tiles[i];
-                if (tile is { CanRender: true, ImageRef.IsAlive: true } && !canvas.QuickReject(tile.DestRect))
-                {
-                    // Paint param is null. IsAntialias is deliberately false: with AA on, tile edges at
-                    // fractional screen pixel positions (after the zoom transform) get partial coverage
-                    // which blends with the canvas background, creating visible white seams between tiles.
-                    canvas.DrawImage(tile.ImageRef.Item, tile.SrcRect, tile.DestRect, _samplingOptions, null);
-                }
+                tile.DrawTile(canvas, _samplingOptions);
             }
 
             canvas.Restore();

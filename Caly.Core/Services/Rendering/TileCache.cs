@@ -1,4 +1,4 @@
-// Copyright (c) 2025 BobLd
+﻿// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -22,27 +22,89 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using Caly.Core.Utilities;
-using SkiaSharp;
 
 namespace Caly.Core.Services.Rendering;
 
 /// <summary>
+/// Outcome of a tile cache lookup.
+/// </summary>
+public enum TileCacheState : byte
+{
+    /// <summary>The tile is not cached. It must be rendered.</summary>
+    Missing = 0,
+
+    /// <summary>
+    /// The tile has been rendered and is known to contain nothing. There is nothing to draw and
+    /// nothing left to render. No image exists for it, so no reference is handed out.
+    /// </summary>
+    Blank = 1,
+
+    /// <summary>
+    /// The tile is cached with pixel data. <see cref="TileCacheResult.Image"/> holds a cloned
+    /// reference that the caller owns and must dispose.
+    /// </summary>
+    Cached = 2
+}
+
+/// <summary>
+/// The result of a tile cache lookup: a state and, for <see cref="TileCacheState.Cached"/>,
+/// the cloned image reference the caller must dispose.
+/// </summary>
+public readonly struct TileCacheResult
+{
+    /// <summary>A lookup that found nothing.</summary>
+    public static TileCacheResult Missing => default;
+
+    /// <summary>A lookup that found a tile known to be blank. Carries no image and nothing to dispose.</summary>
+    public static TileCacheResult Blank => new(TileCacheState.Blank, null);
+
+    public TileCacheState State { get; }
+
+    /// <summary>
+    /// The cloned image reference, non-null if and only if <see cref="State"/> is
+    /// <see cref="TileCacheState.Cached"/>. The caller owns it and must dispose it.
+    /// </summary>
+    public IRef<TileImage>? Image { get; }
+
+    public bool IsCached => State == TileCacheState.Cached;
+
+    private TileCacheResult(TileCacheState state, IRef<TileImage>? image)
+    {
+        State = state;
+        Image = image;
+    }
+
+    /// <summary>Creates a result for a cached tile, taking ownership of <paramref name="image"/>.</summary>
+    public static TileCacheResult FromImage(IRef<TileImage> image) => new(TileCacheState.Cached, image);
+}
+
+/// <summary>
 /// Thread-safe LRU tile cache with a configurable memory budget.
-/// Tiles are stored as ref-counted <see cref="SKImage"/> instances.
+/// Tiles that have pixel data are stored as ref-counted <see cref="TileImage"/> instances and
+/// participate in the memory budget and LRU eviction.
+/// <para>
+/// Tiles that rendered to nothing are not stored as images at all: a blank tile is one bit of
+/// knowledge ("this tile was rendered and is empty"), not a resource. Keeping it as a ref-counted
+/// cache entry would allocate a ref counter, a cache entry and an LRU node - and a fresh
+/// ref-counted clone on every lookup - to own nothing. Worse, such an entry has a memory size of
+/// zero, so evicting it frees nothing while still consuming an eviction step, letting memory
+/// pressure quietly discard the very knowledge that lets us skip rendering. Blank tiles are
+/// therefore held as bare keys in <see cref="_blankKeys"/>, outside the budget and the LRU.
+/// </para>
 /// </summary>
 public sealed class TileCache : IDisposable
 {
     private sealed class CacheEntry
     {
-        public IRef<SKImage> Image { get; }
+        public IRef<TileImage> Image { get; }
 
         public TileKey Key { get; }
 
-        public int MemorySize { get; }
+        public long MemorySize { get; }
 
         public LinkedListNode<TileKey>? LruNode { get; set; }
 
-        public CacheEntry(IRef<SKImage> image, TileKey key, int memorySize)
+        public CacheEntry(IRef<TileImage> image, TileKey key, long memorySize)
         {
             Image = image;
             Key = key;
@@ -64,8 +126,23 @@ public sealed class TileCache : IDisposable
     /// <summary>
     /// Secondary index: page number → set of cached tile levels.
     /// Allows O(1) lookup in <see cref="GetCachedLevelsAbove"/> instead of O(N) scan.
+    /// <para>
+    /// Blank tiles deliberately do not register here: a level holding only blank tiles can never
+    /// contribute a pixel, so <see cref="GetCachedLevelsAbove"/> should not offer it as a fallback
+    /// candidate for the renderer to scan.
+    /// </para>
     /// </summary>
     private readonly Dictionary<int, SortedSet<int>> _pageLevels = new();
+
+    /// <summary>
+    /// Page number → keys of tiles that rendered to nothing.
+    /// <para>
+    /// Held separately from <see cref="_entries"/> so a blank tile costs one <see cref="TileKey"/>
+    /// and no allocation, on write or on lookup. Bounded by the page grid and cleared by
+    /// <see cref="InvalidatePage"/> and <see cref="EvictPageLevelsExcept"/> along with the images.
+    /// </para>
+    /// </summary>
+    private readonly Dictionary<int, HashSet<TileKey>> _blankKeys = new();
 
     private long _currentMemoryBytes;
 
@@ -79,10 +156,12 @@ public sealed class TileCache : IDisposable
     }
 
     /// <summary>
-    /// Tries to get a tile from the cache, moving it to the front of the LRU list.
-    /// Returns a cloned reference that the caller must dispose.
+    /// Looks up a tile, moving it to the front of the LRU list on a hit.
+    /// A <see cref="TileCacheState.Cached"/> result carries a cloned reference the caller must
+    /// dispose; <see cref="TileCacheState.Blank"/> and <see cref="TileCacheState.Missing"/> carry
+    /// nothing and allocate nothing.
     /// </summary>
-    public bool TryGet(in TileKey key, out IRef<SKImage>? imageRef)
+    public TileCacheResult Lookup(in TileKey key)
     {
         lock (_lock)
         {
@@ -94,13 +173,45 @@ public sealed class TileCache : IDisposable
                     _lruList.AddFirst(entry.LruNode);
                 }
 
-                imageRef = entry.Image.Clone();
-                return true;
+                return TileCacheResult.FromImage(entry.Image.Clone());
             }
-        }
 
-        imageRef = null;
-        return false;
+            return IsBlankLocked(key) ? TileCacheResult.Blank : TileCacheResult.Missing;
+        }
+    }
+
+    /// <summary>
+    /// Records that a tile rendered to nothing. Stores the key only - no image, no ref counter,
+    /// no LRU node - so the renderer never repeats the work and the render pass knows there is
+    /// nothing to draw. Blank tiles are exempt from the memory budget: they cost a key each, and
+    /// evicting them under memory pressure would free nothing while discarding useful knowledge.
+    /// </summary>
+    public void AddBlank(in TileKey key)
+    {
+        lock (_lock)
+        {
+            if (_entries.ContainsKey(key))
+            {
+                // A real image won the race for this key; it supersedes the blank result.
+                return;
+            }
+
+            if (!_blankKeys.TryGetValue(key.PageNumber, out var keys))
+            {
+                keys = new HashSet<TileKey>();
+                _blankKeys[key.PageNumber] = keys;
+            }
+
+            keys.Add(key);
+        }
+    }
+
+    /// <summary>
+    /// Whether the key is recorded as blank. Must be called under <see cref="_lock"/>.
+    /// </summary>
+    private bool IsBlankLocked(in TileKey key)
+    {
+        return _blankKeys.TryGetValue(key.PageNumber, out var keys) && keys.Contains(key);
     }
 
     /// <summary>
@@ -109,15 +220,21 @@ public sealed class TileCache : IDisposable
     /// The cache takes ownership of the image.
     /// </summary>
     /// <param name="key">The tile key.</param>
-    /// <param name="image">The SKImage to cache. The cache takes ownership.</param>
-    public void Add(in TileKey key, SKImage image)
+    /// <param name="image">The TileImage to cache. The cache takes ownership.</param>
+    public void Add(in TileKey key, TileImage image)
     {
-        int memorySize = image.Info.BytesSize;
-        IRef<SKImage> imageRef = RefCountable.Create(image);
+        long memorySize = image.BytesSize;
+        IRef<TileImage> imageRef = RefCountable.Create(image);
         List<CacheEntry>? evicted = null;
 
         lock (_lock)
         {
+            // A tile with pixel data supersedes any blank result previously recorded for this key.
+            if (_blankKeys.TryGetValue(key.PageNumber, out var blanks) && blanks.Remove(key) && blanks.Count == 0)
+            {
+                _blankKeys.Remove(key.PageNumber);
+            }
+
             if (_entries.ContainsKey(key))
             {
                 // Already in cache, dispose the new ref
@@ -185,6 +302,9 @@ public sealed class TileCache : IDisposable
 
         lock (_lock)
         {
+            // Blank keys are independent of _pageKeys, so drop them even if the page holds no images.
+            _blankKeys.Remove(pageNumber);
+
             if (!_pageKeys.TryGetValue(pageNumber, out var keys))
             {
                 return;
@@ -223,6 +343,17 @@ public sealed class TileCache : IDisposable
 
         lock (_lock)
         {
+            // Stale-level blanks are as invalid as stale-level images, and are tracked separately,
+            // so prune them before the _pageKeys early-out.
+            if (_blankKeys.TryGetValue(pageNumber, out var blanks))
+            {
+                blanks.RemoveWhere(k => k.TileLevel != keepLevel);
+                if (blanks.Count == 0)
+                {
+                    _blankKeys.Remove(pageNumber);
+                }
+            }
+
             if (!_pageKeys.TryGetValue(pageNumber, out var keys))
             {
                 return;
@@ -282,13 +413,14 @@ public sealed class TileCache : IDisposable
     }
 
     /// <summary>
-    /// Checks whether a tile exists in the cache without modifying LRU order.
+    /// Checks whether a tile has already been rendered, without modifying LRU order.
+    /// Blank tiles count as present: they have been rendered and must not be rendered again.
     /// </summary>
     public bool Contains(in TileKey key)
     {
         lock (_lock)
         {
-            return _entries.ContainsKey(key);
+            return _entries.ContainsKey(key) || IsBlankLocked(key);
         }
     }
 
@@ -300,12 +432,18 @@ public sealed class TileCache : IDisposable
     {
         lock (_lock)
         {
+            // Resolve the page's blank set once rather than per tile.
+            _blankKeys.TryGetValue(pageNumber, out var blanks);
+
             for (int r = startRow; r <= endRow; r++)
             {
                 for (int c = startCol; c <= endCol; c++)
                 {
                     var key = new TileKey(pageNumber, tileLevel, c, r);
-                    if (!_entries.ContainsKey(key))
+
+                    // A blank tile has already been rendered - re-requesting it would redo the
+                    // work and rediscover that it is empty.
+                    if (!_entries.ContainsKey(key) && blanks?.Contains(key) != true)
                     {
                         missing.Add(new TileCoord(c, r));
                     }
@@ -315,10 +453,10 @@ public sealed class TileCache : IDisposable
     }
 
     /// <summary>
-    /// Looks up every tile in the given grid range under a single lock acquisition. Hits are
-    /// returned as fresh ref-counted clones in <paramref name="outRefs"/> (row-major order); misses
-    /// leave the corresponding slot as <see langword="null"/>. The caller owns the returned
-    /// references and must dispose each non-null entry.
+    /// Looks up every tile in the given grid range under a single lock acquisition, writing one
+    /// <see cref="TileCacheResult"/> per tile into <paramref name="results"/> in row-major order.
+    /// The caller owns every <see cref="TileCacheResult.Image"/> returned and must dispose it;
+    /// blank and missing slots carry nothing to dispose.
     /// </summary>
     /// <remarks>
     /// <see cref="TiledPdfPageControl.Render"/> calls this once per frame instead of calling
@@ -327,10 +465,13 @@ public sealed class TileCache : IDisposable
     /// tiles — batching eliminates that contention on the UI thread.
     /// </remarks>
     public void TryGetRange(int pageNumber, int tileLevel, int startCol, int startRow, int endCol, int endRow,
-        Span<IRef<SKImage>?> outRefs)
+        Span<TileCacheResult> results)
     {
         lock (_lock)
         {
+            // Resolve the page's blank set once rather than per tile.
+            _blankKeys.TryGetValue(pageNumber, out var blanks);
+
             int idx = 0;
             for (int r = startRow; r <= endRow; r++)
             {
@@ -345,11 +486,15 @@ public sealed class TileCache : IDisposable
                             _lruList.AddFirst(entry.LruNode);
                         }
 
-                        outRefs[idx] = entry.Image.Clone();
+                        results[idx] = TileCacheResult.FromImage(entry.Image.Clone());
+                    }
+                    else if (blanks?.Contains(key) == true)
+                    {
+                        results[idx] = TileCacheResult.Blank;
                     }
                     else
                     {
-                        outRefs[idx] = null;
+                        results[idx] = TileCacheResult.Missing;
                     }
 
                     idx++;
@@ -473,6 +618,7 @@ public sealed class TileCache : IDisposable
             _lruList.Clear();
             _pageKeys.Clear();
             _pageLevels.Clear();
+            _blankKeys.Clear();
             _currentMemoryBytes = 0;
         }
     }

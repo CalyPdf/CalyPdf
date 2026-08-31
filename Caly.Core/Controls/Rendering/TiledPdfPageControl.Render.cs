@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2025 BobLd
+﻿// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -160,12 +160,12 @@ public partial class TiledPdfPageControl
         // locked TryGet calls. With a background renderer concurrently adding tiles and a
         // separate prefetch thread calling FindMissing, per-tile locking here was the main
         // source of frame-time jitter during fast scrolling.
-        var exactLevelRefs = ArrayPool<IRef<SKImage>?>.Shared.Rent(tileCount);
+        var exactLevelResults = ArrayPool<TileCacheResult>.Shared.Rent(tileCount);
         try
         {
             service.Cache.TryGetRange(pageNumber, tileLevel,
                 startCol, startRow, endCol, endRow,
-                exactLevelRefs.AsSpan(0, tileCount));
+                exactLevelResults.AsSpan(0, tileCount));
 
             // Query cached higher levels once per render. Passed into the finer-level fallback
             // search so it iterates only levels that actually have tiles — this avoids scanning
@@ -183,26 +183,32 @@ public partial class TiledPdfPageControl
                 for (int c = 0; c < rangeCols; c++)
                 {
                     int col = startCol + c;
-                    var imageRef = exactLevelRefs[flatRowIndex + c];
+                    var result = exactLevelResults[flatRowIndex + c];
 
-                    if (imageRef is not null)
+                    if (result.Image is { } imageRef)
                     {
                         // Exact-level tile available — use full image as source.
                         var destRect = TileGrid.GetTileDisplayRect(col, row, tileLevel, in pageDisplaySize).ToSKRect();
                         var srcRect = new SKRect(0, 0, imageRef.Item.Width, imageRef.Item.Height);
                         _renderTileEntries.Add(new TileDrawEntry(imageRef, srcRect, destRect));
                     }
+                    else if (result.State == TileCacheState.Blank)
+                    {
+                        // Rendered and empty: nothing to draw, and no fallback can add pixels to
+                        // an area already known to be blank. It counts as cached, so it must not
+                        // hold back stale-level eviction either.
+                    }
                     else
                     {
                         allVisibleTilesCached = false;
 
                         // Try coarser (lower-level) fallback first — single upscaled tile.
-                        var fallbackEntry = TryGetFallbackTile(service.Cache, pageNumber, tileLevel, col, row, in pageDisplaySize);
+                        var fallbackEntry = TryGetFallbackTile(service.Cache, pageNumber, tileLevel, col, row, in pageDisplaySize, out bool coveredByBlankTile);
                         if (fallbackEntry.HasValue)
                         {
                             _renderTileEntries.Add(fallbackEntry.Value);
                         }
-                        else
+                        else if (!coveredByBlankTile)
                         {
                             // Only ask for the finer-level set when we actually need it. In the
                             // common case where every exact-level tile hits or a coarser fallback
@@ -226,8 +232,8 @@ public partial class TiledPdfPageControl
         {
             // Clear references before returning to the pool — the entries we handed to
             // _renderTileEntries hold the clones we still need; any untransferred slots are null.
-            Array.Clear(exactLevelRefs, 0, tileCount);
-            ArrayPool<IRef<SKImage>?>.Shared.Return(exactLevelRefs, clearArray: false);
+            Array.Clear(exactLevelResults, 0, tileCount);
+            ArrayPool<TileCacheResult>.Shared.Return(exactLevelResults, clearArray: false);
         }
 
         // Evict stale tile levels only after all visible+margin tiles at the current level
@@ -266,7 +272,7 @@ public partial class TiledPdfPageControl
     /// <summary>
     /// Searches cached lower tile levels for a coarser tile that covers the area of a missing tile.
     /// Returns a <see cref="TileDrawEntry"/> with the appropriate sub-region of the fallback image,
-    /// or null if no fallback is available.
+    /// or null if no fallback is available or the covering tile is blank.
     /// </summary>
     /// <param name="cache">The tile cache to search.</param>
     /// <param name="pageNumber">The page number.</param>
@@ -274,9 +280,15 @@ public partial class TiledPdfPageControl
     /// <param name="col">Column of the missing tile.</param>
     /// <param name="row">Row of the missing tile.</param>
     /// <param name="pageDisplaySize">The page display size.</param>
+    /// <param name="isBlank">
+    /// Set to <c>true</c> when a cached tile covering this area was found but is blank. The
+    /// caller must then skip the finer-level fallback search: there is nothing to draw here.
+    /// </param>
     /// <returns>A fallback tile entry with upscaled source rect, or null.</returns>
-    private static TileDrawEntry? TryGetFallbackTile(TileCache cache, int pageNumber, int tileLevel, int col, int row, in Size pageDisplaySize)
+    private static TileDrawEntry? TryGetFallbackTile(TileCache cache, int pageNumber, int tileLevel, int col, int row, in Size pageDisplaySize, out bool isBlank)
     {
+        isBlank = false;
+
         // Search lower levels (coarser tiles) for a cached tile that covers this area.
         // At fallback level fl (where fl < tileLevel), the covering tile is at
         // (col >> d, row >> d) where d = tileLevel - fl. Walks down to
@@ -290,7 +302,17 @@ public partial class TiledPdfPageControl
             int fallbackRow = row >> levelDiff;
 
             var fallbackKey = new TileKey(pageNumber, fl, fallbackCol, fallbackRow);
-            if (!cache.TryGet(fallbackKey, out var fallbackRef) || fallbackRef is null)
+            var fallback = cache.Lookup(fallbackKey);
+
+            if (fallback.State == TileCacheState.Blank)
+            {
+                // The covering tile is rendered and blank. The missing tile's area is a sub-region
+                // of it, so there is nothing to draw and no coarser or finer tile can add pixels.
+                isBlank = true;
+                return null;
+            }
+
+            if (fallback.Image is not { } fallbackRef)
             {
                 continue;
             }
@@ -369,7 +391,10 @@ public partial class TiledPdfPageControl
                 for (int c = startCol; c < endCol; ++c)
                 {
                     var finerKey = new TileKey(pageNumber, fl, c, r);
-                    if (cache.TryGet(finerKey, out var imageRef) && imageRef is not null)
+
+                    // A blank tile yields no image, so it can neither occupy a draw slot nor set
+                    // foundAny - it must not stop the search at a level that contributes nothing.
+                    if (cache.Lookup(finerKey).Image is { } imageRef)
                     {
                         // Each finer tile maps to its own (smaller) display (dest) rect 
                         // draw the full image at that position.

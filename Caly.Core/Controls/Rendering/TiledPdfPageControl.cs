@@ -1,4 +1,4 @@
-// Copyright (c) 2025 BobLd
+﻿// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -50,7 +50,7 @@ public sealed partial class TiledPdfPageControl : Control
     /// </summary>
     private readonly struct TileDrawEntry : IDisposable
     {
-        public IRef<SKImage> ImageRef { get; }
+        private readonly IRef<TileImage> _tileImageRef;
 
         /// <summary>
         /// Source rectangle within the image. For exact-level tiles this is the full image.
@@ -60,19 +60,29 @@ public sealed partial class TiledPdfPageControl : Control
 
         public SKRect DestRect { get; }
 
-        public bool CanRender { get; }
-
-        public TileDrawEntry(IRef<SKImage> imageRef, SKRect srcRect, SKRect destRect)
+        public TileDrawEntry(IRef<TileImage> imageRef, SKRect srcRect, SKRect destRect)
         {
-            ImageRef = imageRef;
+            _tileImageRef = imageRef;
             SrcRect = srcRect;
             DestRect = destRect;
-
-            // BytesSize of 1 means it's empty
-            CanRender = ImageRef is { IsAlive: true, Item.Info.BytesSize: > 1 };
         }
 
-        public void Dispose() => ImageRef.Dispose();
+        /// <summary>
+        /// Draws the tile image onto the given canvas using the specified sampling options.
+        /// <para>Checks if the tile can be rendered and if the destination rectangle is within the canvas bounds.</para>
+        /// </summary>
+        public void DrawTile(SKCanvas canvas, SKSamplingOptions samplingOptions)
+        {
+            if (_tileImageRef is { IsAlive: true } && !canvas.QuickReject(DestRect))
+            {
+                // Paint param is null. IsAntialias is deliberately false: with AA on, tile edges at
+                // fractional screen pixel positions (after the zoom transform) get partial coverage
+                // which blends with the canvas background, creating visible white seams between tiles.
+                canvas.DrawImage(_tileImageRef.Item.Image, SrcRect, DestRect, samplingOptions, null);
+            }            
+        }
+
+        public void Dispose() => _tileImageRef.Dispose();
     }
     
     public static readonly StyledProperty<double> PpiScaleProperty =
