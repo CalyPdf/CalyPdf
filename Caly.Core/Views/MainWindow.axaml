@@ -17,6 +17,6 @@
         WindowStartupLocation="CenterScreen">
     <Border DragDrop.AllowDrop="True"
             Margin="{Binding $parent[Window].OffScreenMargin}">
-        <views:MainView WindowDecorationProperties.ElementRole="User" />
+        <views:MainView x:Name="PART_MainView" WindowDecorationProperties.ElementRole="User" />
     </Border>
 </Window>

@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Reflection;
+using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
 
 namespace Caly.Core;
 
@@ -20,5 +22,14 @@ public static class Globals
     public static bool IsMobilePlatform()
     {
         return OperatingSystem.IsAndroid() || OperatingSystem.IsIOS();
+    }
+
+    /// <summary>
+    /// Whether the app is running with a desktop windowing lifetime, and can therefore open
+    /// additional <see cref="Avalonia.Controls.Window"/>s.
+    /// </summary>
+    public static bool IsDesktopLifetime()
+    {
+        return Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime;
     }
 }

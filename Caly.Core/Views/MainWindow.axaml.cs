@@ -33,6 +33,12 @@ public partial class MainWindow : Window
         InitializeComponent();
     }
 
+    /// <summary>
+    /// This window's tab strip, declared in XAML with its templates and bindings already set
+    /// up. Handed to Tabalonia when a tab is torn off into this window.
+    /// </summary>
+    internal Tabalonia.Controls.TabsControl TabsControl => PART_MainView.TabsControl;
+
     protected override void OnLoaded(RoutedEventArgs e)
     {
         NotificationManager = new WindowNotificationManager(this)
