@@ -87,17 +87,12 @@ public partial class App : Application
         // Initialise dependencies
         var services = new ServiceCollection();
 
-        // Single app-level states, shared between the MainViewModel (created before
-        // the service provider is built) and every DI-scoped DocumentViewModel.
-        var appStates = new ApplicationStates();
-        services.AddSingleton(appStates);
-
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
             desktop.MainWindow = new MainWindow
             {
-                DataContext = new MainViewModel(appStates)
+                DataContext = new MainViewModel()
             };
 
             services.AddSingleton<Visual>(_ => desktop.MainWindow);
@@ -115,7 +110,7 @@ public partial class App : Application
             {
                 mainView = new MainView
                 {
-                    DataContext = new MainViewModel(appStates)
+                    DataContext = new MainViewModel()
                 };
 
                 mainView.Loaded += MainView_Loaded;
@@ -134,7 +129,7 @@ public partial class App : Application
         {
             singleViewPlatform.MainView = new MainView
             {
-                DataContext = new MainViewModel(appStates)
+                DataContext = new MainViewModel()
             };
             services.AddSingleton<Visual>(_ => singleViewPlatform.MainView);
             services.AddSingleton<IStorageProvider>(_ =>
@@ -147,7 +142,7 @@ public partial class App : Application
 #if DEBUG
         else if (ApplicationLifetime is null && Avalonia.Controls.Design.IsDesignMode)
         {
-            var mainView = new MainView { DataContext = new MainViewModel(appStates) };
+            var mainView = new MainView { DataContext = new MainViewModel() };
             services.AddSingleton<Visual>(_ => mainView);
             services.AddSingleton<IStorageProvider>(_ => TopLevel.GetTopLevel(mainView)?.StorageProvider);
             services.AddSingleton<IClipboard>(_ => TopLevel.GetTopLevel(mainView)?.Clipboard);

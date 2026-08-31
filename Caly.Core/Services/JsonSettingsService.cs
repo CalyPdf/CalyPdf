@@ -176,7 +176,7 @@ internal sealed class JsonSettingsService : ISettingsService
 
             if (mw.DataContext is MainViewModel vm)
             {
-                vm.AppStates.PaneSize = _current.PaneSize;
+                vm.PaneSize = _current.PaneSize;
             }
 
             // Set window size and location

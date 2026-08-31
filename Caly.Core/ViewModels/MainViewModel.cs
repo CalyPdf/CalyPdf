@@ -20,8 +20,8 @@
 
 using Avalonia.Collections;
 using Caly.Core.Services;
+using Caly.Core.Models;
 using Caly.Core.Services.Interfaces;
-using Caly.Core.Utilities;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
@@ -51,9 +51,22 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool _isSettingsPaneOpen;
 
     /// <summary>
-    /// App-level states, shared across all documents.
+    /// Whether this window's document side pane is open.
     /// </summary>
-    public ApplicationStates AppStates { get; }
+    [ObservableProperty]
+    public partial bool IsDocumentPaneOpen { get; set; } = !Globals.IsMobilePlatform();
+
+    /// <summary>
+    /// Width of this window's document side pane.
+    /// </summary>
+    [ObservableProperty]
+    public partial double PaneSize { get; set; }
+
+    partial void OnPaneSizeChanged(double oldValue, double newValue)
+    {
+        App.Current?.Services?.GetService<ISettingsService>()?
+            .SetProperty(CalySettings.CalySettingsProperty.PaneSize, newValue);
+    }
 
     public DocumentViewModel? SelectedDocument
     {
@@ -122,20 +135,8 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
         });
     }
 
-#if DEBUG
-    /// <summary>
-    /// Design-time constructor.
-    /// </summary>
-    public MainViewModel() : this(new ApplicationStates())
+    public MainViewModel()
     {
-    }
-#endif
-
-    public MainViewModel(ApplicationStates appStates)
-    {
-        ArgumentNullException.ThrowIfNull(appStates, nameof(appStates));
-        AppStates = appStates;
-
         // Documents are added/removed on the UI thread; the selected document can
         // change on collection changes without SelectedDocumentIndex changing.
         PdfDocuments.CollectionChanged += (_, _) => ScheduleSelectedDocumentChanged();
@@ -257,7 +258,7 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void ActivateSearchTextTab()
     {
-        AppStates.IsDocumentPaneOpen = true;
+        IsDocumentPaneOpen = true;
         SelectedDocument?.SelectedTabIndex = 2;
     }
 
