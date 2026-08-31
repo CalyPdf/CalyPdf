@@ -108,7 +108,21 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
     public bool IsPageLoading => IsPageVisible && PdfPicture is null;
 
     private const int ThumbnailHeight = 135;
-    public PixelSize ThumbnailSize => new PixelSize(Math.Max(1, (int)(Size.AspectRatio * ThumbnailHeight)), ThumbnailHeight);
+
+    private const int ThumbnailMaxWidth = 135;
+
+    public PixelSize ThumbnailSize => GetThumbnailSize(Size.AspectRatio);
+
+    private static PixelSize GetThumbnailSize(double aspectRatio)
+    {
+        int width = Math.Max(1, (int)(aspectRatio * ThumbnailHeight));
+        if (width <= ThumbnailMaxWidth)
+        {
+            return new PixelSize(width, ThumbnailHeight);
+        }
+
+        return new PixelSize(ThumbnailMaxWidth, Math.Max(1, (int)(ThumbnailMaxWidth / aspectRatio)));
+    }
     
     public double DisplayWidth => IsPortrait ? Size.Width : Size.Height;
 
