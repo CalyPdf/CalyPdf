@@ -206,7 +206,9 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
                 throw new NullReferenceException($"Missing {nameof(IPdfDocumentsManagerService)} instance.");
             }
 
-            await pdfDocumentsService.OpenLoadDocument(token);
+            // This window asked, so this window gets the picker and the document - rather than
+            // whichever window happens to be active when the command runs.
+            await pdfDocumentsService.OpenLoadDocument(this, token);
         }
         catch (OperationCanceledException)
         {

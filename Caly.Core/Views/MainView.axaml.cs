@@ -24,6 +24,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Caly.Core.Services;
+using Caly.Core.ViewModels;
 using CommunityToolkit.Mvvm.Messaging;
 
 namespace Caly.Core.Views;
@@ -47,7 +48,20 @@ public partial class MainView : UserControl
         }
     }
 
-    private static async void Drop(object? sender, DragEventArgs e)
+    /// <summary>
+    /// The window a file dropped on this view should open in: the one this view belongs to.
+    /// <para>
+    /// Resolved from the view, never from the registry's active window: dropping a file does
+    /// not activate the window it lands on, so a drop on an unfocused window would otherwise
+    /// open its documents in whichever window happened to have focus.
+    /// </para>
+    /// </summary>
+    internal MainViewModel? DropTarget => DataContext as MainViewModel;
+
+    /// <summary>
+    /// Instance handler, not static: it has to reach this view's <see cref="DropTarget"/>.
+    /// </summary>
+    private async void Drop(object? sender, DragEventArgs e)
     {
         try
         {
@@ -63,7 +77,9 @@ public partial class MainView : UserControl
                 return;
             }
 
-            _ = await App.Messenger.Send(new OpenLoadDocumentsRequestMessage(files, CancellationToken.None));
+            // Null on the design-time surface only; the manager then falls back to the active
+            // window, which is what this path did before.
+            _ = await App.Messenger.Send(new OpenLoadDocumentsRequestMessage(files, DropTarget, CancellationToken.None));
         }
         catch (Exception ex)
         {
