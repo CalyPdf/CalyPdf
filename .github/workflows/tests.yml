@@ -1,0 +1,82 @@
+# Reusable workflow: builds and runs Caly.Tests on a single platform / architecture.
+# Called by the tests-<platform>-<arch>.yml workflows.
+name: Tests
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: Runner label the tests run on (e.g. windows-latest, ubuntu-24.04-arm).
+        required: true
+        type: string
+      target:
+        description: Short platform/architecture name, used for artifact names (e.g. linux-arm64).
+        required: true
+        type: string
+      configuration:
+        description: Build configuration.
+        required: false
+        type: string
+        default: Release
+      dotnet-version:
+        description: .NET SDK version to install.
+        required: false
+        type: string
+        default: 10.0.x
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ inputs.target }} (${{ inputs.configuration }})
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ inputs.dotnet-version }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ inputs.target }}-${{ hashFiles('**/*.csproj', 'Directory.Build.props') }}
+          restore-keys: |
+            nuget-${{ inputs.target }}-
+
+      # SkiaSharp's native library needs fontconfig at runtime; the Avalonia
+      # headless platform needs no display server.
+      - name: Install Linux native dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libfontconfig1
+
+      - name: Restore
+        run: dotnet restore Caly.Tests/Caly.Tests.csproj
+
+      - name: Build
+        run: dotnet build Caly.Tests/Caly.Tests.csproj -c ${{ inputs.configuration }} --no-restore
+
+      - name: Test
+        run: >-
+          dotnet test Caly.Tests/Caly.Tests.csproj
+          -c ${{ inputs.configuration }}
+          --no-build
+          --logger "trx;LogFileName=Caly.Tests.${{ inputs.target }}.trx"
+          --logger "console;verbosity=normal"
+          --results-directory ${{ github.workspace }}/TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ inputs.target }}
+          path: ${{ github.workspace }}/TestResults
+          if-no-files-found: warn
