@@ -27,6 +27,7 @@ namespace Caly.Core.Services;
 internal partial class PdfPigDocumentService
 {
     private long _isDisposed;
+    private long _resourcesReleased;
     private int _activeOperations;
 
     // PdfPig only allow to read 1 page at a time for now
@@ -86,7 +87,11 @@ internal partial class PdfPigDocumentService
         { }
         finally
         {
-            Interlocked.Decrement(ref _activeOperations);
+            if (Interlocked.Decrement(ref _activeOperations) == 0 && IsDisposed())
+            {
+                // Dispose gave up waiting for us and deferred the teardown.
+                await ReleaseResourcesAsync().ConfigureAwait(false);
+            }
         }
     }
 
@@ -115,7 +120,11 @@ internal partial class PdfPigDocumentService
         { }
         finally
         {
-            Interlocked.Decrement(ref _activeOperations);
+            if (Interlocked.Decrement(ref _activeOperations) == 0 && IsDisposed())
+            {
+                // Dispose gave up waiting for us and deferred the teardown.
+                await ReleaseResourcesAsync().ConfigureAwait(false);
+            }
         }
 
         return canceled();
@@ -124,5 +133,59 @@ internal partial class PdfPigDocumentService
     private bool IsDisposed()
     {
         return Interlocked.Read(ref _isDisposed) != 0;
+    }
+
+    /// <summary>
+    /// Releases the document's resources, but only once no operation is still using them.
+    /// <para>
+    /// If an operation is in flight this does nothing: the last one out calls
+    /// <see cref="ReleaseResourcesAsync"/> from its own finally block. Tearing the stream down
+    /// under a running parse is what produced
+    /// <c>ObjectDisposedException: Cannot access a closed file</c> - <see cref="PdfDocument.Open"/>
+    /// is a long synchronous parse that cancellation cannot interrupt, so it can easily outlive
+    /// any bounded wait.
+    /// </para>
+    /// </summary>
+    internal async ValueTask ReleaseResourcesIfIdleAsync()
+    {
+        if (Interlocked.CompareExchange(ref _activeOperations, 0, 0) > 0)
+        {
+            return;
+        }
+
+        await ReleaseResourcesAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Tears down the stream, storage file and parsed document. Idempotent: whichever of the
+    /// dispose path or the last in-flight operation gets here first does the work.
+    /// </summary>
+    private async ValueTask ReleaseResourcesAsync()
+    {
+        if (Interlocked.CompareExchange(ref _resourcesReleased, 1, 0) != 0)
+        {
+            return;
+        }
+
+        _semaphore.Dispose();
+
+        // Document before stream: the document reads through the stream, so closing the stream
+        // first is exactly the ordering that caused the bug this guards against.
+        if (_document is not null)
+        {
+            _document.Dispose();
+            _document = null;
+        }
+
+        if (_fileStream is not null)
+        {
+            await _fileStream.DisposeAsync().ConfigureAwait(false);
+            _fileStream = null;
+        }
+
+        _storageFile?.Dispose();
+        _storageFile = null;
+
+        _mainCts.Dispose();
     }
 }

@@ -514,34 +514,28 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
             
             await _mainCts.CancelAsync();
 
-            // Wait for in-flight operations (with timeout)
-            using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5)))
+            // Give in-flight operations a short grace period so the common case tears down
+            // right here. Correctness no longer depends on it: if an operation is still running
+            // when the grace period ends, it owns the teardown and performs it on its way out.
+            using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1)))
             {
                 while (_activeOperations > 0 && !cts.Token.IsCancellationRequested)
                 {
-                    System.Diagnostics.Debug.WriteLine($"DisposeAsync: '{FileName}' waiting for {_activeOperations} active operations to finish.");
                     await Task.Delay(50, CancellationToken.None);
                 }
             }
 
-            _semaphore.Dispose();
-
-            if (_fileStream is not null)
+            if (_activeOperations > 0)
             {
-                await _fileStream.DisposeAsync();
-                _fileStream = null;
+                // PdfDocument.Open is a synchronous parse that cancellation cannot interrupt,
+                // so it can outlive any wait. Disposing the stream here would leave it seeking
+                // into a closed file - "Cannot access a closed file", over and over.
+                System.Diagnostics.Debug.WriteLine(
+                    $"DisposeAsync: '{FileName}' still has {_activeOperations} active operation(s); deferring teardown to the last one out.");
+                return;
             }
 
-            _storageFile?.Dispose();
-            _storageFile = null;
-
-            if (_document is not null)
-            {
-                _document.Dispose();
-                _document = null;
-            }
-
-            _mainCts.Dispose();
+            await ReleaseResourcesIfIdleAsync();
         }
         catch (Exception ex)
         {
