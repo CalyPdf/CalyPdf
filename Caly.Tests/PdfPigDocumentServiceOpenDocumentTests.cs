@@ -1,4 +1,4 @@
-using Avalonia.Headless.XUnit;
+﻿using Avalonia.Headless.XUnit;
 using Caly.Core.Models;
 using Caly.Core.Services;
 using Caly.Core.Services.Interfaces;
@@ -37,6 +37,15 @@ public class PdfPigDocumentServiceOpenDocumentTests
 
         public Task SaveAsync() => Task.CompletedTask;
     }
+
+    private static readonly FieldInfo ActiveOperationsField =
+        typeof(PdfPigDocumentService).GetField("_activeOperations", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+    private static readonly FieldInfo ResourcesReleasedField =
+        typeof(PdfPigDocumentService).GetField("_resourcesReleased", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+    private static bool ResourcesReleased(PdfPigDocumentService service) =>
+        (long)ResourcesReleasedField.GetValue(service)! != 0;
 
     private static readonly FieldInfo OpenDocumentTaskField =
         typeof(PdfPigDocumentService).GetField("_openDocumentTask", BindingFlags.NonPublic | BindingFlags.Instance)!;
@@ -113,6 +122,72 @@ public class PdfPigDocumentServiceOpenDocumentTests
             Assert.Null(result);
             Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(2),
                 $"Operation should cancel quickly while waiting for open, but took {stopwatch.Elapsed}.");
+        });
+    }
+
+    /// <summary>
+    /// Regression: closing a window (or tab) while a document is still parsing used to tear the
+    /// file stream down under <c>PdfDocument.Open</c>, which then kept seeking into a closed
+    /// file — <c>ObjectDisposedException: Cannot access a closed file</c>, repeatedly.
+    /// <para>
+    /// <c>Open</c> is a long synchronous parse that cancellation cannot interrupt, so it can
+    /// outlive any bounded wait. Teardown is therefore owned by whoever finishes last.
+    /// </para>
+    /// </summary>
+    [AvaloniaFact]
+    public async Task DisposeAsync_DefersTeardownWhileAnOperationIsStillRunning()
+    {
+        await Task.Run(async () =>
+        {
+            var service = new PdfPigDocumentService(new FakeSettingsService());
+
+            // Stand in for a parse still running inside Task.Run.
+            ActiveOperationsField.SetValue(service, 1);
+
+            await service.DisposeAsync();
+
+            Assert.False(ResourcesReleased(service),
+                "Resources were torn down while an operation was still using them.");
+
+            // The operation finishes and hands the resources back.
+            ActiveOperationsField.SetValue(service, 0);
+            await service.ReleaseResourcesIfIdleAsync();
+
+            Assert.True(ResourcesReleased(service));
+        });
+    }
+
+    [AvaloniaFact]
+    public async Task DisposeAsync_ReleasesImmediatelyWhenNoOperationIsRunning()
+    {
+        await Task.Run(async () =>
+        {
+            var service = new PdfPigDocumentService(new FakeSettingsService());
+
+            await service.DisposeAsync();
+
+            Assert.True(ResourcesReleased(service));
+        });
+    }
+
+    /// <summary>
+    /// Both the dispose path and the last in-flight operation call the release; it must run once.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task ReleaseResources_IsIdempotent()
+    {
+        await Task.Run(async () =>
+        {
+            var service = new PdfPigDocumentService(new FakeSettingsService());
+
+            await service.DisposeAsync();
+            Assert.True(ResourcesReleased(service));
+
+            // Must not throw - the semaphore and CTS have already been disposed.
+            await service.ReleaseResourcesIfIdleAsync();
+            await service.DisposeAsync();
+
+            Assert.True(ResourcesReleased(service));
         });
     }
 }
