@@ -1,5 +1,6 @@
 ﻿using Avalonia.Platform.Storage;
 using Caly.Core.Utilities;
+using Caly.Core.ViewModels;
 using CommunityToolkit.Mvvm.Messaging;
 using System.Threading.Tasks;
 
@@ -42,7 +43,7 @@ internal partial class PdfDocumentsManagerService
 
     private void HandleOpenLoadDocumentsRequestMessage(object r, OpenLoadDocumentsRequestMessage m)
     {
-        m.Reply(Task.Run(() => OpenLoadDocuments(m.Documents, m.Token)));
+        m.Reply(Task.Run(() => OpenLoadDocuments(m.Documents, m.Target, m.Token)));
     }
 
     private void HandleShowPdfPasswordDialogRequestMessage(object r, ShowPdfPasswordDialogRequestMessage m)
@@ -63,7 +64,7 @@ internal partial class PdfDocumentsManagerService
 
     private void HandleShowNotificationMessage(object r, ShowNotificationMessage m)
     {
-        _dialogService.ShowNotification(m.Value);
+        _dialogService.ShowNotification(m.Value, m.Target);
     }
 
     private void HandleCopyToClipboardRequestMessage(object r, CopyToClipboardRequestMessage m)
@@ -71,31 +72,41 @@ internal partial class PdfDocumentsManagerService
         m.Reply(_clipboardService.SetAsync(m.TextSelection, m.PdfPageService, m.Token));
     }
 
+    /// <summary>
+    /// Whether <paramref name="document"/> should be the live one: true exactly when it is
+    /// the selected document of the window that owns it.
+    /// </summary>
+    internal bool ShouldBeActive(DocumentViewModel document) =>
+        ReferenceEquals(_windowRegistry.FindOwnerOf(document)?.ViewModel.SelectedDocument, document);
+
+    /// <summary>
+    /// Activity is per-window: a document stays live while it is the selected document of the
+    /// window that owns it, so each open window keeps exactly one live document.
+    /// <para>
+    /// Every document's desired state is recomputed from the registry, so it no longer
+    /// matters which window's selection raised the message.
+    /// </para>
+    /// </summary>
     private void HandleSelectedDocumentChangedMessage(object r, SelectedDocumentChangedMessage m)
     {
-        var selected = _mainViewModel.SelectedDocument;
-        if (selected is null || !selected.Equals(m.Value))
-        {
-            return;
-        }
-
         foreach (var openedFile in _openedFiles)
         {
-            if (openedFile.Value.Document.Equals(m.Value))
+            DocumentViewModel document = openedFile.Value.Document;
+
+            if (ShouldBeActive(document))
             {
-                if (openedFile.Value.Document.IsActive)
+                if (!document.IsActive)
                 {
-                    continue;
+                    document.SetActive();
                 }
 
-                openedFile.Value.Document.SetActive();
                 continue;
             }
 
-            if (openedFile.Value.Document.IsActive)
+            if (document.IsActive)
             {
-                openedFile.Value.Document.SetInactive();
-                openedFile.Value.Document.ClearCommand.Execute(null);
+                document.SetInactive();
+                document.ClearCommand.Execute(null);
             }
         }
     }

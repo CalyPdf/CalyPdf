@@ -73,11 +73,22 @@ internal sealed class OpenLoadDocumentsRequestMessage : AsyncRequestMessage<int>
 {
     public IEnumerable<IStorageItem> Documents { get; }
 
+    /// <summary>
+    /// The window the documents should open in, or <c>null</c> to use the active one.
+    /// <para>
+    /// Files dropped on a window must open in <b>that</b> window, and a drop does not activate
+    /// the window it lands on - so the target has to travel with the request rather than being
+    /// resolved from the registry once it arrives.
+    /// </para>
+    /// </summary>
+    public MainViewModel? Target { get; }
+
     public CancellationToken Token { get; }
 
-    public OpenLoadDocumentsRequestMessage(IEnumerable<IStorageItem> documents, CancellationToken token)
+    public OpenLoadDocumentsRequestMessage(IEnumerable<IStorageItem> documents, MainViewModel? target, CancellationToken token)
     {
         Documents = documents;
+        Target = target;
         Token = token;
     }
 }

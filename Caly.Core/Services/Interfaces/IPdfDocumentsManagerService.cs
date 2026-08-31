@@ -29,19 +29,23 @@ namespace Caly.Core.Services.Interfaces;
 public interface IPdfDocumentsManagerService
 {
     /// <summary>
-    /// Open and load pdf document through popup window.
+    /// Open and load pdf document through popup window. The picker is shown over
+    /// <paramref name="target"/>, and the document opens there; when it is <c>null</c> the
+    /// active window is used for both.
     /// </summary>
-    Task OpenLoadDocument(CancellationToken cancellationToken);
+    Task OpenLoadDocument(MainViewModel? target, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Open and load the pdf document.
+    /// Open and load the pdf document in <paramref name="target"/>, or in the active window
+    /// when the caller has no particular window in mind.
     /// </summary>
-    Task OpenLoadDocument(IStorageFile? storageFile, CancellationToken cancellationToken);
+    Task OpenLoadDocument(IStorageFile? storageFile, MainViewModel? target, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Open and load the pdf documents.
+    /// Open and load the pdf documents in <paramref name="target"/>, or in the active window
+    /// when the caller has no particular window in mind.
     /// </summary>
-    Task<int> OpenLoadDocuments(IEnumerable<IStorageItem?> storageFiles, CancellationToken cancellationToken);
+    Task<int> OpenLoadDocuments(IEnumerable<IStorageItem?> storageFiles, MainViewModel? target, CancellationToken cancellationToken);
 
     /// <summary>
     /// Open and load the pdf document.
