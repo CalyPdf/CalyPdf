@@ -1,4 +1,4 @@
-// Copyright (c) 2025 BobLd
+﻿// Copyright (c) 2025 BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -262,7 +262,7 @@ public sealed class TileRenderService : IAsyncDisposable
                 request.Token.ThrowIfCancellationRequested();
 
                 SKPixmap pixmap = new SKPixmap();
-                SKImage image;
+                TileImage? image = null;
                 bool shouldRender = true;
 
                 try
@@ -279,13 +279,14 @@ public sealed class TileRenderService : IAsyncDisposable
 
                     if (hasPixmap && pixmap.GetPixelSpan().IndexOfAnyExcept(byte.MaxValue) == -1)
                     {
-                        // It's empty (all pixels are white)
+                        // It's empty (all pixels are white). Snapshotting it would cache a tile of
+                        // white pixels; recording the key alone is enough to stop it being
+                        // re-rendered and tells the render pass there is nothing to draw.
                         shouldRender = false;
-                        image = GetEmptyImage();
                     }
                     else
                     {
-                        image = surface.Snapshot();
+                        image = new TileImage(surface.Snapshot());
                     }
                 }
                 finally
@@ -293,7 +294,14 @@ public sealed class TileRenderService : IAsyncDisposable
                     pixmap.Dispose();
                 }
 
-                Cache.Add(request.Key, image);
+                if (image is not null)
+                {
+                    Cache.Add(request.Key, image);
+                }
+                else
+                {
+                    Cache.AddBlank(request.Key);
+                }
 
                 if (shouldRender)
                 {
@@ -311,7 +319,7 @@ public sealed class TileRenderService : IAsyncDisposable
 
             // There is nothing to render. The SKPicture's CullRect is a narrow rect of the area
             // that contains elements to render (SKPicture is recorded with the RTree optimisation).
-            Cache.Add(request.Key, GetEmptyImage());
+            Cache.AddBlank(request.Key);
         }
     }
 
@@ -325,15 +333,6 @@ public sealed class TileRenderService : IAsyncDisposable
     private void ReturnPaint(SKPaint paint)
     {
         _paintPool.Add(paint);
-    }
-
-    /// <summary>
-    /// Placeholder for tiles with no visible content. BytesSize == 1 is the sentinel
-    /// <see cref="TiledPdfPageControl.TileDrawEntry"/> uses to skip the blit.
-    /// </summary>
-    private static SKImage GetEmptyImage()
-    {
-        return SKImage.Create(new SKImageInfo(1, 1, SKColorType.Alpha8));
     }
 
     /// <summary>
