@@ -63,6 +63,13 @@ public sealed partial class DocumentViewModel : ViewModelBase
 
     public bool IsActive => _pdfService.IsActive;
 
+    /// <summary>
+    /// Errors about a document belong to the window showing it. Resolved per notification and
+    /// never cached: a document changes window whenever its tab is dragged.
+    /// </summary>
+    private protected override MainViewModel? NotificationTarget =>
+        App.Current?.Services?.GetService<ICalyWindowRegistry>()?.FindOwnerOf(this)?.ViewModel;
+
     [ObservableProperty] private ObservableCollection<PageViewModel> _pages = [];
 
     [ObservableProperty] private int _selectedTabIndex;
