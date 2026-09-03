@@ -74,8 +74,6 @@ public sealed partial class DocumentViewModel : ViewModelBase
 
     [ObservableProperty] private int _selectedTabIndex;
 
-    [ObservableProperty] private bool _isPasswordProtected;
-
     [ObservableProperty] private TextSelection? _textSelection;
 
     [ObservableProperty] private Range? _visiblePages;
@@ -199,6 +197,8 @@ public sealed partial class DocumentViewModel : ViewModelBase
         _pdfService = pdfService;
         _pdfPageService = pdfPageService;
         _textSearchService = textSearchService;
+
+        _pdfService.PasswordPrompt = RequestPasswordAsync;
 
         _loadPagesTask = new Lazy<Task>(LoadPages);
         

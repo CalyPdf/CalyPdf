@@ -26,6 +26,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Caly.Core.Models;
 using Caly.Core.Utilities;
+using Caly.Core.ViewModels;
 
 namespace Caly.Core.Controls;
 
@@ -40,9 +41,11 @@ namespace Caly.Core.Controls;
 /// Control that represents a PDF document.
 /// </summary>
 [TemplatePart("PART_PageItemsControl", typeof(PageItemsControl))]
+[TemplatePart("PART_TextBoxPassword", typeof(TextBox))]
 public sealed class DocumentControl : CalyTemplatedControl
 {
     private PageItemsControl? _pageItemsControl;
+    private TextBox? _textBoxPassword;
 
     /// <summary>
     /// Defines the <see cref="SelectedPageNumber"/> property. Starts at 1.
@@ -68,10 +71,27 @@ public sealed class DocumentControl : CalyTemplatedControl
     public static readonly StyledProperty<ICommand?> ClearSelectionProperty =
         AvaloniaProperty.Register<DocumentControl, ICommand?>(nameof(ClearSelection));
 
+    /// <summary>
+    /// Defines the <see cref="IsAwaitingPassword"/> property.
+    /// </summary>
+    public static readonly StyledProperty<bool> IsAwaitingPasswordProperty =
+        AvaloniaProperty.Register<DocumentControl, bool>(nameof(IsAwaitingPassword));
+
     public ICommand? ClearSelection
     {
         get => GetValue(ClearSelectionProperty);
         set => SetValue(ClearSelectionProperty, value);
+    }
+
+    /// <summary>
+    /// Whether the inline password prompt is currently shown. Mirrors
+    /// <see cref="ViewModels.DocumentViewModel.IsAwaitingPassword"/> so the control can move
+    /// focus into the password box as soon as it appears.
+    /// </summary>
+    public bool IsAwaitingPassword
+    {
+        get => GetValue(IsAwaitingPasswordProperty);
+        set => SetValue(IsAwaitingPasswordProperty, value);
     }
 
     /// <summary>
@@ -129,6 +149,13 @@ public sealed class DocumentControl : CalyTemplatedControl
                 GoToPage(p);
             }
         }
+        else if (change.Property == IsAwaitingPasswordProperty)
+        {
+            if (change.NewValue is true)
+            {
+                _textBoxPassword?.Focus();
+            }
+        }
         else if (change.Property == SelectedBookmarkProperty)
         {
             if (SelectedBookmark?.PageNumber.HasValue == true)
@@ -163,6 +190,37 @@ public sealed class DocumentControl : CalyTemplatedControl
     {
         base.OnApplyTemplate(e);
         _pageItemsControl = e.NameScope.FindFromNameScope<PageItemsControl>("PART_PageItemsControl");
+
+        if (_textBoxPassword is not null)
+        {
+            _textBoxPassword.KeyDown -= PasswordTextBox_OnKeyDown;
+        }
+
+        _textBoxPassword = e.NameScope.FindFromNameScope<TextBox>("PART_TextBoxPassword");
+
+        if (_textBoxPassword is not null)
+        {
+            _textBoxPassword.KeyDown += PasswordTextBox_OnKeyDown;
+        }
+    }
+
+    private void PasswordTextBox_OnKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (DataContext is not DocumentViewModel vm)
+        {
+            return;
+        }
+
+        if (e.Key == Key.Enter && vm.SubmitPasswordCommand.CanExecute(null))
+        {
+            vm.SubmitPasswordCommand.Execute(null);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape && vm.CancelPasswordCommand.CanExecute(null))
+        {
+            vm.CancelPasswordCommand.Execute(null);
+            e.Handled = true;
+        }
     }
 
     /// <summary>

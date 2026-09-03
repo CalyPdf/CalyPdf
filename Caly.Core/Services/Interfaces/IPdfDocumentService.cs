@@ -75,7 +75,16 @@ public interface IPdfDocumentService : IAsyncDisposable
     string? LocalPath { get; }
 
     bool IsPasswordProtected { get; }
-    
+
+    /// <summary>
+    /// Invoked when the document turns out to be password protected, to ask the owner for a
+    /// password. Returns <c>null</c> or empty to cancel.
+    /// <para>
+    /// Must be set by the owner before <see cref="OpenDocument"/> is called.
+    /// </para>
+    /// </summary>
+    Func<CancellationToken, Task<string?>>? PasswordPrompt { get; set; }
+
     /// <summary>
     /// Open the pdf document.
     /// <para>Can only be called once per instance.</para>

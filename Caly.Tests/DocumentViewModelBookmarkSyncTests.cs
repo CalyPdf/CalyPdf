@@ -47,6 +47,7 @@ public class DocumentViewModelBookmarkSyncTests
         public long? FileSize => throw new NotImplementedException();
         public string? LocalPath => throw new NotImplementedException();
         public bool IsPasswordProtected => throw new NotImplementedException();
+        public Func<CancellationToken, Task<string?>>? PasswordPrompt { get; set; }
 
         public Task<DocumentOpeningState> OpenDocument(IStorageFile? storageFile, string? password, CancellationToken token)
             => throw new NotImplementedException();

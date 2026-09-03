@@ -14,7 +14,6 @@ internal partial class PdfDocumentsManagerService
         App.Messenger.Register<SelectedDocumentChangedMessage>(this, HandleSelectedDocumentChangedMessage);
         App.Messenger.Register<CopyToClipboardRequestMessage>(this, HandleCopyToClipboardRequestMessage);
         App.Messenger.Register<ShowNotificationMessage>(this, HandleShowNotificationMessage);
-        App.Messenger.Register<ShowPdfPasswordDialogRequestMessage>(this, HandleShowPdfPasswordDialogRequestMessage);
         App.Messenger.Register<ShowPrintDialogRequestMessage>(this, HandleShowPrintDialogRequestMessage);
         App.Messenger.Register<OpenEmbeddedFileRequestMessage>(this, HandleOpenEmbeddedFileRequestMessage);
         App.Messenger.Register<SaveEmbeddedFileRequestMessage>(this, HandleSaveEmbeddedFileRequestMessage);
@@ -46,10 +45,6 @@ internal partial class PdfDocumentsManagerService
         m.Reply(Task.Run(() => OpenLoadDocuments(m.Documents, m.Target, m.Token)));
     }
 
-    private void HandleShowPdfPasswordDialogRequestMessage(object r, ShowPdfPasswordDialogRequestMessage m)
-    {
-        m.Reply(_dialogService.ShowPdfPasswordDialogAsync());
-    }
     private void HandleShowPrintDialogRequestMessage(object r, ShowPrintDialogRequestMessage m)
     {
         m.Reply(HandleShowPrintDialogAsync(m));
