@@ -16,6 +16,7 @@
 		<Setter Property="SelectedTextSearchResult" Value="{Binding SelectedTextSearchResult, Mode=OneWay}"/>
 		<Setter Property="UseLayoutRounding" Value="True"/>
 		<Setter Property="ClearSelection" Value="{Binding ClearSelectionCommand}"/>
+		<Setter Property="IsAwaitingPassword" Value="{Binding IsAwaitingPassword, Mode=OneWay}"/>
 
 		<Setter Property="ContextFlyout">
 			<MenuFlyout>
@@ -36,6 +37,7 @@
 
                     <!-- The pages control -->
                     <controls:PageItemsControl Name="PART_PageItemsControl"
+                                               IsVisible="{Binding !IsAwaitingPassword}"
                                                HorizontalAlignment="Stretch"/>
 
                     <Grid IsVisible="{Binding !Pages.Count}">
@@ -61,7 +63,37 @@
                                       Opacity="200"/>
                         </Border>
                     </Grid>
-					
+
+                    <Border IsVisible="{Binding IsAwaitingPassword}"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Padding="24"
+                            MinWidth="260">
+                        <StackPanel Spacing="10">
+               
+
+                            <TextBox Name="PART_TextBoxPassword"
+                                     PasswordChar="*"
+                                     PlaceholderText="Enter password"
+                                     Text="{Binding PasswordInput, Mode=TwoWay}"/>
+
+                            <TextBlock Text="Incorrect password, try again"
+                                       Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}"
+                                       TextAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       IsVisible="{Binding PasswordAttemptFailed}"/>
+
+                            <StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Center"
+                                        Spacing="8">
+                                <Button Content="Cancel"
+                                        Command="{Binding CancelPasswordCommand}"/>
+                                <Button Content="OK"
+                                        Command="{Binding SubmitPasswordCommand}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
 				</Grid>
 			</ControlTemplate>
 		</Setter>

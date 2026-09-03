@@ -51,8 +51,6 @@ internal sealed class CopyToClipboardRequestMessage : AsyncRequestMessage<bool>
     }
 }
 
-internal sealed class ShowPdfPasswordDialogRequestMessage : AsyncRequestMessage<string?>;
-
 internal sealed class ShowPrintDialogRequestMessage : AsyncRequestMessage<bool>
 {
     public IPdfDocumentService PdfDocumentService { get; }

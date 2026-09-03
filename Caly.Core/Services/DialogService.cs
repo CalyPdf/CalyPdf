@@ -118,18 +118,6 @@ internal sealed class DialogService : IDialogService
         return false;
     }
 
-    public async Task<string?> ShowPdfPasswordDialogAsync()
-    {
-        return await Dispatcher.UIThread.InvokeAsync(() =>
-        {
-            if (ActiveWindow is { } w)
-            {
-                return new PdfPasswordWindow().ShowDialog<string?>(w);
-            }
-            return Task.FromResult<string?>(string.Empty);
-        });
-    }
-
     public void ShowNotification(CalyNotification notification, MainViewModel? target = null)
     {
         ShowNotification(notification.Title, notification.Message, notification.Type, target);

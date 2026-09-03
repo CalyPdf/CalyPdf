@@ -36,6 +36,7 @@ public class PdfDocumentsManagerServiceOwnershipTests
         public long? FileSize => throw new NotImplementedException();
         public string? LocalPath => throw new NotImplementedException();
         public bool IsPasswordProtected => throw new NotImplementedException();
+        public Func<CancellationToken, Task<string?>>? PasswordPrompt { get; set; }
 
         public Task<DocumentOpeningState> OpenDocument(IStorageFile? storageFile, string? password, CancellationToken token)
             => throw new NotImplementedException();
@@ -96,8 +97,6 @@ public class PdfDocumentsManagerServiceOwnershipTests
 
     private sealed class StubDialogService : IDialogService
     {
-        public Task<string?> ShowPdfPasswordDialogAsync() => Task.FromResult<string?>(null);
-
         public void ShowNotification(string? title, string? message, NotificationType type, MainViewModel? target = null) { }
 
         public void ShowNotification(CalyNotification notification, MainViewModel? target = null) { }

@@ -30,11 +30,6 @@ namespace Caly.Core.Services.Interfaces
     public interface IDialogService
     {
         /// <summary>
-        /// <c>null</c> if cancelled.
-        /// </summary>
-        Task<string?> ShowPdfPasswordDialogAsync();
-
-        /// <summary>
         /// Show a notification in <paramref name="target"/>, or in the active window when the
         /// caller has no particular window in mind.
         /// <para>

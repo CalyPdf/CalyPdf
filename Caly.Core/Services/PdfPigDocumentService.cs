@@ -69,6 +69,8 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
 
     public bool IsPasswordProtected { get; private set; } = false;
 
+    public Func<CancellationToken, Task<string?>>? PasswordPrompt { get; set; }
+
     private long _isActive = 0;
     public bool IsActive
     {
@@ -196,7 +198,7 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
                 bool shouldContinue = true;
                 while (shouldContinue)
                 {
-                    string? pw = await App.Messenger.Send(new ShowPdfPasswordDialogRequestMessage());
+                    string? pw = PasswordPrompt is null ? null : await PasswordPrompt(ct).ConfigureAwait(false);
                     Debug.ThrowOnUiThread();
 
                     shouldContinue = !string.IsNullOrEmpty(pw);
