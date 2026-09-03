@@ -105,8 +105,9 @@ internal partial class PdfDocumentsManagerService
 
             if (document.IsActive)
             {
+                // SetInactive owns the teardown, so it is always sequenced against the
+                // SetActive that may follow it a moment later
                 document.SetInactive();
-                document.ClearCommand.Execute(null);
             }
         }
     }
