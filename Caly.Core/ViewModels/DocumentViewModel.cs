@@ -301,14 +301,97 @@ public sealed partial class DocumentViewModel : ViewModelBase
         }, DispatcherPriority.Send, _mainToken);
     }
 
+    /// <summary>
+    /// The activation transition currently in flight. UI thread only - both
+    /// <see cref="SetActive"/> and <see cref="SetInactive"/> are called from the
+    /// selected-document message handler.
+    /// </summary>
+    private Task _activityTransition = Task.CompletedTask;
+
+    /// <summary>
+    /// Makes this the document the user is looking at, and puts back whatever the last
+    /// <see cref="SetInactive"/> released.
+    /// </summary>
     public void SetActive()
     {
+        Debug.ThrowNotOnUiThread();
+
         _pdfService.IsActive = true;
+        _activityTransition = QueueActivityTransition(RestoreContent);
     }
 
+    /// <summary>
+    /// Steps this document out of view and releases everything rendered for it.
+    /// </summary>
     public void SetInactive()
     {
+        Debug.ThrowNotOnUiThread();
+
         _pdfService.IsActive = false;
+        _activityTransition = QueueActivityTransition(Clear);
+    }
+
+    /// <summary>
+    /// Runs <paramref name="transition"/> once the transition before it has finished.
+    /// <para>
+    /// The teardown is asynchronous, so without this chaining it can land on a document that
+    /// has since been reactivated: <see cref="PdfPageService.CancelAndClear"/> cancels
+    /// whichever render generation is current when it runs, which by then is the one the
+    /// reactivation just started. Its queued renders are then dropped as they are picked up
+    /// and the page never leaves its loading skeleton.
+    /// </para>
+    /// </summary>
+    private async Task QueueActivityTransition(Func<Task> transition)
+    {
+        Task previous = _activityTransition;
+
+        try
+        {
+            // Faults and cancellation are already reported by the transition that produced
+            // them; this one only needs to know that it is done.
+            await previous.ConfigureAwait(false);
+        }
+        catch
+        { /* No op */ }
+
+        try
+        {
+            await transition().ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        { /* No op */ }
+        catch (Exception e)
+        {
+            Debug.WriteExceptionToFile(e);
+        }
+    }
+
+    /// <summary>
+    /// Re-requests what <see cref="Clear"/> released, so that becoming active again is the
+    /// exact inverse of becoming inactive.
+    /// <para>
+    /// Only the view knows which pages are on screen, so a document whose view has not
+    /// reported a range yet is left alone: it has nothing to restore, and the view will
+    /// request its first render itself.
+    /// </para>
+    /// </summary>
+    private async Task RestoreContent()
+    {
+        if (!IsActive)
+        {
+            // Deactivated again while this transition waited its turn.
+            return;
+        }
+
+        if (VisiblePages.HasValue && RealisedPages.HasValue)
+        {
+            await RefreshPages();
+        }
+
+        if (VisibleThumbnails.HasValue && RealisedThumbnails.HasValue)
+        {
+            await RefreshThumbnails();
+        }
     }
 
     private Task<DocumentOpeningState>? _loadDocumentTask;
@@ -568,6 +651,13 @@ public sealed partial class DocumentViewModel : ViewModelBase
     [RelayCommand]
     private async Task Clear()
     {
+        if (IsActive)
+        {
+            // Reactivated while this teardown waited its turn: releasing now would blank the
+            // document the user is looking at, and nothing would ask for it again.
+            return;
+        }
+
         // Capture pictures/thumbnails and clear all UI-bound page properties on the UI thread
         // in one batch, then dispose the captured resources off the UI thread.
         var toDispose = new List<IDisposable?>();

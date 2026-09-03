@@ -45,6 +45,12 @@ public sealed class TileRenderService : IAsyncDisposable
         public CancellationToken Token { get; }
 
         /// <summary>
+        /// Identifies this request among the ones that have held <see cref="Key"/> in
+        /// <see cref="_inFlight"/>, so it only ever retires its own entry.
+        /// </summary>
+        public long RequestId { get; }
+
+        /// <summary>
         /// Squared Euclidean distance (in tile units) from the tile's centre to the centre of the
         /// visible area at the time of the request. Primary sort key after <see cref="TileKey.PageNumber"/>:
         /// smaller = rendered sooner, so tiles fill outwards in rings from the middle of the viewport.
@@ -59,13 +65,14 @@ public sealed class TileRenderService : IAsyncDisposable
         public double AngleCw { get; }
 
         public TileRequest(in TileKey key, IRef<SKPicture> picture, double ppiScale, in Size pageDisplaySize,
-            CancellationToken token, double distSq, double angleCw)
+            CancellationToken token, long requestId, double distSq, double angleCw)
         {
             Key = key;
             Picture = picture;
             PpiScale = ppiScale;
             PageDisplaySize = pageDisplaySize;
             Token = token;
+            RequestId = requestId;
             DistSq = distSq;
             AngleCw = angleCw;
         }
@@ -105,9 +112,23 @@ public sealed class TileRenderService : IAsyncDisposable
     private readonly Task _processingLoopTask;
 
     /// <summary>
-    /// Tracks in-flight tile requests to avoid duplicate renders.
+    /// Tracks in-flight tile requests to avoid duplicate renders, mapping each key to the id of
+    /// the request holding it.
+    /// <para>
+    /// An entry is a promise that a render for that key is on its way, so it only stands while
+    /// that is still true: <see cref="CancelPage"/> and <see cref="InvalidatePage"/> retire the
+    /// page's entries along with the requests they doom. Leaving them behind deduplicated the
+    /// request that would have repaired the page against renders that were already going to be
+    /// dropped, and the page stayed blank until a scroll asked for different tiles.
+    /// </para>
     /// </summary>
-    private readonly ConcurrentDictionary<TileKey, byte> _inFlight = new();
+    private readonly ConcurrentDictionary<TileKey, long> _inFlight = new();
+
+    /// <summary>
+    /// Source of the ids in <see cref="_inFlight"/>. Requests retire their entry by value, so a
+    /// request dropped after its key has been re-taken cannot retire the new holder's entry.
+    /// </summary>
+    private long _nextRequestId;
 
     /// <summary>
     /// Per-page cancellation tokens for cancelling requests when pages scroll out of view.
@@ -191,7 +212,7 @@ public sealed class TileRenderService : IAsyncDisposable
                 catch (Exception e) { Debug.WriteExceptionToFile(e); }
                 finally
                 {
-                    _inFlight.TryRemove(request.Key, out _);
+                    RetireInFlight(request.Key, request.RequestId);
                     request.Picture.Dispose();
                 }
 
@@ -421,7 +442,8 @@ public sealed class TileRenderService : IAsyncDisposable
                 // cache before allocating a surface. Re-acquiring the cache lock per tile just
                 // to repeat the Contains check serialized batches with concurrent Cache.Add
                 // operations for no benefit.
-                if (!_inFlight.TryAdd(key, 0))
+                long requestId = Interlocked.Increment(ref _nextRequestId);
+                if (!_inFlight.TryAdd(key, requestId))
                 {
                     continue;
                 }
@@ -447,17 +469,43 @@ public sealed class TileRenderService : IAsyncDisposable
                 var pictureClone = batchPicture.Clone();
 
                 var request = new TileRequest(in key, pictureClone, ppiScale, in pageDisplaySize, pageToken,
-                    distSq, angleCw);
+                    requestId, distSq, angleCw);
                 if (!_requestWriter.TryWrite(request))
                 {
                     pictureClone.Dispose();
-                    _inFlight.TryRemove(key, out _);
+                    RetireInFlight(key, requestId);
                 }
             }
         }
         finally
         {
             batchPicture.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Retires an <see cref="_inFlight"/> entry, but only while it is still the one
+    /// <paramref name="requestId"/> put there. A request whose key has since been re-taken by a
+    /// newer one must not retire that newer entry, or the tile it promises could be queued twice.
+    /// </summary>
+    private void RetireInFlight(in TileKey key, long requestId)
+    {
+        _inFlight.TryRemove(KeyValuePair.Create(key, requestId));
+    }
+
+    /// <summary>
+    /// Retires every <see cref="_inFlight"/> entry for a page whose queued requests have just
+    /// been cancelled. They are certain to be dropped as the workers reach them, so the keys
+    /// have to be free for whatever asks for those tiles next.
+    /// </summary>
+    private void RetirePageInFlight(int pageNumber)
+    {
+        foreach (var pair in _inFlight)
+        {
+            if (pair.Key.PageNumber == pageNumber)
+            {
+                _inFlight.TryRemove(pair);
+            }
         }
     }
 
@@ -471,6 +519,8 @@ public sealed class TileRenderService : IAsyncDisposable
             cts.Cancel();
             cts.Dispose();
         }
+
+        RetirePageInFlight(pageNumber);
 
         Cache.InvalidatePage(pageNumber);
     }
@@ -497,6 +547,8 @@ public sealed class TileRenderService : IAsyncDisposable
 
         cts.Cancel();
         cts.Dispose();
+
+        RetirePageInFlight(pageNumber);
     }
 
     public async ValueTask DisposeAsync()
