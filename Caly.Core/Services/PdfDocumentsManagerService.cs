@@ -31,6 +31,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -48,7 +49,7 @@ internal sealed partial class PdfDocumentsManagerService : IPdfDocumentsManagerS
     /// move the "active window" out from under the request.
     /// </para>
     /// </summary>
-    private readonly record struct OpenDocumentRequest(IStorageFile? File, MainViewModel? Target);
+    private readonly record struct OpenDocumentRequest(IStorageFile? File, MainViewModel? Target, bool SelectOnOpen);
 
     private sealed class PdfDocumentRecord
     {
@@ -183,7 +184,7 @@ internal sealed partial class PdfDocumentsManagerService : IPdfDocumentsManagerS
 
         MainViewModel resolved = context.ViewModel;
 
-        await Task.Run(() => EnqueueOpenRequest(file, resolved, cancellationToken), cancellationToken);
+        await Task.Run(() => EnqueueOpenRequest(file, resolved, selectOnOpen: true, cancellationToken), cancellationToken);
     }
 
     public async Task OpenLoadDocument(string? path, CancellationToken cancellationToken)
@@ -211,12 +212,12 @@ internal sealed partial class PdfDocumentsManagerService : IPdfDocumentsManagerS
         // the active window, captured now rather than when the queue drains.
         target ??= await Dispatcher.UIThread.InvokeAsync(() => _windowRegistry.Active?.ViewModel);
 
-        await EnqueueOpenRequest(storageFile, target, cancellationToken);
+        await EnqueueOpenRequest(storageFile, target, selectOnOpen: true, cancellationToken);
     }
 
-    private async Task EnqueueOpenRequest(IStorageFile? storageFile, MainViewModel? target, CancellationToken cancellationToken)
+    private async Task EnqueueOpenRequest(IStorageFile? storageFile, MainViewModel? target, bool selectOnOpen, CancellationToken cancellationToken)
     {
-        await _channelWriter.WriteAsync(new OpenDocumentRequest(storageFile, target), cancellationToken);
+        await _channelWriter.WriteAsync(new OpenDocumentRequest(storageFile, target, selectOnOpen), cancellationToken);
     }
 
     /// <summary>
@@ -256,19 +257,21 @@ internal sealed partial class PdfDocumentsManagerService : IPdfDocumentsManagerS
         // activates another while the batch is still queueing.
         target ??= await Dispatcher.UIThread.InvokeAsync(() => _windowRegistry.Active?.ViewModel);
 
-        int count = 0;
-        foreach (IStorageItem? item in storageFiles)
-        {
-            if (item is not IStorageFile file)
-            {
-                continue;
-            }
+        List<IStorageFile> files = storageFiles.OfType<IStorageFile>().ToList();
 
-            await OpenLoadDocument(file, target, cancellationToken);
-            count++;
+        // Only the last file of a batch drop takes over the tab strip and gets its page rendered
+        // immediately. Selecting every file as it opens (the old behaviour) makes each one flash
+        // through as the active tab in turn, which fires a real page-1 render for every one of
+        // them - wasted work for the ones instantly superseded, and it starts that render's
+        // 30-second budget long before the user has actually looked at the tab, so a page can
+        // show as already timed out the first time it is genuinely activated. The rest still open
+        // as background tabs; nothing stops the user opening them by hand.
+        for (int i = 0; i < files.Count; i++)
+        {
+            await EnqueueOpenRequest(files[i], target, selectOnOpen: i == files.Count - 1, cancellationToken);
         }
 
-        return count;
+        return files.Count;
     }
 
     public async Task CloseUnloadDocument(DocumentViewModel? document)
@@ -578,7 +581,13 @@ internal sealed partial class PdfDocumentsManagerService : IPdfDocumentsManagerS
                 }
 
                 target.PdfDocuments.Add(document);
-                target.SelectedDocumentIndex = Math.Max(0, target.PdfDocuments.Count - 1);
+
+                // Always select the window's first tab (otherwise it opens with nothing shown);
+                // beyond that, only select if this request asked to (see OpenLoadDocuments).
+                if (request.SelectOnOpen || target.PdfDocuments.Count == 1)
+                {
+                    target.SelectedDocumentIndex = Math.Max(0, target.PdfDocuments.Count - 1);
+                }
 
                 // From here on "no window owns this document" means its window closed, rather
                 // than this open not having got that far yet.
