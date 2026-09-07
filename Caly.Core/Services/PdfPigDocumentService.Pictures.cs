@@ -39,6 +39,9 @@ internal sealed partial class PdfPigDocumentService
     {
         Debug.ThrowOnUiThread();
 
+        var requestSw = System.Diagnostics.Stopwatch.StartNew();
+        Debug.WriteTimingLog($"[{FileName}] page {pageNumber}: GetRenderPageAsync entered");
+
         SKPicture? pic = await GuardDispose(async guardCt =>
         {
             await WaitForDocumentToOpen(guardCt);
@@ -48,16 +51,28 @@ internal sealed partial class PdfPigDocumentService
                 return null;
             }
 
+            Debug.WriteTimingLog($"[{FileName}] page {pageNumber}: document open, waiting for per-document lock (+{requestSw.Elapsed.TotalMilliseconds:0} ms since entry)");
+
             return await ExecuteWithLockAsync(lockCt =>
                 {
+                    Debug.WriteTimingLog($"[{FileName}] page {pageNumber}: lock acquired, calling GetPageAsSKPicture (+{requestSw.Elapsed.TotalMilliseconds:0} ms since entry)");
+                    var callSw = System.Diagnostics.Stopwatch.StartNew();
+                    using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(lockCt);
+                    linkedCts.CancelAfter(PageTimeOut);
                     try
                     {
-                        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(lockCt);
-                        linkedCts.CancelAfter(PageTimeOut);
-                        return document?.GetPageAsSKPicture(pageNumber, linkedCts.Token);
+                        var result = document?.GetPageAsSKPicture(pageNumber, linkedCts.Token);
+                        Debug.WriteTimingLog($"[{FileName}] page {pageNumber}: GetPageAsSKPicture returned after {callSw.Elapsed.TotalMilliseconds:0} ms");
+                        return result;
                     }
                     catch (OperationCanceledException)
                     {
+                        // Diagnostic: distinguishes our own token's state (request/30s-timer) from
+                        // a spurious cancellation the render call threw for an unrelated reason -
+                        // if linkedCts is NOT cancelled either, the exception did not come from any
+                        // token we control.
+                        Debug.WriteTimingLog($"[{FileName}] page {pageNumber}: GetPageAsSKPicture CANCELLED after {callSw.Elapsed.TotalMilliseconds:0} ms (request token cancelled={lockCt.IsCancellationRequested}, our linkedCts cancelled={linkedCts.IsCancellationRequested})");
+
                         if (!lockCt.IsCancellationRequested)
                         {
                             App.Messenger.Send(new ShowNotificationMessage(NotificationType.Error,
@@ -70,6 +85,7 @@ internal sealed partial class PdfPigDocumentService
                     }
                     catch (Exception e)
                     {
+                        Debug.WriteTimingLog($"[{FileName}] page {pageNumber}: GetPageAsSKPicture threw {e.GetType().Name} after {callSw.Elapsed.TotalMilliseconds:0} ms");
                         Debug.WriteExceptionToFile(e);
                         return GetErrorPicture(document, pageNumber, e, lockCt);
                     }

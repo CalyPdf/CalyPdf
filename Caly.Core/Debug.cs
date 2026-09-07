@@ -21,6 +21,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Threading;
 using Avalonia;
 using Caly.Core.Services;
 
@@ -28,6 +29,31 @@ namespace Caly.Core;
 
 public static class Debug
 {
+    private static readonly Lock _timingLogLock = new();
+
+    /// <summary>
+    /// Temporary diagnostic for the batch-open render-timeout investigation: appends a
+    /// timestamped line to a single shared log file so render timing can be inspected after a
+    /// real repro, without needing an attached debugger. Never throws - logging must not be able
+    /// to break rendering.
+    /// </summary>
+    public static void WriteTimingLog(string message)
+    {
+        try
+        {
+            Directory.CreateDirectory(JsonSettingsService.LogFilePath);
+            string logFile = Path.Combine(JsonSettingsService.LogFilePath, "render-timing.log");
+            string line = $"{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss.fff} [T{Environment.CurrentManagedThreadId}] {message}{Environment.NewLine}";
+
+            lock (_timingLogLock)
+            {
+                File.AppendAllText(logFile, line);
+            }
+        }
+        catch
+        { /* No op - diagnostic logging must never break rendering. */ }
+    }
+
     /// <summary>
     /// Whether <see cref="Avalonia.Threading.Dispatcher.UIThread"/> identifies a real, dedicated
     /// UI thread. It does not hold under the headless unit-test host.

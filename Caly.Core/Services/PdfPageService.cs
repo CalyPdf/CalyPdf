@@ -207,6 +207,8 @@ namespace Caly.Core.Services
                 bool hasLock = false;
                 var mutex = _renderLocks[pageNumber - 1];
 
+                Debug.WriteTimingLog($"[{_pdfDocumentService.FileName}] page {pageNumber}: GetPicture requested, waiting for per-page mutex");
+
                 try
                 {
                     await mutex.WaitAsync(token);
@@ -218,12 +220,14 @@ namespace Caly.Core.Services
                     }
 
                     System.Diagnostics.Debug.WriteLine($"Render page #{pageNumber} started.");
-                    
+                    Debug.WriteTimingLog($"[{_pdfDocumentService.FileName}] page {pageNumber}: mutex acquired, calling GetRenderPageAsync");
+
                     var sw = ValueStopwatch.StartNew();
                     picture = await _pdfDocumentService.GetRenderPageAsync(pageNumber, token);
                     TimeSpan elapsed = sw.GetElapsedTime();
 
                     System.Diagnostics.Debug.WriteLine($"Render page #{pageNumber} done in {elapsed.TotalMilliseconds}ms.");
+                    Debug.WriteTimingLog($"[{_pdfDocumentService.FileName}] page {pageNumber}: GetRenderPageAsync returned after {elapsed.TotalMilliseconds:0} ms (picture={(picture is null ? "null" : "set")})");
 
                     if (picture is not null)
                     {
