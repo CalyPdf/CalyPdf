@@ -472,32 +472,84 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
         }, token);
     }
 
-    private PdfBookmarkNode BuildPdfBookmarkNode(BookmarkNode node, CancellationToken token)
+    private PdfBookmarkNode BuildPdfBookmarkNode(BookmarkNode root, CancellationToken token)
     {
-        token.ThrowIfCancellationRequested();
+        // Iterative post-order traversal. The outline tree can be arbitrarily deep - crafted
+        // documents chain tens of thousands of nodes - and recursing here overflows the stack.
+        var stack = new Stack<BookmarkFrame>();
+        stack.Push(new BookmarkFrame(root));
 
-        int? pageNumber = null;
-        double? offsetY = null;
-        if (node is DocumentBookmarkNode bookmarkNode)
+        PdfBookmarkNode? result = null;
+
+        while (stack.Count > 0)
         {
-            pageNumber = bookmarkNode.PageNumber;
-            offsetY = bookmarkNode.Destination?.Coordinates?.Top * PpiScale;
+            token.ThrowIfCancellationRequested();
+
+            BookmarkFrame current = stack.Peek();
+
+            if (current.Index < current.Node.Children.Count)
+            {
+                // Still has children to visit, come back to this node once they are all built.
+                stack.Push(new BookmarkFrame(current.Node.Children[current.Index++]));
+                continue;
+            }
+
+            stack.Pop();
+
+            PdfBookmarkNode built = Create(current.Node, current.Children);
+            if (stack.Count == 0)
+            {
+                result = built;
+            }
+            else
+            {
+                stack.Peek().AddChild(built);
+            }
         }
 
-        if (node.IsLeaf)
+        System.Diagnostics.Debug.Assert(result is not null);
+        return result!;
+
+        PdfBookmarkNode Create(BookmarkNode node, IReadOnlyList<PdfBookmarkNode>? children)
         {
-            return new PdfBookmarkNode(node.Title, pageNumber, offsetY, null);
+            int? pageNumber = null;
+            double? offsetY = null;
+            if (node is DocumentBookmarkNode bookmarkNode)
+            {
+                pageNumber = bookmarkNode.PageNumber;
+                offsetY = bookmarkNode.Destination?.Coordinates?.Top * PpiScale;
+            }
+
+            return new PdfBookmarkNode(node.Title, pageNumber, offsetY, children);
+        }
+    }
+
+    /// <summary>
+    /// Mutable state of a single outline node while it is being converted, see <see cref="BuildPdfBookmarkNode"/>.
+    /// </summary>
+    private sealed class BookmarkFrame
+    {
+        public BookmarkNode Node { get; }
+
+        /// <summary>
+        /// Index of the next child of <see cref="Node"/> to visit.
+        /// </summary>
+        public int Index { get; set; }
+
+        /// <summary>
+        /// The already built children, <c>null</c> while none was built.
+        /// </summary>
+        public List<PdfBookmarkNode>? Children { get; private set; }
+
+        public BookmarkFrame(BookmarkNode node)
+        {
+            Node = node;
         }
 
-        var children = new List<PdfBookmarkNode>();
-        foreach (var child in node.Children)
+        public void AddChild(PdfBookmarkNode child)
         {
-            var n = BuildPdfBookmarkNode(child, token);
-            System.Diagnostics.Debug.Assert(n is not null);
-            children.Add(n);
+            (Children ??= new List<PdfBookmarkNode>(Node.Children.Count)).Add(child);
         }
-
-        return new PdfBookmarkNode(node.Title, pageNumber, offsetY, children.Count == 0 ? null : children);
     }
 
     public async ValueTask DisposeAsync()
