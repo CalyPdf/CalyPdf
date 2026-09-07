@@ -237,20 +237,20 @@ public class DocumentViewModelBookmarkSyncTests
     [AvaloniaFact]
     public async Task Bookmarks_BelowExpandThreshold_AreExpanded()
     {
-        // 499 bookmarks: one below the threshold.
-        var doc = NewDocumentWithBookmarks(BookmarksWithCount(499), pageCount: 1);
+        // 1500 bookmarks: one below the threshold.
+        var doc = NewDocumentWithBookmarks(BookmarksWithCount(1500), pageCount: 1);
 
         var source = await doc.BookmarksSource;
         Assert.NotNull(source);
 
-        Assert.Equal(499, source!.Rows.Count);
+        Assert.Equal(1_500, source!.Rows.Count);
     }
 
     [AvaloniaFact]
     public async Task Bookmarks_AtExpandThreshold_AreNotExpanded()
     {
-        // 500 bookmarks: only the root is realised, the outline stays collapsed.
-        var doc = NewDocumentWithBookmarks(BookmarksWithCount(500), pageCount: 1);
+        // 1_501 bookmarks: only the root is realised, the outline stays collapsed.
+        var doc = NewDocumentWithBookmarks(BookmarksWithCount(1_501), pageCount: 1);
 
         var source = await doc.BookmarksSource;
         Assert.NotNull(source);
