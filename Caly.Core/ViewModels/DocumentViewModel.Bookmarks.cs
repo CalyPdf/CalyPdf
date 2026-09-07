@@ -35,6 +35,8 @@ namespace Caly.Core.ViewModels;
 
 public partial class DocumentViewModel
 {
+    private const int MaxAutoExpandBookmarkCount = 500;
+
     private readonly Lazy<Task<HierarchicalTreeDataGridSource<PdfBookmarkNode>?>> _bookmarksTask;
     public Task<HierarchicalTreeDataGridSource<PdfBookmarkNode>?> BookmarksSource => _bookmarksTask.Value;
 
@@ -75,9 +77,12 @@ public partial class DocumentViewModel
                 };
                 _bookmarksSource.RowSelection!.SingleSelect = true;
                 _bookmarksSource.RowSelection.SelectionChanged += BookmarksSelectionChanged;
-                _bookmarksSource.ExpandAll();
+                _bookmarkLocations = FlattenBookmarks(bookmarks, out int bookmarkCount);
 
-                _bookmarkLocations = FlattenBookmarks(bookmarks);
+                if (bookmarkCount < MaxAutoExpandBookmarkCount)
+                {
+                    _bookmarksSource.ExpandAll();
+                }
 
                 UpdateActiveBookmark();
 
@@ -255,32 +260,47 @@ public partial class DocumentViewModel
         }
     }
 
-    private static FrozenDictionary<int, IReadOnlyList<PdfBookmarkLocation>> FlattenBookmarks(IReadOnlyList<PdfBookmarkNode> roots)
+    /// <summary>
+    /// Indexes by page number the bookmarks that point to one.
+    /// </summary>
+    /// <param name="roots">The root bookmarks.</param>
+    /// <param name="count">The total number of bookmarks, whether they point to a page or not.</param>
+    private static FrozenDictionary<int, IReadOnlyList<PdfBookmarkLocation>> FlattenBookmarks(IReadOnlyList<PdfBookmarkNode> roots, out int count)
     {
+        count = 0;
         var list = new List<PdfBookmarkLocation>();
 
-        void Recurse(IReadOnlyList<PdfBookmarkNode> nodes, IndexPath parent)
+        // Iterative pre-order traversal, the outline tree can be arbitrarily deep - see
+        // PdfPigDocumentService.BuildPdfBookmarkNode. Children are pushed in reverse so
+        // they are visited in document order.
+        var stack = new Stack<(PdfBookmarkNode Node, IndexPath Path)>();
+        IndexPath root = default;
+        for (int i = roots.Count - 1; i >= 0; --i)
         {
-            for (int i = 0; i < nodes.Count; ++i)
+            stack.Push((roots[i], root.Append(i)));
+        }
+
+        while (stack.Count > 0)
+        {
+            (PdfBookmarkNode node, IndexPath path) = stack.Pop();
+            ++count;
+
+            if (node.PageNumber.HasValue)
             {
-                var node = nodes[i];
-                var path = parent.Append(i);
+                list.Add(new PdfBookmarkLocation(node, path));
+            }
 
-                if (node.PageNumber.HasValue)
+            if (node.Nodes is { Count: > 0 } children)
+            {
+                for (int i = children.Count - 1; i >= 0; --i)
                 {
-                    list.Add(new PdfBookmarkLocation(node, path));
-                }
-
-                if (node.Nodes is { Count: > 0 } children)
-                {
-                    Recurse(children, path);
+                    stack.Push((children[i], path.Append(i)));
                 }
             }
         }
 
-        Recurse(roots, default);
         return list.GroupBy(x => x.Node.PageNumber!.Value)
             .ToFrozenDictionary(g => g.Key,
-                IReadOnlyList<PdfBookmarkLocation> (g) => g.ToArray()); ;
+                IReadOnlyList<PdfBookmarkLocation> (g) => g.ToArray());
     }
 }

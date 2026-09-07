@@ -102,6 +102,21 @@ public class DocumentViewModelBookmarkSyncTests
         return doc;
     }
 
+    /// <summary>
+    /// A single root bookmark holding <paramref name="count"/> - 1 children, all pointing to
+    /// page 1.
+    /// </summary>
+    private static IReadOnlyList<PdfBookmarkNode> BookmarksWithCount(int count)
+    {
+        var children = new List<PdfBookmarkNode>(count - 1);
+        for (int i = 1; i < count; ++i)
+        {
+            children.Add(new PdfBookmarkNode($"Child {i}", 1, null, null));
+        }
+
+        return [new PdfBookmarkNode("Root", 1, null, children)];
+    }
+
     [AvaloniaFact]
     public async Task PageNavigation_WithUnchangedScrollOffset_UpdatesActiveBookmark()
     {
@@ -217,5 +232,29 @@ public class DocumentViewModelBookmarkSyncTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal("Details", source.RowSelection.SelectedItem?.Title);
+    }
+
+    [AvaloniaFact]
+    public async Task Bookmarks_BelowExpandThreshold_AreExpanded()
+    {
+        // 499 bookmarks: one below the threshold.
+        var doc = NewDocumentWithBookmarks(BookmarksWithCount(499), pageCount: 1);
+
+        var source = await doc.BookmarksSource;
+        Assert.NotNull(source);
+
+        Assert.Equal(499, source!.Rows.Count);
+    }
+
+    [AvaloniaFact]
+    public async Task Bookmarks_AtExpandThreshold_AreNotExpanded()
+    {
+        // 500 bookmarks: only the root is realised, the outline stays collapsed.
+        var doc = NewDocumentWithBookmarks(BookmarksWithCount(500), pageCount: 1);
+
+        var source = await doc.BookmarksSource;
+        Assert.NotNull(source);
+
+        Assert.Single(source!.Rows);
     }
 }
