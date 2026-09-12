@@ -200,7 +200,11 @@ public partial class App : Application
         }
 #endif
 
-        services.AddSingleton<ISettingsService, JsonSettingsService>();
+        // Explicit factory, not AddSingleton<ISettingsService, JsonSettingsService>(): that overload
+        // reflects for a public constructor, and JsonSettingsService's is internal because it takes
+        // the internal ICalyWindowRegistry. Passing the registry here also keeps the "last window
+        // writes the settings" behaviour, which a registry-less constructor would silently lose.
+        services.AddSingleton<ISettingsService>(sp => new JsonSettingsService(sp.GetRequiredService<Visual>(), windowRegistry));
         services.AddSingleton<IFilesService, FilesService>();
         services.AddSingleton<IDialogService, DialogService>();
         services.AddSingleton<IClipboardService, ClipboardService>();
