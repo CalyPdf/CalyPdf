@@ -190,34 +190,67 @@ namespace Caly.Desktop
             ShowExceptionSafely(exception);
         }
 
+        /// <summary>
+        /// Skia's GPU resource budget. Avalonia's own default is 28 MiB, smaller than the tiles visible
+        /// at once, so Skia re-uploads tiles it has just evicted.
+        /// </summary>
+        /// <remarks>
+        /// <b>Process-wide, not per document.</b> Every platform Caly targets creates a single
+        /// <c>Compositor</c> per process, which builds one <c>GRContext</c> and applies this limit to it,
+        /// however many windows are open. Size it against the tiles visible simultaneously across all
+        /// visible windows — a tile is 512×512×4B = 1 MB — and deliberately <i>not</i> against
+        /// <c>TileCache</c>'s budget, which is per open document and bounds every cached tile, most of
+        /// which are never drawn and so never reach the GPU. The two are independent on purpose: raising
+        /// the tile cache for large documents must not silently inflate VRAM use on every machine.
+        /// </remarks>
+        private const long GpuResourceBudgetBytes = 256L * 1024 * 1024;
+
+        /// <summary>
+        /// Forces the software renderer when <c>CALY_RENDER_MODE=software</c>. GPU is the default;
+        /// this is the escape hatch for broken drivers, and how the two back-ends are measured
+        /// against each other.
+        /// </summary>
+        private static bool UseSoftwareRendering =>
+            string.Equals(Environment.GetEnvironmentVariable("CALY_RENDER_MODE"), "software",
+                StringComparison.OrdinalIgnoreCase);
+
         // Avalonia configuration, don't remove; also used by visual designer.
         public static AppBuilder BuildAvaloniaApp()
         {
             try
             {
-                // GPU rendering disabled for now
-                return AppBuilder.Configure<DesktopApp>()
+                bool software = UseSoftwareRendering;
+
+                var x11 = new X11PlatformOptions
+                {
+                    WmClass = Globals.AppName,
+                    ExternalGLibMainLoopExceptionLogger = ShowExceptionSafely,
+#pragma warning disable AVALONIA_X11_CSD
+                    EnableDrawnDecorations = true,
+#pragma warning restore AVALONIA_X11_CSD
+                };
+
+                if (software)
+                {
+                    x11.RenderingMode = [X11RenderingMode.Software];
+                }
+
+                var builder = AppBuilder.Configure<DesktopApp>()
                     .UsePlatformDetect()
                     .WithInterFont()
                     .UseSkia()
-                    .With(new Win32PlatformOptions
-                    {
-                        RenderingMode = [Win32RenderingMode.Software],
-                    })
-                    .With(new X11PlatformOptions
-                    {
-                        RenderingMode = [X11RenderingMode.Software],
-                        WmClass = Globals.AppName,
-                        ExternalGLibMainLoopExceptionLogger = ShowExceptionSafely,
-#pragma warning disable AVALONIA_X11_CSD
-                        EnableDrawnDecorations = true,
-#pragma warning restore AVALONIA_X11_CSD
-                    })
-                    .With(new AvaloniaNativePlatformOptions
-                    {
-                        RenderingMode = [AvaloniaNativeRenderingMode.Software]
-                    })
-                    .LogToTrace();
+                    .With(x11)
+                    // Inert under software rendering; see GpuResourceBudgetBytes for the sizing rationale.
+                    .With(new SkiaOptions { MaxGpuResourceSizeBytes = GpuResourceBudgetBytes });
+
+                if (software)
+                {
+                    builder = builder
+                        .With(new Win32PlatformOptions { RenderingMode = [Win32RenderingMode.Software] })
+                        .With(new AvaloniaNativePlatformOptions { RenderingMode = [AvaloniaNativeRenderingMode.Software] });
+                }
+
+                return builder.LogToTrace();
             }
             catch (Exception e)
             {

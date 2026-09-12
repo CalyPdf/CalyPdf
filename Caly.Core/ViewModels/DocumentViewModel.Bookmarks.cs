@@ -35,7 +35,9 @@ namespace Caly.Core.ViewModels;
 
 public partial class DocumentViewModel
 {
-    private const int MaxAutoExpandBookmarkCount = 1_500;
+    // internal so the tests can pin the real boundary rather than duplicating the number: a duplicated
+    // copy silently drifted when this was raised from 500, leaving the boundary effectively untested.
+    internal const int MaxAutoExpandBookmarkCount = 1_500;
 
     private readonly Lazy<Task<HierarchicalTreeDataGridSource<PdfBookmarkNode>?>> _bookmarksTask;
     public Task<HierarchicalTreeDataGridSource<PdfBookmarkNode>?> BookmarksSource => _bookmarksTask.Value;
