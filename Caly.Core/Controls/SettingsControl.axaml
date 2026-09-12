@@ -1,6 +1,7 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:controls="using:Caly.Core.Controls"
+                    xmlns:settings="using:Caly.Core.Controls.Settings"
                     xmlns:vm="clr-namespace:Caly.Core.ViewModels">
 
     <Design.PreviewWith>
@@ -20,7 +21,52 @@
                 <Border BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
                         BorderThickness="1">
 
-                    <controls:LicenseControl/>
+                    <!-- Vertical tab strip, matching the navigation tabs in DocumentTabView. -->
+                    <TabControl Name="PART_SettingsTabs"
+                                TabStripPlacement="Left"
+                                Padding="4,0,0,0">
+
+                        <!-- Rendering -->
+                        <TabItem MinHeight="40"
+                                 Focusable="False"
+                                 IsSelected="True">
+                            <TabItem.Header>
+                                <PathIcon Width="17"
+                                          Height="17"
+                                          Data="{StaticResource desktop_regular}">
+                                    <ToolTip.Tip>Rendering</ToolTip.Tip>
+                                </PathIcon>
+                            </TabItem.Header>
+                            <settings:SettingsRenderingView/>
+                        </TabItem>
+
+                        <!-- Debug -->
+                        <TabItem MinHeight="40"
+                                 Focusable="False">
+                            <TabItem.Header>
+                                <PathIcon Width="17"
+                                          Height="17"
+                                          Data="{StaticResource bug_regular}">
+                                    <ToolTip.Tip>Debug</ToolTip.Tip>
+                                </PathIcon>
+                            </TabItem.Header>
+                            <settings:SettingsDebugView/>
+                        </TabItem>
+
+                        <!-- About -->
+                        <TabItem MinHeight="40"
+                                 Focusable="False">
+                            <TabItem.Header>
+                                <PathIcon Width="17"
+                                          Height="17"
+                                          Data="{StaticResource info_regular}">
+                                    <ToolTip.Tip>About</ToolTip.Tip>
+                                </PathIcon>
+                            </TabItem.Header>
+                            <controls:LicenseControl/>
+                        </TabItem>
+
+                    </TabControl>
 
                 </Border>
 

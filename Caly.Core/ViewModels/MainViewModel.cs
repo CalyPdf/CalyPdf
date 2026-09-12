@@ -267,6 +267,16 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
         SelectedDocument?.SelectedTabIndex = 2;
     }
 
+    /// <summary>
+    /// Opens or closes the settings pane. Mirrors the gear toggle in the status bar, but reachable
+    /// from a key gesture so the pane can be driven without hitting the button.
+    /// </summary>
+    [RelayCommand]
+    private void ToggleSettingsPane()
+    {
+        IsSettingsPaneOpen = !IsSettingsPaneOpen;
+    }
+
     [RelayCommand]
     private Task CopyText(CancellationToken token)
     {

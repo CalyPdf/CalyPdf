@@ -72,12 +72,6 @@ SOFTWARE.</TextBox>
 
                     <Separator DockPanel.Dock="Top"/>
 
-                    <Button DockPanel.Dock="Bottom"
-                            Name="PART_OpenLogsButton"
-                            Content="Open logs folder"
-                            HorizontalAlignment="Left"
-                            Margin="0,5"/>
-
                     <Grid/>
 
                 </DockPanel>

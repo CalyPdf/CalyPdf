@@ -234,23 +234,40 @@ public class DocumentViewModelBookmarkSyncTests
         Assert.Equal("Details", source.RowSelection.SelectedItem?.Title);
     }
 
+    // The three tests below derive their counts from MaxAutoExpandBookmarkCount rather than hard-coding
+    // it, so raising the threshold cannot leave the boundary silently untested again.
+
     [AvaloniaFact]
     public async Task Bookmarks_BelowExpandThreshold_AreExpanded()
     {
-        // 499 bookmarks: one below the threshold.
-        var doc = NewDocumentWithBookmarks(BookmarksWithCount(499), pageCount: 1);
+        const int count = 499; // comfortably below the threshold: the ordinary outline case
+        var doc = NewDocumentWithBookmarks(BookmarksWithCount(count), pageCount: 1);
 
         var source = await doc.BookmarksSource;
         Assert.NotNull(source);
 
-        Assert.Equal(499, source!.Rows.Count);
+        Assert.Equal(count, source!.Rows.Count);
     }
 
     [AvaloniaFact]
-    public async Task Bookmarks_AtExpandThreshold_AreNotExpanded()
+    public async Task Bookmarks_AtExpandThreshold_AreExpanded()
     {
-        // 500 bookmarks: only the root is realised, the outline stays collapsed.
-        var doc = NewDocumentWithBookmarks(BookmarksWithCount(500), pageCount: 1);
+        // Exactly at the threshold. The check is inclusive, so this still expands.
+        const int count = DocumentViewModel.MaxAutoExpandBookmarkCount;
+        var doc = NewDocumentWithBookmarks(BookmarksWithCount(count), pageCount: 1);
+
+        var source = await doc.BookmarksSource;
+        Assert.NotNull(source);
+
+        Assert.Equal(count, source!.Rows.Count);
+    }
+
+    [AvaloniaFact]
+    public async Task Bookmarks_AboveExpandThreshold_AreNotExpanded()
+    {
+        // One past the threshold: only the root is realised, the outline stays collapsed.
+        const int count = DocumentViewModel.MaxAutoExpandBookmarkCount + 1;
+        var doc = NewDocumentWithBookmarks(BookmarksWithCount(count), pageCount: 1);
 
         var source = await doc.BookmarksSource;
         Assert.NotNull(source);

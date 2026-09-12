@@ -42,6 +42,11 @@ public sealed class CalySettings
 
     public bool ShowPdfLogs { get; set; }
 
+    public bool UseSoftwareRendering { get; set; }
+
+    /// <summary>Dumps render-path timings to the logs folder at exit. Absent means off.</summary>
+    public bool LogRenderTimings { get; set; }
+
     public CalySettingsDebug? Debug { get; set; }
 
 

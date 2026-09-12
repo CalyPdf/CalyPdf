@@ -1,0 +1,68 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Caly.Core.ViewModels"
+             x:Class="Caly.Core.Controls.Settings.SettingsDebugView"
+             x:DataType="vm:MainViewModel"
+             x:CompileBindings="True">
+
+    <StackPanel Margin="8" Spacing="6">
+
+        <TextBlock Text="Debug"
+                   FontWeight="SemiBold"/>
+
+        <CheckBox Content="Log render timings"
+                  IsChecked="{Binding LogRenderTimings, Mode=TwoWay}"
+                  ToolTip.Tip="Writes render-path timings to the logs folder when Caly exits."/>
+
+        <TextBlock Text="Applies after restarting Caly."
+                   FontSize="11"
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"/>
+
+        <Separator Margin="0,4"/>
+
+        <CheckBox Content="Show PDF logs"
+                  IsChecked="{Binding ShowPdfLogs, Mode=TwoWay}"
+                  ToolTip.Tip="Passes a logger to PdfPig while parsing, so problems found in a PDF are reported."/>
+
+        <TextBlock Text="Applies to the next document opened."
+                   FontSize="11"
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"/>
+
+        <Separator Margin="0,4"/>
+
+        <TextBlock Text="Renderer overlays"
+                   FontWeight="SemiBold"/>
+
+        <CheckBox Content="Render time graph"
+                  IsChecked="{Binding DebugRenderTimeGraph, Mode=TwoWay}"
+                  ToolTip.Tip="Draws Avalonia's render time graph over the window."/>
+
+        <CheckBox Content="Layout time graph"
+                  IsChecked="{Binding DebugLayoutTimeGraph, Mode=TwoWay}"
+                  ToolTip.Tip="Draws Avalonia's layout time graph over the window."/>
+
+        <CheckBox Content="FPS"
+                  IsChecked="{Binding DebugFps, Mode=TwoWay}"
+                  ToolTip.Tip="Shows the frames-per-second counter."/>
+
+        <CheckBox Content="Dirty rects"
+                  IsChecked="{Binding DebugDirtyRects, Mode=TwoWay}"
+                  ToolTip.Tip="Highlights the regions Avalonia repaints each frame."/>
+
+        <TextBlock Text="Overlays apply after restarting Caly."
+                   FontSize="11"
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"/>
+
+        <Separator Margin="0,4"/>
+
+        <Button Content="Open logs folder"
+                Command="{Binding OpenLogsFolderCommand}"
+                HorizontalAlignment="Left"
+                ToolTip.Tip="Opens the folder holding crash logs and render-timing dumps."/>
+
+    </StackPanel>
+
+</UserControl>

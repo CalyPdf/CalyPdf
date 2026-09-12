@@ -23,13 +23,14 @@
 		<KeyBinding Gesture="{x:Static utilities:CalyHotkeyConfiguration.DocumentPreviousGesture}" Command="{Binding ActivatePreviousDocumentCommand}"/>
         <KeyBinding Gesture="{x:Static utilities:CalyHotkeyConfiguration.DocumentPrintGesture}" Command="{Binding PrintDocumentCommand}"/>
         <KeyBinding Gesture="{x:Static utilities:CalyHotkeyConfiguration.DocumentSearchGesture}" Command="{Binding ActivateSearchTextTabCommand}" />
+        <KeyBinding Gesture="{x:Static utilities:CalyHotkeyConfiguration.SettingsGesture}" Command="{Binding ToggleSettingsPaneCommand}" />
 	</UserControl.KeyBindings>
 
 	<Grid RowDefinitions="*,22">
 
 		<SplitView Grid.Row="0"
                    IsPaneOpen="{Binding IsSettingsPaneOpen, Mode=TwoWay}"
-                   OpenPaneLength="300"
+                   OpenPaneLength="360"
                    CompactPaneLength="0"
                    DisplayMode="CompactOverlay"
                    PanePlacement="Right">
