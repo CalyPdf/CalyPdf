@@ -25,6 +25,8 @@ using System.IO;
 using System.Threading.Tasks;
 using Avalonia;
 using Caly.Core;
+using Caly.Core.Models;
+using Caly.Core.Services;
 using Caly.Core.Services.Interfaces;
 using Caly.Core.Utilities;
 using Microsoft.Extensions.DependencyInjection;
@@ -206,13 +208,13 @@ namespace Caly.Desktop
         private const long GpuResourceBudgetBytes = 256L * 1024 * 1024;
 
         /// <summary>
-        /// Forces the software renderer when <c>CALY_RENDER_MODE=software</c>. GPU is the default;
-        /// this is the escape hatch for broken drivers, and how the two back-ends are measured
-        /// against each other.
+        /// Forces the software renderer when <c>UseSoftwareRendering</c> is <c>true</c> in the settings
+        /// file. GPU is the default, so an absent key means GPU; this is the escape hatch for broken
+        /// drivers, and how the two back-ends are compared.
         /// </summary>
         private static bool UseSoftwareRendering =>
-            string.Equals(Environment.GetEnvironmentVariable("CALY_RENDER_MODE"), "software",
-                StringComparison.OrdinalIgnoreCase);
+            JsonSettingsService.TryReadBooleanSetting(nameof(CalySettings.UseSoftwareRendering), out bool software)
+            && software;
 
         // Avalonia configuration, don't remove; also used by visual designer.
         public static AppBuilder BuildAvaloniaApp()
