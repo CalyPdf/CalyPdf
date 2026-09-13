@@ -1,4 +1,4 @@
-// Copyright (c) 2025 BobLd
+// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,17 +18,17 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-using Avalonia.Controls.Primitives;
+using Avalonia.Controls;
 
-namespace Caly.Core.Controls;
+namespace Caly.Core.Controls.Settings;
 
 /// <summary>
-/// Control that displays application license information.
+/// Debug category of the settings pane.
 /// </summary>
-/// <remarks>
-/// The "Open logs folder" button used to live here and was wired up by name in
-/// <c>OnApplyTemplate</c>. It moved to the settings Debug tab, where it binds to
-/// <c>MainViewModel.OpenLogsFolderCommand</c>, so this control is now purely declarative.
-/// </remarks>
-public class LicenseControl : TemplatedControl
-{ }
+public partial class SettingsDebugView : UserControl
+{
+    public SettingsDebugView()
+    {
+        InitializeComponent();
+    }
+}
