@@ -44,10 +44,45 @@ namespace Caly.Core.ViewModels;
 public sealed partial class MainViewModel
 {
     /// <summary>
+    /// Whether pages are drawn on the GPU. On is the default.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The inverse of the stored <see cref="CalySettings.UseSoftwareRendering"/>: the setting records
+    /// the exception (force software), while the UI states the normal case (GPU is in use), which
+    /// reads better as a checkbox. The stored key keeps its meaning so
+    /// <c>Caly.Desktop/Program.cs</c> and the settings file are unaffected.
+    /// </para>
+    /// <para>
+    /// Only read while the <c>AppBuilder</c> is being configured, so a change applies from the next
+    /// launch. Note <see cref="GetSetting"/> yields <c>false</c> when no settings service is
+    /// available, so this reads as GPU-on in that case - which matches the actual default.
+    /// </para>
+    /// </remarks>
+    public bool UseGpuRendering
+    {
+        get => !GetSetting(static s => s.UseSoftwareRendering);
+        set => SetSetting(static (s, v) => s.UseSoftwareRendering = !v, value);
+    }
+
+    /// <summary>
+    /// Dumps render-path timings to the logs folder at exit.
+    /// <para>
+    /// Latched by <see cref="Services.Rendering.RenderTimings"/> at the first draw, so a change
+    /// applies from the next launch.
+    /// </para>
+    /// </summary>
+    public bool LogRenderTimings
+    {
+        get => GetSetting(static s => s.LogRenderTimings);
+        set => SetSetting(static (s, v) => s.LogRenderTimings = v, value);
+    }
+
+    /// <summary>
     /// Passes a logger to PdfPig while parsing.
     /// <para>
-    /// Read by <c>PdfPigDocumentService</c> each time a document is opened, so a change applies to
-    /// the next document rather than the next launch.
+    /// Read by <c>PdfPigDocumentService</c> each time a document is opened, so unlike the two
+    /// rendering flags a change applies to the next document rather than the next launch.
     /// </para>
     /// </summary>
     public bool ShowPdfLogs
@@ -58,7 +93,7 @@ public sealed partial class MainViewModel
 
     /*
      * Avalonia renderer overlays. Each maps to a RendererDebugOverlays flag that JsonSettingsService
-     * applies in the window's Opened handler, so they land at the next launch.
+     * applies in the window's Opened handler, so like the rendering flags they land at the next launch.
      *
      * CalySettings.Debug is null by default, hence the null-safe read and the ??= on write. Once
      * created it stays non-null even if every overlay is turned back off - the empty object is
@@ -90,7 +125,7 @@ public sealed partial class MainViewModel
     }
 
     /// <summary>
-    /// Opens the folder holding the crash logs.
+    /// Opens the folder holding the crash logs and the render-timing dumps.
     /// </summary>
     /// <remarks>
     /// Creates the folder first: nothing writes there until something is actually logged, so on a

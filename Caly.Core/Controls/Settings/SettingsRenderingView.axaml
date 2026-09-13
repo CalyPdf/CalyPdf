@@ -1,0 +1,24 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Caly.Core.ViewModels"
+             x:Class="Caly.Core.Controls.Settings.SettingsRenderingView"
+             x:DataType="vm:MainViewModel"
+             x:CompileBindings="True">
+
+    <StackPanel Margin="8" Spacing="6">
+
+        <TextBlock Text="Rendering"
+                   FontWeight="SemiBold"/>
+
+        <CheckBox Content="Use GPU rendering"
+                  IsChecked="{Binding UseGpuRendering, Mode=TwoWay}"
+                  ToolTip.Tip="Draws pages on the GPU, which is faster. Turn this off to fall back to CPU rendering if the GPU renderer misbehaves on your machine."/>
+
+        <TextBlock Text="Applies after restarting Caly."
+                   FontSize="11"
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"/>
+
+    </StackPanel>
+
+</UserControl>

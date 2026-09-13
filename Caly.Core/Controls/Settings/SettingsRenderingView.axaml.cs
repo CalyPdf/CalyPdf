@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2025 BobLd
+// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,50 +18,17 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-namespace Caly.Core.Models;
+using Avalonia.Controls;
 
-public sealed class CalySettings
+namespace Caly.Core.Controls.Settings;
+
+/// <summary>
+/// Rendering category of the settings pane.
+/// </summary>
+public partial class SettingsRenderingView : UserControl
 {
-    public static readonly CalySettings Default = new CalySettings()
+    public SettingsRenderingView()
     {
-        Width = 1000,
-        Height = 500,
-        PaneSize = 350,
-        Debug = null
-    };
-
-    // TODO - Add version for compatibility checks
-
-    public int Width { get; set; }
-
-    public int Height { get; set; }
-
-    public bool IsMaximised { get; set; }
-
-    public int PaneSize { get; set; }
-
-    public bool ShowPdfLogs { get; set; }
-
-    public bool UseSoftwareRendering { get; set; }
-
-    /// <summary>
-    /// Dumps render-path timings to the logs folder at exit. Absent means off.
-    /// </summary>
-    public bool LogRenderTimings { get; set; }
-
-    public CalySettingsDebug? Debug { get; set; }
-
-
-    public sealed class CalySettingsDebug
-    {
-        public bool Render { get; set; }
-        public bool Layout { get; set; }
-        public bool Fps { get; set; }
-        public bool DirtyRects { get; set; }
-    }
-    
-    public enum CalySettingsProperty
-    {
-        PaneSize = 0
+        InitializeComponent();
     }
 }
