@@ -35,7 +35,7 @@ namespace Caly.Core.ViewModels;
 
 public partial class DocumentViewModel
 {
-    private const int MaxAutoExpandBookmarkCount = 1_500;
+    internal const int MaxAutoExpandBookmarkCount = 1_500;
 
     private readonly Lazy<Task<HierarchicalTreeDataGridSource<PdfBookmarkNode>?>> _bookmarksTask;
     public Task<HierarchicalTreeDataGridSource<PdfBookmarkNode>?> BookmarksSource => _bookmarksTask.Value;
