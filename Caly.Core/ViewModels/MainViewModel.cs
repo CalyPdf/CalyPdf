@@ -268,6 +268,12 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
     }
 
     [RelayCommand]
+    private void ToggleSettingsPane()
+    {
+        IsSettingsPaneOpen = !IsSettingsPaneOpen;
+    }
+
+    [RelayCommand]
     private Task CopyText(CancellationToken token)
     {
         DocumentViewModel? vm = SelectedDocument;

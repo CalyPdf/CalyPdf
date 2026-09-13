@@ -1,0 +1,61 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:settings="using:Caly.Core.Controls.Settings"
+                    xmlns:vm="clr-namespace:Caly.Core.ViewModels">
+
+    <Design.PreviewWith>
+        <DockPanel Width="300" Height="700">
+            <DockPanel Background="{DynamicResource SystemRegionBrush}">
+                <settings:SettingsControl />
+            </DockPanel>
+        </DockPanel>
+    </Design.PreviewWith>
+
+    <ControlTheme x:Key="{x:Type settings:SettingsControl}"
+                  TargetType="settings:SettingsControl"
+                  x:DataType="vm:MainViewModel">
+        <Setter Property="Template">
+            <ControlTemplate>
+
+                <Border BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+                        BorderThickness="1">
+
+                    <TabControl Name="PART_SettingsTabs"
+                                TabStripPlacement="Left"
+                                Padding="4,0,0,0">
+
+                        <!-- Debug -->
+                        <TabItem MinHeight="40"
+                                 Focusable="False"
+                                 IsSelected="True">
+                            <TabItem.Header>
+                                <PathIcon Width="17"
+                                          Height="17"
+                                          Data="{StaticResource bug_regular}">
+                                    <ToolTip.Tip>Debug</ToolTip.Tip>
+                                </PathIcon>
+                            </TabItem.Header>
+                            <settings:SettingsDebugView/>
+                        </TabItem>
+
+                        <!-- About -->
+                        <TabItem MinHeight="40"
+                                 Focusable="False">
+                            <TabItem.Header>
+                                <PathIcon Width="17"
+                                          Height="17"
+                                          Data="{StaticResource info_regular}">
+                                    <ToolTip.Tip>About</ToolTip.Tip>
+                                </PathIcon>
+                            </TabItem.Header>
+                            <settings:LicenseControl/>
+                        </TabItem>
+
+                    </TabControl>
+
+                </Border>
+
+            </ControlTemplate>
+        </Setter>
+    </ControlTheme>
+</ResourceDictionary>

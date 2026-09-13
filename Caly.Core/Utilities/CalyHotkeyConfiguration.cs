@@ -75,6 +75,11 @@ internal static class CalyHotkeyConfiguration
     public static KeyGesture DocumentSearchGesture => new KeyGesture(Key.F, CommandModifiers);
 
     /// <summary>
+    /// Gets a platform-specific <see cref="KeyGesture"/> for toggling the settings pane.
+    /// </summary>
+    public static KeyGesture SettingsGesture => new KeyGesture(Key.OemComma, CommandModifiers);
+
+    /// <summary>
     /// Gets a platform-specific <see cref="KeyGesture"/> for the 'Close Document' action.
     /// </summary>
     public static KeyGesture DocumentCloseGesture => new KeyGesture(Key.F4, CommandModifiers);

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 BobLd
+// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,7 +20,7 @@
 
 using Avalonia.Controls.Primitives;
 
-namespace Caly.Core.Controls;
+namespace Caly.Core.Controls.Settings;
 
 public class SettingsControl : TemplatedControl
 { }

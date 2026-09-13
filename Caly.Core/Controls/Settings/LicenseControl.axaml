@@ -1,19 +1,19 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:controls="using:Caly.Core.Controls"
+                    xmlns:settings="using:Caly.Core.Controls.Settings"
                     xmlns:vm="clr-namespace:Caly.Core.ViewModels">
 
     <Design.PreviewWith>
         <StackPanel Width="300" Height="500" Spacing="10">
             <StackPanel Background="{DynamicResource SystemRegionBrush}">
-                <controls:LicenseControl />
+                <settings:LicenseControl />
             </StackPanel>
         </StackPanel>
     </Design.PreviewWith>
 
-    <ControlTheme x:Key="{x:Type controls:LicenseControl}"
+    <ControlTheme x:Key="{x:Type settings:LicenseControl}"
                   x:DataType="vm:MainViewModel"
-                  TargetType="controls:LicenseControl">
+                  TargetType="settings:LicenseControl">
 
         <Setter Property="MinWidth" Value="300"/>
         <Setter Property="Template">
@@ -71,12 +71,6 @@ SOFTWARE.</TextBox>
                     </HyperlinkButton>
 
                     <Separator DockPanel.Dock="Top"/>
-
-                    <Button DockPanel.Dock="Bottom"
-                            Name="PART_OpenLogsButton"
-                            Content="Open logs folder"
-                            HorizontalAlignment="Left"
-                            Margin="0,5"/>
 
                     <Grid/>
 
