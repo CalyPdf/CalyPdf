@@ -19,8 +19,8 @@
 
                 <ResourceInclude Source="avares://Caly.Core/Controls/FullSearchPanelControl.axaml"/>
                 <ResourceInclude Source="avares://Caly.Core/Controls/VerticalSeparator.axaml"/>
-                <ResourceInclude Source="avares://Caly.Core/Controls/SettingsControl.axaml"/>
-                <ResourceInclude Source="avares://Caly.Core/Controls/LicenseControl.axaml"/>
+                <ResourceInclude Source="avares://Caly.Core/Controls/Settings/SettingsControl.axaml"/>
+                <ResourceInclude Source="avares://Caly.Core/Controls/Settings/LicenseControl.axaml"/>
 			</ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
 	</Application.Resources>

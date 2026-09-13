@@ -1,4 +1,4 @@
-// Copyright (c) 2025 BobLd
+// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,40 +18,17 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-using System.IO;
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
-using Avalonia.Interactivity;
-using Avalonia.LogicalTree;
-using Caly.Core.Services;
-using Caly.Core.Utilities;
 
-namespace Caly.Core.Controls;
+namespace Caly.Core.Controls.Settings;
 
 /// <summary>
-/// Control that displays application license information.
+/// Debug category of the settings pane.
 /// </summary>
-public class LicenseControl : TemplatedControl
+public partial class SettingsDebugView : UserControl
 {
-    private Button? _openLogsButton;
-    protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
+    public SettingsDebugView()
     {
-        base.OnApplyTemplate(e);
-
-        _openLogsButton = e.NameScope.Find<Button>("PART_OpenLogsButton");
-        _openLogsButton?.Click += OnOpenLogsButtonClick;
-    }
-
-    protected override void OnDetachedFromLogicalTree(LogicalTreeAttachmentEventArgs e)
-    {
-        base.OnDetachedFromLogicalTree(e);
-
-        _openLogsButton?.Click -= OnOpenLogsButtonClick;
-    }
-
-    private static void OnOpenLogsButtonClick(object? sender, RoutedEventArgs e)
-    {
-        Directory.CreateDirectory(JsonSettingsService.LogFilePath);
-        CalyExtensions.OpenDirectory(JsonSettingsService.LogFilePath);
+        InitializeComponent();
     }
 }
