@@ -51,6 +51,34 @@
 
 		<DirectPInvoke Include="libHarfBuzzSharp" />
 		<NativeLibrary Include="..\native\libHarfBuzzSharp.lib" />
+
+		<!--
+		  ANGLE, so the GPU renderer survives a Portable publish. Avalonia P/Invokes exactly one
+		  module, av_libGLESv2 (Avalonia.Win32/OpenGl/Angle/AngleEglInterface.cs), and ships no
+		  av_libEGL.dll - but its libGLESv2 exports no egl* entry points, so libEGL_static has to be
+		  linked alongside or eglInitialize/eglGetProcAddress go unresolved.
+		  Built from AvaloniaUI/angle @ avalonia-fork-master, matching the av_libglesv2.dll that
+		  Avalonia.Angle.Windows.Natives ships - see native/README.md.
+		-->
+		<DirectPInvoke Include="av_libGLESv2" />
+		<NativeLibrary Include="..\native\libGLESv2_static.lib" />
+		<NativeLibrary Include="..\native\libEGL_static.lib" />
+		<NativeLibrary Include="..\native\libANGLE_static.lib" />
+
+		<!--
+		  System imports ANGLE needs. libGLESv2_static is built with complete_static_lib, so it bundles
+		  every backend - D3D11, D3D9 and WGL - not just the D3D11 one Avalonia uses. gdi32 (pixel
+		  format / SwapBuffers) and d3d9 (Direct3DCreate9, D3DPERF_*) are pulled in by those extra
+		  backends; Synchronization covers WaitOnAddress/WakeByAddressSingle.
+		  Slimming this would mean rebuilding ANGLE with angle_enable_d3d9/angle_enable_gl = false.
+		-->
+		<NativeLibrary Include="d3d11.lib" />
+		<NativeLibrary Include="dxgi.lib" />
+		<NativeLibrary Include="dxguid.lib" />
+		<NativeLibrary Include="d3dcompiler.lib" />
+		<NativeLibrary Include="d3d9.lib" />
+		<NativeLibrary Include="gdi32.lib" />
+		<NativeLibrary Include="Synchronization.lib" />
 	</ItemGroup>
 
 	<ItemGroup Condition="'$(Configuration)'=='Portable' And $(RuntimeIdentifier) == 'linux-x64'">
