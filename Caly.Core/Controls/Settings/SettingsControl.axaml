@@ -24,10 +24,23 @@
                                 TabStripPlacement="Left"
                                 Padding="4,0,0,0">
 
-                        <!-- Debug -->
+                        <!-- Rendering -->
                         <TabItem MinHeight="40"
                                  Focusable="False"
                                  IsSelected="True">
+                            <TabItem.Header>
+                                <PathIcon Width="17"
+                                          Height="17"
+                                          Data="{StaticResource desktop_regular}">
+                                    <ToolTip.Tip>Rendering</ToolTip.Tip>
+                                </PathIcon>
+                            </TabItem.Header>
+                            <settings:SettingsRenderingView/>
+                        </TabItem>
+
+                        <!-- Debug -->
+                        <TabItem MinHeight="40"
+                                 Focusable="False">
                             <TabItem.Header>
                                 <PathIcon Width="17"
                                           Height="17"

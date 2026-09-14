@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
@@ -39,7 +40,7 @@ namespace Caly.Core.Services;
 [JsonSerializable(typeof(CalySettings), GenerationMode = JsonSourceGenerationMode.Metadata)]
 internal partial class SourceGenerationContext : JsonSerializerContext;
 
-internal sealed class JsonSettingsService : ISettingsService
+public sealed class JsonSettingsService : ISettingsService
 {
     private const string SettingsFileName = "caly_settings";
 
@@ -71,7 +72,124 @@ internal sealed class JsonSettingsService : ISettingsService
     
     private static readonly string SettingsFileFullPath = Path.Combine(SettingsFilePath, SettingsFileName);
 
-    public JsonSettingsService(Visual target, ICalyWindowRegistry? windowRegistry = null)
+    private const long MaxSettingsFileBytes = 1024 * 1024;
+
+    private static ReadOnlySpan<byte> Utf8Bom => [0xEF, 0xBB, 0xBF];
+
+    /// <summary>
+    /// Reads one top-level boolean straight out of the settings file, without deserialising the rest
+    /// of it and without needing an instance of this service.
+    /// </summary>
+    public static bool TryReadBooleanSetting(string propertyName, out bool value)
+    {
+        return TryReadBooleanSetting(null, propertyName, out value);
+    }
+
+    /// <summary>
+    /// Same as <see cref="TryReadBooleanSetting(string, out bool)"/>, but when <paramref name="sectionName"/>
+    /// is not <c>null</c> the boolean is read from inside that top-level object, e.g. <c>Debug</c>.
+    /// </summary>
+    public static bool TryReadBooleanSetting(string? sectionName, string propertyName, out bool value)
+    {
+        value = false;
+
+        try
+        {
+            if (!File.Exists(SettingsFileFullPath))
+            {
+                return false;
+            }
+
+            using var stream = new FileStream(SettingsFileFullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+
+            if (stream.Length is 0 or > MaxSettingsFileBytes)
+            {
+                return false;
+            }
+
+            int length = (int)stream.Length;
+            byte[]? bufferRented = null;
+            Span<byte> buffer = length <= 1_024 ? stackalloc byte[length] :
+                bufferRented = ArrayPool<byte>.Shared.Rent(length);
+
+            try
+            {
+                int read = stream.ReadAtLeast(buffer.Slice(0, length), length, throwOnEndOfStream: false);
+                ReadOnlySpan<byte> json = buffer.Slice(0, read);
+
+                // JsonSerializer never writes a BOM, but a hand-edited file can carry one and
+                // Utf8JsonReader would reject it.
+                if (json.StartsWith(Utf8Bom))
+                {
+                    json = json[Utf8Bom.Length..];
+                }
+
+                var reader = new Utf8JsonReader(json);
+                if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
+                {
+                    return false;
+                }
+
+                if (sectionName is not null &&
+                    (!TrySeekProperty(ref reader, sectionName) || reader.TokenType != JsonTokenType.StartObject))
+                {
+                    return false;
+                }
+
+                if (!TrySeekProperty(ref reader, propertyName) ||
+                    reader.TokenType is not (JsonTokenType.True or JsonTokenType.False))
+                {
+                    return false;
+                }
+
+                value = reader.GetBoolean();
+                return true;
+            }
+            finally
+            {
+                if (bufferRented is not null)
+                {
+                    ArrayPool<byte>.Shared.Return(bufferRented);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteExceptionToFile(ex);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Scans the properties of the object the reader is positioned on (its <c>StartObject</c>) and
+    /// stops on the value of <paramref name="propertyName"/>. Nested objects and arrays are skipped.
+    /// </summary>
+    private static bool TrySeekProperty(ref Utf8JsonReader reader, string propertyName)
+    {
+        while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
+        {
+            bool isMatch = reader.ValueTextEquals(propertyName);
+
+            if (!reader.Read())
+            {
+                return false;
+            }
+
+            if (isMatch)
+            {
+                return true;
+            }
+
+            if (reader.TokenType is JsonTokenType.StartObject or JsonTokenType.StartArray)
+            {
+                reader.Skip();
+            }
+        }
+
+        return false;
+    }
+
+    internal JsonSettingsService(Visual target, ICalyWindowRegistry? windowRegistry = null)
     {
         if (Globals.IsMobilePlatform())
         {
@@ -437,6 +555,12 @@ internal sealed class JsonSettingsService : ISettingsService
 
             using (FileStream createStream = File.OpenRead(SettingsFileFullPath))
             {
+                if (createStream.Length is 0 or > MaxSettingsFileBytes)
+                {
+                    HandleCorruptedFile();
+                    return;
+                }
+
                 _current = JsonSerializer.Deserialize(createStream, SourceGenerationContext.Default.CalySettings);
                 ValidateSetting(_current);
             }

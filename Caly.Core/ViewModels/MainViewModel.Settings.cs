@@ -33,6 +33,18 @@ namespace Caly.Core.ViewModels;
 
 public sealed partial class MainViewModel
 {
+    public bool UseGpuRendering
+    {
+        get => !GetSetting(static s => s.UseSoftwareRendering);
+        set => SetSetting(static (s, v) => s.UseSoftwareRendering = !v, value);
+    }
+
+    public bool LogRenderTimings
+    {
+        get => GetSetting(static s => s.Debug?.LogRenderTimings ?? false);
+        set => SetSetting(static (s, v) => (s.Debug ??= new CalySettings.CalySettingsDebug()).LogRenderTimings = v, value);
+    }
+
     public bool ShowPdfLogs
     {
         get => GetSetting(static s => s.ShowPdfLogs);

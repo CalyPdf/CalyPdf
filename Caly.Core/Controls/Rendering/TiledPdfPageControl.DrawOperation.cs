@@ -22,6 +22,7 @@ using Avalonia;
 using Avalonia.Media;
 using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
+using Caly.Core.Services.Rendering;
 using SkiaSharp;
 using System;
 using System.Buffers;
@@ -85,6 +86,14 @@ public partial class TiledPdfPageControl
                 return;
             }
 
+            bool timing = RenderTimings.IsEnabled;
+            long startTicks = 0;
+            if (timing)
+            {
+                RenderTimings.RecordBackend(lease);
+                startTicks = System.Diagnostics.Stopwatch.GetTimestamp();
+            }
+
 #if DEBUG
             using var backgroundPaint = new SKPaint();
             backgroundPaint.Style = SKPaintStyle.Fill;
@@ -102,6 +111,11 @@ public partial class TiledPdfPageControl
             }
 
             canvas.Restore();
+
+            if (timing)
+            {
+                RenderTimings.RecordDraw(System.Diagnostics.Stopwatch.GetTimestamp() - startTicks, _tileCount);
+            }
 
 #if DEBUG
             using var borderPaint = new SKPaint();

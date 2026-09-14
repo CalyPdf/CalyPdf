@@ -153,7 +153,11 @@ public class SettingsPersistenceAcrossWindowsTests
         var services = new ServiceCollection();
         services.AddSingleton<ICalyWindowRegistry>(registry);
         services.AddSingleton<Avalonia.Visual>(_ => primaryWindow);
-        services.AddSingleton<ISettingsService, JsonSettingsService>();
+        // Same factory registration as App.axaml.cs. The AddSingleton<TService, TImplementation>()
+        // overload cannot be used: it reflects for a public constructor, and JsonSettingsService's is
+        // internal because it takes the internal ICalyWindowRegistry.
+        services.AddSingleton<ISettingsService>(sp =>
+            new JsonSettingsService(sp.GetRequiredService<Avalonia.Visual>(), registry));
 
         var settings = (JsonSettingsService)services.BuildServiceProvider()
             .GetRequiredService<ISettingsService>();

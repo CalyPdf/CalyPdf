@@ -25,6 +25,8 @@ using System.IO;
 using System.Threading.Tasks;
 using Avalonia;
 using Caly.Core;
+using Caly.Core.Models;
+using Caly.Core.Services;
 using Caly.Core.Services.Interfaces;
 using Caly.Core.Utilities;
 using Microsoft.Extensions.DependencyInjection;
@@ -190,34 +192,60 @@ namespace Caly.Desktop
             ShowExceptionSafely(exception);
         }
 
+        /// <summary>
+        /// Skia's GPU resource budget. Avalonia's own default is 28 MiB, smaller than the tiles visible
+        /// at once, so Skia re-uploads tiles it has just evicted.
+        /// </summary>
+        private const long GpuResourceBudgetBytes = 256L * 1024 * 1024;
+
+        /// <summary>
+        /// Forces the software renderer when <c>UseSoftwareRendering</c> is <c>true</c> in the settings
+        /// file. GPU is the default, so an absent key means GPU.
+        /// </summary>
+        private static bool UseSoftwareRendering =>
+            JsonSettingsService.TryReadBooleanSetting(nameof(CalySettings.UseSoftwareRendering), out bool software)
+            && software;
+
         // Avalonia configuration, don't remove; also used by visual designer.
         public static AppBuilder BuildAvaloniaApp()
         {
             try
             {
-                // GPU rendering disabled for now
-                return AppBuilder.Configure<DesktopApp>()
+                bool software = UseSoftwareRendering;
+
+                var x11 = new X11PlatformOptions
+                {
+                    WmClass = Globals.AppName,
+                    ExternalGLibMainLoopExceptionLogger = ShowExceptionSafely,
+#pragma warning disable AVALONIA_X11_CSD
+                    EnableDrawnDecorations = true,
+#pragma warning restore AVALONIA_X11_CSD
+                };
+
+                if (software)
+                {
+                    x11.RenderingMode = [X11RenderingMode.Software];
+                }
+
+                var builder = AppBuilder.Configure<DesktopApp>()
                     .UsePlatformDetect()
                     .WithInterFont()
                     .UseSkia()
-                    .With(new Win32PlatformOptions
+                    .With(x11)
+                    .With(new SkiaOptions
                     {
-                        RenderingMode = [Win32RenderingMode.Software],
-                    })
-                    .With(new X11PlatformOptions
-                    {
-                        RenderingMode = [X11RenderingMode.Software],
-                        WmClass = Globals.AppName,
-                        ExternalGLibMainLoopExceptionLogger = ShowExceptionSafely,
-#pragma warning disable AVALONIA_X11_CSD
-                        EnableDrawnDecorations = true,
-#pragma warning restore AVALONIA_X11_CSD
-                    })
-                    .With(new AvaloniaNativePlatformOptions
-                    {
-                        RenderingMode = [AvaloniaNativeRenderingMode.Software]
-                    })
-                    .LogToTrace();
+                        // Inert under software rendering
+                        MaxGpuResourceSizeBytes = GpuResourceBudgetBytes
+                    });
+
+                if (software)
+                {
+                    builder = builder
+                        .With(new Win32PlatformOptions { RenderingMode = [Win32RenderingMode.Software] })
+                        .With(new AvaloniaNativePlatformOptions { RenderingMode = [AvaloniaNativeRenderingMode.Software] });
+                }
+
+                return builder.LogToTrace();
             }
             catch (Exception e)
             {

@@ -10,6 +10,17 @@
         <TextBlock Text="Debug"
                    FontWeight="SemiBold"/>
 
+        <CheckBox Content="Log render timings"
+                  IsChecked="{Binding LogRenderTimings, Mode=TwoWay}"
+                  ToolTip.Tip="Writes render-path timings to the logs folder when Caly exits."/>
+
+        <TextBlock Text="Applies after restarting Caly."
+                   FontSize="11"
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"/>
+
+        <Separator Margin="0,4"/>
+
         <CheckBox Content="Show PDF logs in popups"
                   IsChecked="{Binding ShowPdfLogs, Mode=TwoWay}"
                   ToolTip.Tip="Problems found in a PDF are reported in popups."/>
