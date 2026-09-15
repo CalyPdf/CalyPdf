@@ -115,6 +115,7 @@ public partial class TiledPdfPageControl
             if (timing)
             {
                 RenderTimings.RecordDraw(System.Diagnostics.Stopwatch.GetTimestamp() - startTicks, _tileCount);
+                RenderTimings.RecordGpuCache(lease?.GrContext);
             }
 
 #if DEBUG

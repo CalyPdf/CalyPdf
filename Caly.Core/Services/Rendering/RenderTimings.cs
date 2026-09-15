@@ -20,6 +20,7 @@
 
 using Avalonia.Skia;
 using Caly.Core.Models;
+using SkiaSharp;
 using System;
 using System.IO;
 using System.Text;
@@ -58,6 +59,9 @@ public static class RenderTimings
     private static long _maxDrawTicks;
     private static long _tilesDrawn;
 
+    private static long _peakGpuCacheBytes;
+    private static int _peakGpuCacheCount;
+
     private static string? _backend;
     private static int _exitHookInstalled;
 
@@ -75,6 +79,48 @@ public static class RenderTimings
         while (ticks > observed)
         {
             long actual = Interlocked.CompareExchange(ref _maxDrawTicks, ticks, observed);
+            if (actual == observed)
+            {
+                break;
+            }
+
+            observed = actual;
+        }
+    }
+
+    /// <summary>
+    /// Records the size of Skia's GPU resource cache - the textures tiles are uploaded into. Must be
+    /// called on the render thread, where the <see cref="GRContext"/> is current.
+    /// </summary>
+    public static void RecordGpuCache(GRContext? grContext)
+    {
+        if (grContext is null)
+        {
+            return;
+        }
+
+        grContext.GetResourceCacheUsage(out int count, out long bytes);
+        UpdateMax(ref _peakGpuCacheBytes, bytes);
+
+        int observedCount = Volatile.Read(ref _peakGpuCacheCount);
+        while (count > observedCount)
+        {
+            int actual = Interlocked.CompareExchange(ref _peakGpuCacheCount, count, observedCount);
+            if (actual == observedCount)
+            {
+                break;
+            }
+
+            observedCount = actual;
+        }
+    }
+
+    private static void UpdateMax(ref long target, long value)
+    {
+        long observed = Interlocked.Read(ref target);
+        while (value > observed)
+        {
+            long actual = Interlocked.CompareExchange(ref target, value, observed);
             if (actual == observed)
             {
                 break;
@@ -136,6 +182,7 @@ public static class RenderTimings
         sb.AppendLine($"Mean draw time : {ticks * toMs / count:F3} ms");
         sb.AppendLine($"Max draw time  : {maxTicks * toMs:F3} ms");
         sb.AppendLine($"Peak working set: {Environment.WorkingSet / (1024.0 * 1024.0):F0} MB");
+        sb.AppendLine($"Peak GPU cache : {Interlocked.Read(ref _peakGpuCacheBytes) / (1024.0 * 1024.0):F1} MB, {Volatile.Read(ref _peakGpuCacheCount)} resources");
 
         try
         {
