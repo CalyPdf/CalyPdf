@@ -266,6 +266,7 @@ public sealed class TileCache : IDisposable
 
             _entries[key] = entry;
             _currentMemoryBytes += memorySize;
+            RenderTimings.AddTileCacheBytes(memorySize);
 
             // Update secondary indexes
             if (!_pageKeys.TryGetValue(key.PageNumber, out var keys))
@@ -603,6 +604,7 @@ public sealed class TileCache : IDisposable
         }
 
         _currentMemoryBytes -= entry.MemorySize;
+        RenderTimings.AddTileCacheBytes(-entry.MemorySize);
     }
 
     public void Dispose()
@@ -619,6 +621,7 @@ public sealed class TileCache : IDisposable
             _pageKeys.Clear();
             _pageLevels.Clear();
             _blankKeys.Clear();
+            RenderTimings.AddTileCacheBytes(-_currentMemoryBytes);
             _currentMemoryBytes = 0;
         }
     }

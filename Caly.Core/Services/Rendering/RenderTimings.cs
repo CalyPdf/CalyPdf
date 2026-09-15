@@ -20,7 +20,10 @@
 
 using Avalonia.Skia;
 using Caly.Core.Models;
+using SkiaSharp;
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Threading;
@@ -53,13 +56,38 @@ public static class RenderTimings
             nameof(CalySettings.CalySettingsDebug.LogRenderTimings), out bool enabled)
         && enabled;
 
+    private const int SampleIntervalMs = 250;
+
     private static long _drawCount;
     private static long _drawTicks;
     private static long _maxDrawTicks;
     private static long _tilesDrawn;
 
+    private static long _tileCacheBytes;
+    private static long _peakTileCacheBytes;
+
+    private static long _gpuCacheBytes;
+    private static long _peakGpuCacheBytes;
+    private static int _gpuCacheCount;
+    private static int _peakGpuCacheCount;
+    private static long _gpuCacheLimit;
+
     private static string? _backend;
     private static int _exitHookInstalled;
+
+    private static readonly List<MemorySample> _samples = new();
+    private static volatile bool _stopSampler;
+    private static Thread? _sampler;
+
+    private readonly record struct MemorySample(
+        long ElapsedMs,
+        long WorkingSet,
+        long PrivateBytes,
+        long ManagedHeap,
+        long TileCacheBytes,
+        long GpuCacheBytes,
+        int GpuCacheCount,
+        long DrawCount);
 
     /// <summary>
     /// Records one completed tile draw operation. <paramref name="ticks"/> is a
@@ -70,18 +98,44 @@ public static class RenderTimings
         Interlocked.Increment(ref _drawCount);
         Interlocked.Add(ref _drawTicks, ticks);
         Interlocked.Add(ref _tilesDrawn, tiles);
+        UpdateMax(ref _maxDrawTicks, ticks);
+    }
 
-        long observed = Interlocked.Read(ref _maxDrawTicks);
-        while (ticks > observed)
+    /// <summary>
+    /// Records the size of Skia's GPU resource cache - the textures tiles were uploaded into. Must be
+    /// called on the render thread, where the context is current.
+    /// </summary>
+    public static void RecordGpuCache(GRContext? grContext)
+    {
+        if (grContext is null)
         {
-            long actual = Interlocked.CompareExchange(ref _maxDrawTicks, ticks, observed);
-            if (actual == observed)
-            {
-                break;
-            }
-
-            observed = actual;
+            return;
         }
+
+        grContext.GetResourceCacheUsage(out int count, out long bytes);
+
+        Volatile.Write(ref _gpuCacheBytes, bytes);
+        Volatile.Write(ref _gpuCacheCount, count);
+        UpdateMax(ref _peakGpuCacheBytes, bytes);
+        UpdateMax(ref _peakGpuCacheCount, count);
+
+        if (Volatile.Read(ref _gpuCacheLimit) == 0)
+        {
+            Volatile.Write(ref _gpuCacheLimit, grContext.GetResourceCacheLimit());
+        }
+    }
+
+    /// <summary>
+    /// Tracks host-side tile memory across every <see cref="TileCache"/> in the process.
+    /// </summary>
+    public static void AddTileCacheBytes(long delta)
+    {
+        if (!IsEnabled || delta == 0)
+        {
+            return;
+        }
+
+        UpdateMax(ref _peakTileCacheBytes, Interlocked.Add(ref _tileCacheBytes, delta));
     }
 
     /// <summary>
@@ -102,13 +156,84 @@ public static class RenderTimings
         EnsureExitHook();
     }
 
+    private static void UpdateMax(ref long target, long value)
+    {
+        long observed = Interlocked.Read(ref target);
+        while (value > observed)
+        {
+            long actual = Interlocked.CompareExchange(ref target, value, observed);
+            if (actual == observed)
+            {
+                break;
+            }
+
+            observed = actual;
+        }
+    }
+
+    private static void UpdateMax(ref int target, int value)
+    {
+        int observed = Volatile.Read(ref target);
+        while (value > observed)
+        {
+            int actual = Interlocked.CompareExchange(ref target, value, observed);
+            if (actual == observed)
+            {
+                break;
+            }
+
+            observed = actual;
+        }
+    }
+
     private static void EnsureExitHook()
     {
         if (Interlocked.Exchange(ref _exitHookInstalled, 1) == 0)
         {
             AppDomain.CurrentDomain.ProcessExit += static (_, _) => Dump();
+
+            _sampler = new Thread(SampleMemory)
+            {
+                IsBackground = true,
+                Name = "Caly render memory sampler",
+                Priority = ThreadPriority.BelowNormal
+            };
+            _sampler.Start();
         }
     }
+
+    /// <summary>
+    /// Samples process memory on its own thread so the render thread never pays for it.
+    /// </summary>
+    private static void SampleMemory()
+    {
+        using var process = System.Diagnostics.Process.GetCurrentProcess();
+        long start = System.Diagnostics.Stopwatch.GetTimestamp();
+
+        while (!_stopSampler)
+        {
+            process.Refresh();
+
+            var sample = new MemorySample(
+                (long)System.Diagnostics.Stopwatch.GetElapsedTime(start).TotalMilliseconds,
+                process.WorkingSet64,
+                process.PrivateMemorySize64,
+                GC.GetTotalMemory(false),
+                Interlocked.Read(ref _tileCacheBytes),
+                Interlocked.Read(ref _gpuCacheBytes),
+                Volatile.Read(ref _gpuCacheCount),
+                Interlocked.Read(ref _drawCount));
+
+            lock (_samples)
+            {
+                _samples.Add(sample);
+            }
+
+            Thread.Sleep(SampleIntervalMs);
+        }
+    }
+
+    private static string Mb(long bytes) => (bytes / (1024.0 * 1024.0)).ToString("F0", CultureInfo.InvariantCulture);
 
     /// <summary>
     /// Writes the accumulated summary next to the crash logs. Safe to call more than once.
@@ -121,6 +246,29 @@ public static class RenderTimings
             return;
         }
 
+        _stopSampler = true;
+        _sampler?.Join(SampleIntervalMs * 2);
+
+        MemorySample[] samples;
+        lock (_samples)
+        {
+            samples = _samples.ToArray();
+        }
+
+        long peakWs = 0, peakPrivate = 0, peakManaged = 0;
+        foreach (var s in samples)
+        {
+            peakWs = Math.Max(peakWs, s.WorkingSet);
+            peakPrivate = Math.Max(peakPrivate, s.PrivateBytes);
+            peakManaged = Math.Max(peakManaged, s.ManagedHeap);
+        }
+
+        long osPeakWs;
+        using (var process = System.Diagnostics.Process.GetCurrentProcess())
+        {
+            osPeakWs = process.PeakWorkingSet64;
+        }
+
         long ticks = Interlocked.Read(ref _drawTicks);
         long maxTicks = Interlocked.Read(ref _maxDrawTicks);
         long tiles = Interlocked.Read(ref _tilesDrawn);
@@ -129,20 +277,40 @@ public static class RenderTimings
 
         var sb = new StringBuilder();
         sb.AppendLine("Caly render timings");
-        sb.AppendLine($"Backend        : {_backend ?? "unknown"}");
-        sb.AppendLine($"Draw ops       : {count}");
-        sb.AppendLine($"Tiles drawn    : {tiles} (avg {tiles / (double)count:F1} per op)");
-        sb.AppendLine($"Total draw time: {ticks * toMs:F1} ms");
-        sb.AppendLine($"Mean draw time : {ticks * toMs / count:F3} ms");
-        sb.AppendLine($"Max draw time  : {maxTicks * toMs:F3} ms");
-        sb.AppendLine($"Peak working set: {Environment.WorkingSet / (1024.0 * 1024.0):F0} MB");
+        sb.AppendLine($"Backend             : {_backend ?? "unknown"}");
+        sb.AppendLine($"Draw ops            : {count}");
+        sb.AppendLine($"Tiles drawn         : {tiles} (avg {tiles / (double)count:F1} per op)");
+        sb.AppendLine($"Total draw time     : {ticks * toMs:F1} ms");
+        sb.AppendLine($"Mean draw time      : {ticks * toMs / count:F3} ms");
+        sb.AppendLine($"Max draw time       : {maxTicks * toMs:F3} ms");
+        sb.AppendLine($"Peak working set    : {Mb(osPeakWs)} MB (OS peak; sampled {Mb(peakWs)} MB)");
+        sb.AppendLine($"Peak private bytes  : {Mb(peakPrivate)} MB (sampled)");
+        sb.AppendLine($"Peak managed heap   : {Mb(peakManaged)} MB (sampled)");
+        sb.AppendLine($"Peak tile cache     : {Mb(Interlocked.Read(ref _peakTileCacheBytes))} MB (all documents)");
+        sb.AppendLine($"Peak GPU cache      : {Mb(Interlocked.Read(ref _peakGpuCacheBytes))} MB, {Volatile.Read(ref _peakGpuCacheCount)} resources (limit {Mb(Volatile.Read(ref _gpuCacheLimit))} MB)");
 
         try
         {
             Directory.CreateDirectory(JsonSettingsService.LogFilePath);
-            string path = Path.Combine(JsonSettingsService.LogFilePath,
-                $"render_timings_{DateTime.UtcNow:yyyyMMdd_HHmmss}.txt");
-            File.WriteAllText(path, sb.ToString());
+            string stamp = $"{DateTime.UtcNow:yyyyMMdd_HHmmss}";
+
+            File.WriteAllText(Path.Combine(JsonSettingsService.LogFilePath, $"render_timings_{stamp}.txt"), sb.ToString());
+
+            var csv = new StringBuilder("elapsed_ms,working_set_mb,private_mb,managed_mb,tile_cache_mb,gpu_cache_mb,gpu_cache_count,draw_ops");
+            csv.AppendLine();
+            foreach (var s in samples)
+            {
+                csv.Append(s.ElapsedMs).Append(',')
+                    .Append(Mb(s.WorkingSet)).Append(',')
+                    .Append(Mb(s.PrivateBytes)).Append(',')
+                    .Append(Mb(s.ManagedHeap)).Append(',')
+                    .Append(Mb(s.TileCacheBytes)).Append(',')
+                    .Append(Mb(s.GpuCacheBytes)).Append(',')
+                    .Append(s.GpuCacheCount).Append(',')
+                    .Append(s.DrawCount).AppendLine();
+            }
+
+            File.WriteAllText(Path.Combine(JsonSettingsService.LogFilePath, $"render_memory_{stamp}.csv"), csv.ToString());
         }
         catch (Exception e)
         {
