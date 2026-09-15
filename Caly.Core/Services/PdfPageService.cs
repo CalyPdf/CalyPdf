@@ -154,6 +154,12 @@ namespace Caly.Core.Services
         private readonly ConcurrentDictionary<int, IRef<SKPicture>> _cachePictures = new();
         private readonly ConcurrentDictionary<int, PdfTextLayer> _cacheTextLayers = new();
 
+        /// <summary>
+        /// Number of pages to keep cached in <see cref="_cachePictures"/> and
+        /// <see cref="_cacheTextLayers"/> beyond the realised range on each side.
+        /// </summary>
+        private const int PageCacheBuffer = 1;
+
         private SemaphoreSlim[]? _renderLocks;
 
         private async Task ProcessPageSizeRequest(RenderRequest renderRequest)
@@ -550,14 +556,27 @@ namespace Caly.Core.Services
             int realisedStart = realised.Start.GetOffset(NumberOfPages);
             int realisedEnd = realised.End.GetOffset(NumberOfPages);
 
+            int keepStart = Math.Max(1, realisedStart - PageCacheBuffer);
+            int keepEnd = Math.Min(NumberOfPages + 1, realisedEnd + PageCacheBuffer);
+
+            EvictPicturesOutside(keepStart, keepEnd);
+        }
+
+        /// <summary>
+        /// Removes and disposes every cached picture whose page number falls outside
+        /// [<paramref name="keepStart"/>, <paramref name="keepEnd"/>). Pass (0, 0) to clear the
+        /// whole cache unconditionally.
+        /// </summary>
+        private void EvictPicturesOutside(int keepStart, int keepEnd)
+        {
             foreach (var kvp in _cachePictures)
             {
-                if (kvp.Key >= realisedStart && kvp.Key < realisedEnd)
+                if (kvp.Key >= keepStart && kvp.Key < keepEnd)
                 {
                     continue;
                 }
 
-                // Page is not realised anymore
+                // Page is outside the realised range, safe to evict.
                 if (_cachePictures.TryRemove(kvp.Key, out var picture))
                 {
                     System.Diagnostics.Debug.WriteLine($"Removed page #{kvp.Key}'s picture from cache.");
@@ -579,14 +598,27 @@ namespace Caly.Core.Services
             int realisedStart = realised.Start.GetOffset(NumberOfPages);
             int realisedEnd = realised.End.GetOffset(NumberOfPages);
 
+            int keepStart = Math.Max(1, realisedStart - PageCacheBuffer);
+            int keepEnd = Math.Min(NumberOfPages + 1, realisedEnd + PageCacheBuffer);
+
+            EvictTextLayersOutside(keepStart, keepEnd);
+        }
+
+        /// <summary>
+        /// Removes every cached text layer whose page number falls outside
+        /// [<paramref name="keepStart"/>, <paramref name="keepEnd"/>). Pass (0, 0) to clear the
+        /// whole cache unconditionally.
+        /// </summary>
+        private void EvictTextLayersOutside(int keepStart, int keepEnd)
+        {
             foreach (var kvp in _cacheTextLayers)
             {
-                if (kvp.Key >= realisedStart && kvp.Key < realisedEnd)
+                if (kvp.Key >= keepStart && kvp.Key < keepEnd)
                 {
                     continue;
                 }
 
-                // Page is not realised anymore
+                // Page is outside the realised range, safe to evict.
                 if (_cacheTextLayers.TryRemove(kvp.Key, out _))
                 {
                     System.Diagnostics.Debug.WriteLine($"Removed page #{kvp.Key}'s text layer from cache.");
@@ -761,18 +793,14 @@ namespace Caly.Core.Services
             }, token);
         }
 
-        public static Range Empty => new Range(Index.Start, Index.Start);
-
         public async Task CancelAndClear()
         {
             await _pagesGenerations.CancelCurrentAsync();
             await _thumbnailsGenerations.CancelCurrentAsync();
 
-            // Picture Cache
-            UpdatePictureCache(Empty, null);
-
-            // Text Cache
-            UpdateTextLayerCache(Empty, null);
+            // Caches - full clear, no buffer retained.
+            EvictPicturesOutside(0, 0);
+            EvictTextLayersOutside(0, 0);
         }
 
         public async ValueTask DisposeAsync()
