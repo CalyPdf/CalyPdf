@@ -19,6 +19,17 @@
                    TextWrapping="Wrap"
                    Foreground="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"/>
 
+        <Separator Margin="0,4"/>
+
+        <CheckBox Content="Reduce tile memory (beta)"
+                  IsChecked="{Binding UseCompactTileFormat, Mode=TwoWay}"
+                  ToolTip.Tip="Uses a smaller pixel format for page tiles, cutting memory use at the cost of a very slightly coarser colour depth."/>
+
+        <TextBlock Text="Applies to the next document opened."
+                   FontSize="11"
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"/>
+
     </StackPanel>
 
 </UserControl>

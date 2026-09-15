@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2025 BobLd
+﻿// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -109,9 +109,17 @@ namespace Caly.Core.Services
             catch (OperationCanceledException) { }
         }
 
-        public PdfPageService(IPdfDocumentService pdfDocumentService)
+        /// <summary>
+        /// <paramref name="settingsService"/> defaults to <c>null</c> so tests that only care about the
+        /// document/tile pipeline, not settings, are unaffected; the DI-resolved <c>App</c> container
+        /// always has one registered and passes it in (<c>AddScoped&lt;PdfPageService&gt;</c>).
+        /// </summary>
+        public PdfPageService(IPdfDocumentService pdfDocumentService, ISettingsService? settingsService = null)
         {
-            TileRenderService = new TileRenderService();
+            // Read once per document, not live: changing the setting mid-document would leave already
+            // cached tiles in the old format sitting alongside new ones in the new format.
+            bool useCompactTileFormat = settingsService?.GetSettings().UseCompactTileFormat ?? false;
+            TileRenderService = new TileRenderService(new TileCache(), startProcessingLoop: true, useCompactTileFormat);
             _pdfDocumentService = pdfDocumentService;
 
             var channel = Channel.CreateUnboundedPrioritized(new UnboundedPrioritizedChannelOptions<RenderRequest>()

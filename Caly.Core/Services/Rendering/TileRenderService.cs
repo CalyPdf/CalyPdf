@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2025 BobLd
+﻿// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -36,6 +36,13 @@ namespace Caly.Core.Services.Rendering;
 /// </summary>
 public sealed class TileRenderService : IAsyncDisposable
 {
+    /// <summary>
+    /// Pixel format tiles are rasterised into. Tiles are always fully opaque so <see cref="SKColorType.Bgra8888"/>'s alpha byte is
+    /// dead weight; <see cref="CalySettings.UseCompactTileFormat"/> switches to <see cref="SKColorType.Rgb565"/> (2 bytes/pixel,
+    /// no alpha) to trade that for lower tile memory.
+    /// </summary>
+    private readonly SKColorType _tileColorType;
+
     private readonly struct TileRequest
     {
         public TileKey Key { get; }
@@ -167,10 +174,11 @@ public sealed class TileRenderService : IAsyncDisposable
     /// queued requests are never consumed, deterministically reproducing disposal
     /// racing ahead of the render workers.
     /// </summary>
-    internal TileRenderService(TileCache cache, bool startProcessingLoop)
+    internal TileRenderService(TileCache cache, bool startProcessingLoop, bool useCompactTileFormat = false)
     {
         _mainToken = _mainCts.Token;
         Cache = cache;
+        _tileColorType = useCompactTileFormat ? SKColorType.Rgb565 : SKColorType.Bgra8888;
 
         var channel = Channel.CreateUnboundedPrioritized(new UnboundedPrioritizedChannelOptions<TileRequest>()
         {
@@ -250,7 +258,11 @@ public sealed class TileRenderService : IAsyncDisposable
             return;
         }
 
-        var imageInfo = new SKImageInfo(tileWidth, tileHeight, SKColorType.Bgra8888, SKAlphaType.Premul);
+        // Rgb565 has no alpha channel at all, so Opaque is the only valid alpha type there; Bgra8888 keeps
+        // Premul unchanged, since PDF content can draw translucent elements (highlights, watermarks) that
+        // need real alpha blending during DrawPicture.
+        var alphaType = _tileColorType == SKColorType.Bgra8888 ? SKAlphaType.Premul : SKAlphaType.Opaque;
+        var imageInfo = new SKImageInfo(tileWidth, tileHeight, _tileColorType, alphaType);
         var matrix = TileGrid.CreateRenderMatrix(request.Key.Column, request.Key.Row, request.PpiScale, request.Key.TileLevel);
 
         if (matrix.MapRect(request.Picture.Item.CullRect).IntersectsWith(imageInfo.Rect))

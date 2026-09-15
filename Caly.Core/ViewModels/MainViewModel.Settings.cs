@@ -39,6 +39,12 @@ public sealed partial class MainViewModel
         set => SetSetting(static (s, v) => s.UseSoftwareRendering = !v, value);
     }
 
+    public bool UseCompactTileFormat
+    {
+        get => GetSetting(static s => s.UseCompactTileFormat);
+        set => SetSetting(static (s, v) => s.UseCompactTileFormat = v, value);
+    }
+
     public bool LogRenderTimings
     {
         get => GetSetting(static s => s.Debug?.LogRenderTimings ?? false);

@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2025 BobLd
+﻿// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -43,6 +43,12 @@ public sealed class CalySettings
     public bool ShowPdfLogs { get; set; }
 
     public bool UseSoftwareRendering { get; set; }
+
+    /// <summary>
+    /// Renders tiles as <c>Rgb565</c> (2 bytes/pixel, no alpha channel)
+    /// instead of <c>Bgra8888</c> (4 bytes/pixel).
+    /// </summary>
+    public bool UseCompactTileFormat { get; set; } // TODO - Might be a good default for mobile platform
 
     public CalySettingsDebug? Debug { get; set; }
 
