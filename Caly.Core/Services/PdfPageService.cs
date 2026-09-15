@@ -360,7 +360,8 @@ namespace Caly.Core.Services
             int tWidth = vm.ThumbnailSize.Width;
             int tHeight = vm.ThumbnailSize.Height;
 
-            var skImageInfo = new SKImageInfo(tWidth, tHeight, SKColorType.Bgra8888, SKAlphaType.Premul);
+            // A thumbnail's colour depth loss (Rgb565) is far less noticeable at that size.
+            var skImageInfo = new SKImageInfo(tWidth, tHeight, SKColorType.Rgb565, SKAlphaType.Opaque);
 
             SKMatrix scale = SKMatrix.CreateScale(tWidth / (float)(vm.Size.Width / vm.PpiScale),
                 tHeight / (float)(vm.Size.Height / vm.PpiScale));
@@ -386,8 +387,8 @@ namespace Caly.Core.Services
                 var thumbnail = new WriteableBitmap(
                     new PixelSize(tWidth, tHeight),
                     new Vector(96, 96),
-                    PixelFormat.Bgra8888,
-                    AlphaFormat.Premul);
+                    PixelFormat.Rgb565,
+                    AlphaFormat.Opaque);
 
                 using (var fb = thumbnail.Lock())
                 {
