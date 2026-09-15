@@ -149,8 +149,8 @@ public sealed class TileCache : IDisposable
     /// <summary>
     /// Creates a new tile cache with the specified memory budget.
     /// </summary>
-    /// <param name="maxMemoryBytes">Maximum memory budget in bytes. Default is 256 MB.</param>
-    public TileCache(long maxMemoryBytes = 256L * 1024 * 1024)
+    /// <param name="maxMemoryBytes">Maximum memory budget in bytes. Default is 128 MB.</param>
+    public TileCache(long maxMemoryBytes = 128L * 1024 * 1024)
     {
         _maxMemoryBytes = maxMemoryBytes;
     }
