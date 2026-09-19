@@ -30,6 +30,14 @@
         <ResourceDictionary x:Key="Light">
             <SolidColorBrush x:Key="CalyDeskBrush" Color="#ffd8d4de" />
 
+            <!--
+                Two shadows per page: a hairline at zero blur that draws the page's edge, and
+                the cast shadow under it. Both are box shadows rather than a border, so neither
+                adds a pixel to the page's layout size - the tile renderer and the text layer
+                both work in page coordinates and would be thrown off by a border.
+            -->
+            <BoxShadows x:Key="CalyPageShadow">0 0 0 1 #26000000, 0 2 10 0 #4D000000</BoxShadows>
+
             <SolidColorBrush x:Key="TabControlWindowActiveBackgroundBrush" Color="#ffdbd7e1" />
             <SolidColorBrush x:Key="TabControlWindowInactiveBackgroundBrush" Color="#ffe8e5ec" />
             <SolidColorBrush x:Key="TabItemBackgroundBrush" Color="#ffdbd7e1" />
@@ -40,6 +48,9 @@
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
             <SolidColorBrush x:Key="CalyDeskBrush" Color="#ff333333" />
+
+            <!-- Heavier than light's: a shadow has to carry further on a dark ground to read. -->
+            <BoxShadows x:Key="CalyPageShadow">0 0 30 10 #FFFF0000</BoxShadows>
 
             <SolidColorBrush x:Key="TabControlWindowActiveBackgroundBrush" Color="#ff202020" />
             <SolidColorBrush x:Key="TabControlWindowInactiveBackgroundBrush" Color="#ff2f2f2f" />

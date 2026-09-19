@@ -1,4 +1,4 @@
-<ResourceDictionary xmlns="https://github.com/avaloniaui"
+﻿<ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:controls="using:Caly.Core.Controls"
                     xmlns:vm="clr-namespace:Caly.Core.ViewModels"
@@ -18,7 +18,12 @@
                   TargetType="controls:PageItem"
                   x:DataType="vm:PageViewModel">
 
-        <Setter Property="Margin" Value="0,0,0,5"/>
+        <!--
+            Wide enough that neighbouring pages' shadows do not run into each other. The margin
+            sits inside the zoom transform, so it scales with the page rather than turning into
+            a fixed gutter at low zoom.
+        -->
+        <Setter Property="Margin" Value="0,0,0,12"/>
         <Setter Property="Exception" Value="{Binding Exception}"/>
 		<Setter Property="Width" Value="{Binding DisplayWidth}"/>
 		<Setter Property="Height" Value="{Binding DisplayHeight}"/>
@@ -73,46 +78,54 @@
 								<RotateTransform Angle="{Binding Rotation}" />
 							</LayoutTransformControl.LayoutTransform>
 
-							<Grid Background="White"
-								  Width="{Binding Size.Width}"
-								  Height="{Binding Size.Height}">
+							<!--
+							    Inside the rotation, so the shadow turns with the page. The page
+							    itself keeps its exact size: the Border adds no thickness and no
+							    padding, and a box shadow paints outside the bounds.
+							-->
+							<Border Background="White"
+									BoxShadow="{DynamicResource CalyPageShadow}">
 
-								<!-- Host for the page-loading skeleton, filled in on demand by PageItem -->
-								<Panel Name="PART_PageLoadingHost"
-								       IsVisible="{Binding IsPageLoading}"
-								       IsHitTestVisible="False"/>
+								<Grid Width="{Binding Size.Width}"
+									  Height="{Binding Size.Height}">
 
-								<rendering:TiledPdfPageControl TileRenderService="{Binding TileRenderService}"
-                                                               Picture="{Binding PdfPicture}"
-                                                               PpiScale="{Binding PpiScale}"
-                                                               VisibleArea="{Binding VisibleArea}"
-                                                               IsPageVisible="{Binding IsPageVisible}"
-                                                               PageNumber="{Binding PageNumber}"
-                                                               PageDisplaySize="{Binding Size}"
-                                                               ZoomLevel="{Binding $parent[controls:PageItemsControl].ZoomLevel}"
-                                                               HorizontalAlignment="Stretch"
-                                                               VerticalAlignment="Stretch"/>
+									<!-- Host for the page-loading skeleton, filled in on demand by PageItem -->
+									<Panel Name="PART_PageLoadingHost"
+									       IsVisible="{Binding IsPageLoading}"
+									       IsHitTestVisible="False"/>
 
-								<controls:PageInteractiveLayerControl Name="PART_PageInteractiveLayerControl"
-																	  Focusable="False"
-                                                                      VisibleArea="{Binding VisibleArea}"
-                                                                      PdfTextLayer="{Binding PdfTextLayer}"
-                                                                      PageNumber="{Binding PageNumber}"
-																	  SelectedWords="{Binding SelectedWords}"
-																	  SearchResults="{Binding SearchResults}"
-                                                                      HorizontalAlignment="Stretch"
-                                                                      VerticalAlignment="Stretch">
+									<rendering:TiledPdfPageControl TileRenderService="{Binding TileRenderService}"
+	                                                               Picture="{Binding PdfPicture}"
+	                                                               PpiScale="{Binding PpiScale}"
+	                                                               VisibleArea="{Binding VisibleArea}"
+	                                                               IsPageVisible="{Binding IsPageVisible}"
+	                                                               PageNumber="{Binding PageNumber}"
+	                                                               PageDisplaySize="{Binding Size}"
+	                                                               ZoomLevel="{Binding $parent[controls:PageItemsControl].ZoomLevel}"
+	                                                               HorizontalAlignment="Stretch"
+	                                                               VerticalAlignment="Stretch"/>
 
-									<FlyoutBase.AttachedFlyout>
-										<Flyout ShowMode="Standard"
-												Placement="Pointer"
-												HorizontalOffset="15"
-												OverlayInputPassThroughElement="{Binding $parent}"/>
-									</FlyoutBase.AttachedFlyout>
+									<controls:PageInteractiveLayerControl Name="PART_PageInteractiveLayerControl"
+																		  Focusable="False"
+	                                                                      VisibleArea="{Binding VisibleArea}"
+	                                                                      PdfTextLayer="{Binding PdfTextLayer}"
+	                                                                      PageNumber="{Binding PageNumber}"
+																		  SelectedWords="{Binding SelectedWords}"
+																		  SearchResults="{Binding SearchResults}"
+	                                                                      HorizontalAlignment="Stretch"
+	                                                                      VerticalAlignment="Stretch">
 
-								</controls:PageInteractiveLayerControl>
+										<FlyoutBase.AttachedFlyout>
+											<Flyout ShowMode="Standard"
+													Placement="Pointer"
+													HorizontalOffset="15"
+													OverlayInputPassThroughElement="{Binding $parent}"/>
+										</FlyoutBase.AttachedFlyout>
 
-							</Grid>
+									</controls:PageInteractiveLayerControl>
+
+								</Grid>
+							</Border>
 						</LayoutTransformControl>
 
 					</ContentPresenter.Content>

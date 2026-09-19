@@ -135,7 +135,7 @@
 
 	<ItemGroup>
 		<PackageReference Include="Avalonia.Desktop" Version="12.1.2" />
-		<PackageReference Condition="'$(Configuration)'=='Debug'" Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3" />
+		<PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3" />
 	</ItemGroup>
 
 	<ItemGroup>
