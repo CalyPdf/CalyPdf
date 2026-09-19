@@ -45,6 +45,37 @@ public sealed partial class MainViewModel
         set => SetSetting(static (s, v) => s.UseCompactTileFormat = v, value);
     }
 
+    /// <summary>
+    /// Order matters: these line up with <see cref="ThemeOrder"/>.
+    /// </summary>
+    public string[] ThemeOptions { get; } = ["Follow system", "Light", "Dark"];
+
+    private static readonly CalyTheme[] ThemeOrder = [CalyTheme.System, CalyTheme.Light, CalyTheme.Dark];
+
+    /// <summary>
+    /// Bound to the theme combo box by index rather than by enum value, so the view needs no
+    /// converter and compiled bindings stay happy.
+    /// </summary>
+    public int ThemeIndex
+    {
+        get
+        {
+            int index = Array.IndexOf(ThemeOrder, GetSetting(static s => s.Theme, CalyTheme.Dark));
+            return index < 0 ? Array.IndexOf(ThemeOrder, CalyTheme.Dark) : index;
+        }
+        set
+        {
+            if ((uint)value >= (uint)ThemeOrder.Length)
+            {
+                return;
+            }
+
+            CalyTheme theme = ThemeOrder[value];
+            SetSetting(static (s, v) => s.Theme = v, theme);
+            App.ApplyTheme(theme);
+        }
+    }
+
     public bool LogRenderTimings
     {
         get => GetSetting(static s => s.Debug?.LogRenderTimings ?? false);
@@ -94,7 +125,13 @@ public sealed partial class MainViewModel
         return settings is not null && read(settings);
     }
 
-    private void SetSetting(Action<CalySettings, bool> write, bool value, [CallerMemberName] string? propertyName = null)
+    private static T GetSetting<T>(Func<CalySettings, T> read, T fallback)
+    {
+        var settings = App.Current?.Services?.GetService<ISettingsService>()?.GetSettings();
+        return settings is null ? fallback : read(settings);
+    }
+
+    private void SetSetting<T>(Action<CalySettings, T> write, T value, [CallerMemberName] string? propertyName = null)
     {
         var service = App.Current?.Services?.GetService<ISettingsService>();
         var settings = service?.GetSettings();
@@ -107,4 +144,5 @@ public sealed partial class MainViewModel
         OnPropertyChanged(propertyName);
         service.Save();
     }
+
 }

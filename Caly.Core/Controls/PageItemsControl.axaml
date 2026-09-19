@@ -17,6 +17,7 @@
                   x:DataType="vm:DocumentViewModel">
 
         <Setter Property="Focusable" Value="True"/>
+        <Setter Property="Background" Value="{DynamicResource CalyDeskBrush}"/>
         <Setter Property="ItemsSource" Value="{Binding Pages}"/>
         <Setter Property="PageCount" Value="{Binding PageCount}"/>
         <Setter Property="SelectedPageNumber" Value="{Binding SelectedPageNumber, Mode=TwoWay}"/>

@@ -28,7 +28,21 @@
 	<Application.Styles>
 		<FluentTheme DensityStyle="Compact">
 			<FluentTheme.Palettes>
-                <ColorPaletteResources x:Key="Light" Accent="#15f2c7" AltHigh="White" AltLow="White" AltMedium="White" AltMediumHigh="White" AltMediumLow="White" BaseHigh="Black" BaseLow="#ff999999" BaseMedium="#ff616161" BaseMediumHigh="#ff3b3b3b" BaseMediumLow="#ff4e4e4e" ChromeAltLow="#ff3b3b3b" ChromeBlackHigh="Black" ChromeBlackLow="#ff999999" ChromeBlackMedium="#ff3b3b3b" ChromeBlackMediumLow="#ff616161" ChromeDisabledHigh="#ff999999" ChromeDisabledLow="#ff616161" ChromeGray="#ff4e4e4e" ChromeHigh="#ff999999" ChromeLow="#ffd9d9d9" ChromeMedium="#ffcccccc" ChromeMediumLow="#ffd9d9d9" ChromeWhite="White" ListLow="#ffcccccc" ListMedium="#ff999999" RegionColor="#ffcccccc" />
+                <!--
+                    Dark is Caly's original grey palette, unchanged.
+
+                    Light was already in this file but had never been reachable, because the
+                    theme variant was hard-coded. Now that it can be selected it is a real
+                    palette: neutrals carrying a faint violet cast taken from the logo, and an
+                    accent dark enough that white reads on an accent fill at 5.4:1.
+
+                    On which note - ChromeWhite is not "white" in Fluent. It is the foreground
+                    painted on top of an accent fill (AccentButtonForeground,
+                    ToggleButtonForegroundChecked, the CheckBox glyph, the ToggleSwitch knob).
+                    Both accents here are dark enough for it to stay White; a brighter one
+                    would need a dark ink here instead.
+                -->
+                <ColorPaletteResources x:Key="Light" Accent="#ff0a6fb0" AltHigh="White" AltLow="White" AltMedium="White" AltMediumHigh="White" AltMediumLow="White" BaseHigh="#ff120821" BaseLow="#ff9990a6" BaseMedium="#ff5d5470" BaseMediumHigh="#ff3a3049" BaseMediumLow="#ff4a4059" ChromeAltLow="#ff3a3049" ChromeBlackHigh="Black" ChromeBlackLow="#ff9990a6" ChromeBlackMedium="#ff3a3049" ChromeBlackMediumLow="#ff5d5470" ChromeDisabledHigh="#ff9990a6" ChromeDisabledLow="#ff5d5470" ChromeGray="#ff4a4059" ChromeHigh="#ff9990a6" ChromeLow="#ffe8e5ec" ChromeMedium="#ffdbd7e1" ChromeMediumLow="#ffe8e5ec" ChromeWhite="White" ListLow="#ffdbd7e1" ListMedium="#ff9990a6" RegionColor="#ffeceaf0" />
                 <ColorPaletteResources x:Key="Dark" Accent="#ff585858" AltHigh="Black" AltLow="Black" AltMedium="Black" AltMediumHigh="Black" AltMediumLow="Black" BaseHigh="White" BaseLow="#ff666666" BaseMedium="#ffb3b3b3" BaseMediumHigh="#ffc6c6c6" BaseMediumLow="#ff8c8c8c" ChromeAltLow="#ffc6c6c6" ChromeBlackHigh="Black" ChromeBlackLow="#ffc6c6c6" ChromeBlackMedium="Black" ChromeBlackMediumLow="Black" ChromeDisabledHigh="#ff666666" ChromeDisabledLow="#ffb3b3b3" ChromeGray="#ffa0a0a0" ChromeHigh="#ffa0a0a0" ChromeLow="#ff2d2d2d" ChromeMedium="#ff3b3b3b" ChromeMediumLow="#ff585858" ChromeWhite="White" ListLow="#ff3b3b3b" ListMedium="#ff666666" RegionColor="#ff333333" />
 			</FluentTheme.Palettes>
 		</FluentTheme>

@@ -31,7 +31,9 @@ using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform.Storage;
+using Avalonia.Styling;
 using Avalonia.Threading;
+using Caly.Core.Models;
 using Caly.Core.Services;
 using Caly.Core.Services.Interfaces;
 using Caly.Core.Utilities;
@@ -247,10 +249,39 @@ public partial class App : Application
         }
 
         // Load settings
-        Services.GetRequiredService<ISettingsService>().Load();
+        var settingsService = Services.GetRequiredService<ISettingsService>();
+        settingsService.Load();
+
+        // On desktop this runs before the window is shown, so a non-default theme does not
+        // flash. The Android activity lifetime defers it until the view is loaded, where a
+        // brief repaint is unavoidable.
+        ApplyTheme(settingsService.GetSettings().Theme);
 
         // We need to make sure IPdfDocumentsService singleton is initiated in UI thread
         _pdfDocumentsService = Services.GetRequiredService<IPdfDocumentsManagerService>();
+    }
+
+    /// <summary>
+    /// Switches the interface between the light and dark palettes. Takes effect immediately:
+    /// every brush in both palettes is resolved through theme dictionaries, so nothing needs
+    /// a restart.
+    /// </summary>
+    internal static void ApplyTheme(CalyTheme theme)
+    {
+        if (Current is null)
+        {
+            return;
+        }
+
+        // ThemeVariant.Default leaves ActualThemeVariant to the platform's colour values,
+        // which Avalonia keeps up to date, so 'System' keeps following the OS while Caly runs
+        // rather than only sampling it at startup.
+        Current.RequestedThemeVariant = theme switch
+        {
+            CalyTheme.Light => ThemeVariant.Light,
+            CalyTheme.Dark => ThemeVariant.Dark,
+            _ => ThemeVariant.Default
+        };
     }
 
     protected virtual void OverrideRegisteredServices(IServiceCollection services)

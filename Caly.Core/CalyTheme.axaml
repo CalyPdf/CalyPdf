@@ -4,4 +4,42 @@
     <x:Double x:Key="CalySplitViewHandleWidth">3</x:Double>
     <x:Double x:Key="ControlContentThemeFontSize">12</x:Double>
 
+    <!--
+        CalyDeskBrush is the surface the pages sit on. Dark keeps it equal to RegionColor, so
+        the reading area looks exactly as it always has. Light gives it its own value, a shade
+        darker than the panels, so a white page has a ground to sit on instead of disappearing
+        into the chrome.
+
+        The Tab* keys override Tabalonia's own palette. Application.Resources is searched
+        before Application.Styles, so redefining the keys here wins over the brushes
+        CustomTheme ships. Dark restates Tabalonia's own values rather than omitting them:
+        the keys are then pinned to what Caly has always looked like, and stay pinned if
+        Tabalonia ever changes its palette. Light matches Caly's light palette, whose
+        neutrals are not Tabalonia's.
+    -->
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+            <SolidColorBrush x:Key="CalyDeskBrush" Color="#ffd8d4de" />
+
+            <SolidColorBrush x:Key="TabControlWindowActiveBackgroundBrush" Color="#ffdbd7e1" />
+            <SolidColorBrush x:Key="TabControlWindowInactiveBackgroundBrush" Color="#ffe8e5ec" />
+            <SolidColorBrush x:Key="TabItemBackgroundBrush" Color="#ffdbd7e1" />
+            <SolidColorBrush x:Key="TabItemBackgroundBrushWindowInactive" Color="#ffe8e5ec" />
+            <SolidColorBrush x:Key="SelectedTabItemBackgroundBrush" Color="#ffeceaf0" />
+            <SolidColorBrush x:Key="TabItemHeaderBackgroundUnselectedPointerOver" Color="#ffe4e1ea" />
+            <SolidColorBrush x:Key="TabItemRightSeparatorBackgroundBrush" Color="#ffb9b2c4" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+            <SolidColorBrush x:Key="CalyDeskBrush" Color="#ff333333" />
+
+            <SolidColorBrush x:Key="TabControlWindowActiveBackgroundBrush" Color="#ff202020" />
+            <SolidColorBrush x:Key="TabControlWindowInactiveBackgroundBrush" Color="#ff2f2f2f" />
+            <SolidColorBrush x:Key="TabItemBackgroundBrush" Color="#ff202020" />
+            <SolidColorBrush x:Key="TabItemBackgroundBrushWindowInactive" Color="#ff2e2e2e" />
+            <SolidColorBrush x:Key="SelectedTabItemBackgroundBrush" Color="#ff3b3b3b" />
+            <SolidColorBrush x:Key="TabItemHeaderBackgroundUnselectedPointerOver" Color="#ff2a2a2a" />
+            <SolidColorBrush x:Key="TabItemRightSeparatorBackgroundBrush" Color="#ff777777" />
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+
 </ResourceDictionary>
