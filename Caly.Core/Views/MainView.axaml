@@ -48,7 +48,7 @@
                     <StackPanel Orientation="Vertical"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
-                                Opacity="200"
+                                Opacity="0.5"
                                 IsVisible="{Binding !PdfDocuments.Count}"
                                 IsEnabled="{Binding !PdfDocuments.Count}">
 
