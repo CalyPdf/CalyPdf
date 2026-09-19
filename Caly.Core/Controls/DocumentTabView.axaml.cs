@@ -21,6 +21,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using Caly.Core.Utilities;
 using Caly.Core.ViewModels;
@@ -80,6 +81,12 @@ public sealed partial class DocumentTabView : UserControl
     public DocumentTabView()
     {
         InitializeComponent();
+
+        // Tunnelled, so this runs before the TabItem has processed the click and IsSelected
+        // still describes the state the user clicked on. A bubbling handler would always see
+        // the tab as already selected and could never tell a re-click from a switch.
+        AddHandler(PointerPressedEvent, NavigationRail_OnPointerPressed, RoutingStrategies.Tunnel);
+
         KeyBindings.Add(new KeyBinding
         {
             Gesture = CalyHotkeyConfiguration.DocumentGoToGesture,
@@ -95,6 +102,36 @@ public sealed partial class DocumentTabView : UserControl
                 textBox.SelectAll();
             })
         });
+    }
+
+    /// <summary>
+    /// Makes the rail work while the pane is collapsed. Clicking a slot opens the pane on it;
+    /// clicking the slot that is already showing collapses the pane again, so the rail toggles
+    /// its own panel instead of only ever opening it.
+    /// </summary>
+    private void NavigationRail_OnPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (e.Source is not Visual source)
+        {
+            return;
+        }
+
+        // A TabItem ancestor means the click landed on the rail itself. The selected tab's
+        // content is hosted outside the TabItem, so clicks inside a panel never match.
+        var tabItem = source.FindAncestorOfType<TabItem>(true);
+        if (tabItem is null || !tabItem.IsEnabled)
+        {
+            return;
+        }
+
+        // Only this view's rail, never some other TabControl that ends up in the subtree.
+        var tabControl = tabItem.FindAncestorOfType<TabControl>();
+        if (tabControl?.Name != "PART_TabControlNavigation")
+        {
+            return;
+        }
+
+        IsPaneOpen = !(tabItem.IsSelected && IsPaneOpen);
     }
 
     private TextBox? GetTextBoxPageNumber()

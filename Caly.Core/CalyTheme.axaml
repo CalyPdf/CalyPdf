@@ -5,6 +5,15 @@
     <x:Double x:Key="ControlContentThemeFontSize">12</x:Double>
 
     <!--
+        The navigation rail stays on screen when the side pane is collapsed, so its width is
+        also the pane's compact length and the two have to agree exactly. A pixel of
+        disagreement either clips the icons or leaks a sliver of the collapsed pane's content.
+        The compact length is the rail plus the 1px border on each side of it.
+    -->
+    <x:Double x:Key="CalyNavigationRailWidth">40</x:Double>
+    <x:Double x:Key="CalyNavigationRailCompactLength">42</x:Double>
+
+    <!--
         CalyDeskBrush is the surface the pages sit on. Dark keeps it equal to RegionColor, so
         the reading area looks exactly as it always has. Light gives it its own value, a shade
         darker than the panels, so a white page has a ground to sit on instead of disappearing

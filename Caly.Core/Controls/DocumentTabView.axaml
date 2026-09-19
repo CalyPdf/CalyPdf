@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -199,7 +199,7 @@
 				   Name="PART_SplitView"
 				   IsPaneOpen="{Binding #PART_Root.IsPaneOpen, Mode=TwoWay}"
 				   OpenPaneLength="{Binding #PART_Root.PaneSize, Mode=TwoWay}"
-				   CompactPaneLength="0"
+				   CompactPaneLength="{DynamicResource CalyNavigationRailCompactLength}"
 				   DisplayMode="CompactInline">
 
                         <!-- Document control -->
@@ -207,11 +207,16 @@
                             <controls:DocumentControl />
                         </SplitView.Content>
 
-			<!-- Left navigation bar -->
+			<!--
+			    Left navigation bar. Collapsing the pane leaves the rail behind rather than
+			    taking it with it: with no menu bar anywhere in Caly, a rail that disappears
+			    takes thumbnails, bookmarks, search and properties with it, and the only way
+			    back is knowing that the toolbar's first button exists. The pane's compact
+			    length is the rail's width, so 'collapsed' means 'rail only'.
+			-->
 			<SplitView.Pane>
 
-				<Grid ColumnDefinitions="*,5"
-                                  IsVisible="{Binding #PART_Root.IsPaneOpen}">
+				<Grid ColumnDefinitions="*,Auto">
 
                                 <Border Grid.Column="0"
                                         BorderThickness="1">
@@ -220,6 +225,18 @@
 									TabStripPlacement="Left"
 									Padding="12,0,0,0"
 									SelectedIndex="{Binding SelectedTabIndex}">
+
+							<TabControl.Styles>
+								<!--
+								    Every slot keeps the same width whether or not the document
+								    has anything to put in it, so the rail is the same shape in
+								    every document.
+								-->
+								<Style Selector="TabItem">
+									<Setter Property="Width" Value="{DynamicResource CalyNavigationRailWidth}"/>
+									<Setter Property="MinWidth" Value="0"/>
+								</Style>
+							</TabControl.Styles>
 
 							<!-- Thumbnails tab -->
 							<TabItem MinHeight="40"
@@ -289,7 +306,6 @@
 							<!-- Bookmarks tab -->
 							<TabItem MinHeight="40"
                                                  Focusable="False"
-                                                 IsVisible="{Binding BookmarksSource^, Converter={x:Static ObjectConverters.IsNotNull}}"
                                                  IsEnabled="{Binding BookmarksSource^, Converter={x:Static ObjectConverters.IsNotNull}}">
 								<TabItem.Header>
 									<PathIcon Width="17"
@@ -339,7 +355,6 @@
                                         <!-- Embedded files tab -->
                                         <TabItem MinHeight="40"
                                                  Focusable="False"
-                                                 IsVisible="{Binding !!EmbeddedFiles^.Count}"
                                                  IsEnabled="{Binding !!EmbeddedFiles^.Count}">
                                             <TabItem.Header>
                                                 <PathIcon Width="17"
@@ -404,6 +419,8 @@
 
 					<!-- Resize left navigation bar -->
                                 <Grid Grid.Column="1"
+                                      Width="5"
+                                      IsVisible="{Binding #PART_Root.IsPaneOpen}"
 						  Background="Transparent"
                                       PointerMoved="Resize_OnPointerMoved"
                                       PointerEntered="Resize_OnPointerEntered"
