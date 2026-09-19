@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2025 BobLd
+﻿// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -118,7 +118,7 @@ internal static class Helpers
         }
 
         System.Diagnostics.Debug.WriteLine($"-> RequestGcCollect({DateTime.UtcNow})");
-        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, true, true);
     }
     #endregion
 
