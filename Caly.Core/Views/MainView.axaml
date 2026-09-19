@@ -6,6 +6,7 @@
              xmlns:controls="clr-namespace:Caly.Core.Controls"
              xmlns:settings="clr-namespace:Caly.Core.Controls.Settings"
              xmlns:utilities="clr-namespace:Caly.Core.Utilities"
+             xmlns:converters="clr-namespace:Caly.Core.Converters"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="Caly.Core.Views.MainView"
              x:DataType="vm:MainViewModel">
@@ -91,7 +92,21 @@
 					<ToolTip.Tip>Settings</ToolTip.Tip>
 				</PathIcon>
 			</ToggleButton>
-			<TextBlock Text="{Binding SelectedDocument.InteractiveActionOver, FallbackValue=' '}" VerticalAlignment="Center"/>
+
+			<TextBlock Text="{Binding SelectedDocument.InteractiveActionOver, FallbackValue=' ', Mode=OneWay}" VerticalAlignment="Center"/>
+
+            <TextBlock DockPanel.Dock="Right"
+                       IsVisible="{Binding PdfDocuments.Count, Mode=OneWay}"
+                       VerticalAlignment="Center"
+                       Opacity="0.4">
+                <Run Text="{Binding SelectedDocumentIndex, Mode=OneWay, Converter={x:Static converters:ZeroToOneBasedIndexConverter.Instance}}" />
+                <Run Text="/" />
+                <Run Text="{Binding PdfDocuments.Count, Mode=OneWay}" />
+                <Run Text=" " />
+            </TextBlock>
+
+            <Grid DockPanel.Dock="Right"/>
+            
 		</DockPanel>
 	</Grid>
 </UserControl>
