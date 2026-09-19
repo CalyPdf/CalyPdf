@@ -60,7 +60,7 @@
                                       HorizontalAlignment="Center"
                                       VerticalAlignment="Center"
                                       Data="{StaticResource document_dismiss_regular}"
-                                      Opacity="200"/>
+                                      Opacity="0.5"/>
                         </Border>
                     </Grid>
 
