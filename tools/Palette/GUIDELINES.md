@@ -81,6 +81,7 @@ Each theme MUST define all of: `accent`, `ink`, `surface`, `chrome`, `paper`, `e
 | Close button: inactive-window hover glyph | `BaseMediumHigh` |
 | Close button: pressed circle | `ChromeMediumLow` |
 | Selected drop-down item text (rest, hover, pressed) | `ChromeWhite` |
+| Scrollbar track (rest and expanded) | `ChromeLow` |
 
 - `DocumentsTabsControl.axaml` MUST NOT set `Background` on the `TabsControl`.
 - The `TabsControl` content row MUST be painted `RegionColor` by the style in `DocumentsTabsControl.axaml`.
@@ -124,6 +125,7 @@ Ratios are measured in both themes.
 | D1 | Tab separator on the strip | 1.5 |
 | D2 | `BaseMediumLow` on `BaseLow` (disabled text) | 1.5 |
 | D3 | Disabled scroll glyph on the strip | 1.5 |
+| D4 | Scrollbar thumb (`BaseLow` rest, `BaseMediumLow` hover, `BaseMedium` pressed) on the scrollbar track | 1.5 |
 
 - Every foreground, in every state (rest, hover, pressed, inactive window, disabled), MUST reach at least 1.5:1 against its background.
 - Body text MUST use T1-T3 colours. Text MUST NOT be faded with opacity.
