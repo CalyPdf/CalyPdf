@@ -24,7 +24,7 @@ namespace Caly.Pdf.PageFactories
 
         public IReadOnlyList<IGraphicsStateOperation> Parse(int pageNumber, IInputBytes inputBytes, ILog log)
         {
-            var scanner = new CoreTokenScanner(inputBytes, false, stackDepthGuard, useLenientParsing: useLenientParsing);
+            var scanner = new CoreTokenScanner(inputBytes, stackDepthGuard, useLenientParsing: useLenientParsing);
 
             var precedingTokens = new List<IToken>();
             var graphicsStateOperations = new List<IGraphicsStateOperation>();

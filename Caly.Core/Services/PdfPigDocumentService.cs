@@ -151,6 +151,7 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
                     var pdfParsingOptions = new ParsingOptions()
                     {
                         SkipMissingFonts = true,
+                        UseActualText = true,
                         FilterProvider = SkiaRenderingFilterProvider.Instance,
                         IccProfileService = UnicolourIccProfileService.Instance
                     };

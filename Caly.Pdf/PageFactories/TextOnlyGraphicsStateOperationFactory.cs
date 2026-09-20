@@ -136,7 +136,7 @@ namespace Caly.Pdf.PageFactories
 
                     if (operand is StringToken snl)
                     {
-                        return new MoveToNextLineShowText(snl.Data);
+                        return MoveToNextLineShowText.FromLiteralBytes(snl.Memory);
                     }
 
                     if (operand is HexToken hnl)
@@ -158,8 +158,8 @@ namespace Caly.Pdf.PageFactories
 
                     if (text is StringToken stringToken)
                     {
-                        return new MoveToNextLineShowTextWithSpacing(wordSpacing.Double, charSpacing.Double,
-                            stringToken.Data);
+                        return MoveToNextLineShowTextWithSpacing.FromLiteralBytes(wordSpacing.Double, charSpacing.Double,
+                            stringToken.Memory);
                     }
 
                     if (text is HexToken hexToken)
@@ -183,12 +183,12 @@ namespace Caly.Pdf.PageFactories
 
                         if (operand is StringToken s)
                         {
-                            return new ShowText(s.Data);
+                            return ShowText.FromLiteralBytes(s.Memory);
                         }
 
                         if (operand is HexToken h)
                         {
-                            return new ShowText(h.Bytes.ToArray());
+                            return new ShowText(h.Memory);
                         }
 
                         throw new InvalidOperationException($"Tried to create a show text operation with operand type: {operand?.GetType().Name ?? "null"}");
