@@ -22,6 +22,32 @@
         <Style Selector="tabalonia|TabsControl /template/ ContentPresenter#PART_SelectedContentHost">
             <Setter Property="Background" Value="{DynamicResource SystemRegionBrush}" />
         </Style>
+
+        <!--
+            An inactive tab's document has been torn down and is nowhere on screen, so its tab
+            carries a preview of the page the user was last on. A Setter whose value is a
+            <Template> is materialised per instance, so each tab gets its own control, and
+            ToolTip parents its popup to the tab - which is how the control inherits the
+            document as its data context.
+        -->
+        <Style Selector="tabalonia|DragTabItem">
+            <Setter Property="ToolTip.Tip">
+                <Template>
+                    <controls:TabPreviewControl />
+                </Template>
+            </Setter>
+            <Setter Property="ToolTip.Placement" Value="Bottom" />
+            <Setter Property="ToolTip.ShowDelay" Value="500" />
+        </Style>
+
+        <!--
+            The selected tab's document is already on screen. It keeps a plain file-name tip -
+            bound to the property rather than to Tabalonia's $self.Header, which is the view
+            model itself and only reads as a name because ToString() returns one.
+        -->
+        <Style Selector="tabalonia|DragTabItem:selected" x:DataType="vm:DocumentViewModel">
+            <Setter Property="ToolTip.Tip" Value="{Binding FileName}" />
+        </Style>
     </UserControl.Styles>
 
 	<tabalonia:TabsControl x:Name="PART_TabsControl"

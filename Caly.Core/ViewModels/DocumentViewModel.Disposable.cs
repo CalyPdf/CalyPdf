@@ -43,7 +43,12 @@ public partial class DocumentViewModel : IAsyncDisposable
             });
 
         Pages.Clear();
-        
+
+        // Same idiom as PageViewModel.Dispose: drop the reference first, then free it.
+        var tabPreview = TabPreview;
+        TabPreview = null;
+        tabPreview?.Dispose();
+
         _searchResultsDisposable.Dispose();
 
         if (SearchResultsSource?.RowSelection is not null)
@@ -76,5 +81,6 @@ public partial class DocumentViewModel : IAsyncDisposable
 
         _mainCts.Dispose();
         _pendingSearchTaskCts?.Dispose();
+        _tabPreviewCts?.Dispose();
     }
 }
