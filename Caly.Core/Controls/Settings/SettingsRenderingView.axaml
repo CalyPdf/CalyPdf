@@ -17,7 +17,7 @@
         <TextBlock Text="Applies after restarting Caly."
                    FontSize="11"
                    TextWrapping="Wrap"
-                   Foreground="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"/>
+                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
 
         <Separator Margin="0,4"/>
 
@@ -28,7 +28,7 @@
         <TextBlock Text="Applies to the next document opened."
                    FontSize="11"
                    TextWrapping="Wrap"
-                   Foreground="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"/>
+                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
 
     </StackPanel>
 

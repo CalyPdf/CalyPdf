@@ -13,8 +13,18 @@
         <vm:MainViewModel />
     </Design.DataContext>
 
+    <UserControl.Styles>
+        <!--
+            The tab control's own Background is the strip colour, and its template also fills the
+            content row with it. Paint the content row with the view colour so the document area
+            (and the empty window) keep the surface colour.
+        -->
+        <Style Selector="tabalonia|TabsControl /template/ ContentPresenter#PART_SelectedContentHost">
+            <Setter Property="Background" Value="{DynamicResource SystemRegionBrush}" />
+        </Style>
+    </UserControl.Styles>
+
 	<tabalonia:TabsControl x:Name="PART_TabsControl"
-                           Background="Transparent"
                            Padding="0"
                            Margin="0"
                            AddItemCommand="{Binding OpenFileCommand}"

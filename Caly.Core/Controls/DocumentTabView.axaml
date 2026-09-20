@@ -19,7 +19,18 @@
         the nearest ancestor that exists on every lifetime - mobile and single-view have no Window.
     -->
 
-
+	<UserControl.Styles>
+		<!--
+			An invalid page number is also shown by a thicker border and italic text, so the state
+			does not depend on the border colour alone.
+		-->
+		<Style Selector="TextBox#PART_TextBoxPageNumber:error">
+			<Setter Property="FontStyle" Value="Italic" />
+		</Style>
+		<Style Selector="TextBox#PART_TextBoxPageNumber:error /template/ Border#PART_BorderElement">
+			<Setter Property="BorderThickness" Value="2" />
+		</Style>
+	</UserControl.Styles>
 
 	<Grid RowDefinitions="30,*">
 
@@ -273,7 +284,7 @@
                                                                        VerticalAlignment="Bottom"
                                                                        Padding="3,0"
                                                                        Margin="3"
-                                                                       Background="{DynamicResource SystemChromeMediumLowColor}"
+                                                                       Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
                                                                        BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
                                                                        BorderThickness="1"
                                                                        CornerRadius="7"/>
