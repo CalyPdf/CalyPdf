@@ -106,6 +106,38 @@ public class TileRenderServiceTests
     }
 
     /// <summary>
+    /// <see cref="TileRenderService.Clear"/> is what a deactivated document uses to give its tile
+    /// memory back: it drops every cached tile - the cache is otherwise only trimmed by its LRU
+    /// budget or per page - and, like <see cref="TileRenderService.CancelPage"/>, frees the
+    /// in-flight keys of the requests it cancels so the tiles can be asked for again on
+    /// reactivation.
+    /// </summary>
+    [Fact]
+    public async Task Clear_EmptiesTheCache_AndLetsTheSameTilesBeRequestedAgain()
+    {
+        var service = new TileRenderService(new TileCache(), startProcessingLoop: false);
+        await using var _ = service;
+
+        using var picture = CreatePicture();
+
+        RequestTiles(service, picture);
+        int queued = picture.RefCount;
+        Assert.True(queued > 1, "the first batch should be queued");
+
+        var key = new TileKey(2, 0, 0, 0);
+        service.Cache.AddBlank(key);
+
+        service.Clear();
+
+        Assert.False(service.Cache.Contains(key));
+
+        RequestTiles(service, picture);
+
+        Assert.True(picture.RefCount > queued,
+            "the tiles cancelled by Clear must be requested again, not deduplicated away");
+    }
+
+    /// <summary>
     /// Cancelling one page must not free another page's in-flight entries: those requests are
     /// still live, and dropping their entries would let the same tiles be queued twice.
     /// </summary>

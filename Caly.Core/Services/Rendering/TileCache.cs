@@ -334,6 +334,32 @@ public sealed class TileCache : IDisposable
     }
 
     /// <summary>
+    /// Removes every tile, image and blank, for every page. The cache stays usable afterwards.
+    /// </summary>
+    public void Clear()
+    {
+        List<CacheEntry> toDispose;
+
+        lock (_lock)
+        {
+            toDispose = new List<CacheEntry>(_entries.Values);
+
+            _entries.Clear();
+            _lruList.Clear();
+            _pageKeys.Clear();
+            _pageLevels.Clear();
+            _blankKeys.Clear();
+            _currentMemoryBytes = 0;
+        }
+
+        // Dispose outside the lock
+        foreach (var entry in toDispose)
+        {
+            entry.Image.Dispose();
+        }
+    }
+
+    /// <summary>
     /// Removes all tiles for a given page whose tile level differs from <paramref name="keepLevel"/>.
     /// This prevents stale high-res (or low-res) tiles from consuming budget after a zoom change.
     /// </summary>

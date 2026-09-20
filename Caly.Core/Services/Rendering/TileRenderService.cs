@@ -563,6 +563,26 @@ public sealed class TileRenderService : IAsyncDisposable
         RetirePageInFlight(pageNumber);
     }
 
+    /// <summary>
+    /// Cancels every pending tile request and empties the cache. The service stays usable, so
+    /// reactivation simply requests the tiles again.
+    /// </summary>
+    public void Clear()
+    {
+        foreach (var pageNumber in _pageTokens.Keys)
+        {
+            if (_pageTokens.TryRemove(pageNumber, out var cts))
+            {
+                cts.Cancel();
+                cts.Dispose();
+            }
+        }
+
+        _inFlight.Clear();
+
+        Cache.Clear();
+    }
+
     public async ValueTask DisposeAsync()
     {
         await _mainCts.CancelAsync();
