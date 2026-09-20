@@ -271,7 +271,6 @@ namespace Caly.Core.Services
 
                 if (textLayer is not null)
                 {
-                    token.ThrowIfCancellationRequested();
                     _cacheTextLayers[pageNumber] = textLayer;
                 }
             }
