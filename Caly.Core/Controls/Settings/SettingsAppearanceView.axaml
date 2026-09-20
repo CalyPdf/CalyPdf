@@ -1,0 +1,28 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Caly.Core.ViewModels"
+             x:Class="Caly.Core.Controls.Settings.SettingsAppearanceView"
+             x:DataType="vm:MainViewModel"
+             x:CompileBindings="True">
+
+    <StackPanel Margin="8" Spacing="6">
+
+        <TextBlock Text="Appearance"
+                   FontWeight="SemiBold"/>
+
+        <TextBlock Text="Theme"
+                   Margin="0,2,0,0"/>
+
+        <ComboBox ItemsSource="{Binding ThemeOptions}"
+                  SelectedItem="{Binding Theme, Mode=TwoWay}"
+                  HorizontalAlignment="Stretch"
+                  ToolTip.Tip="System matches your operating system's light or dark setting, and keeps matching it if you change it."/>
+
+        <TextBlock Text="Applies straight away."
+                   FontSize="11"
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
+
+    </StackPanel>
+
+</UserControl>

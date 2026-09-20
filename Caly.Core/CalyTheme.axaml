@@ -1,7 +1,49 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    
+
     <x:Double x:Key="CalySplitViewHandleWidth">3</x:Double>
     <x:Double x:Key="ControlContentThemeFontSize">12</x:Double>
+
+    <!--
+    CalyDeskBrush is the surface the pages sit on.
+    The Tab*, AddItem*, InactiveWindowAddCommand* and CloseItem* keys override Tabalonia's own colours.
+    -->
+    <SolidColorBrush x:Key="CalyDeskBrush" Color="{DynamicResource SystemRegionColor}" />
+
+    <SolidColorBrush x:Key="TabControlWindowActiveBackgroundBrush" Color="{DynamicResource SystemChromeLowColor}" />
+    <SolidColorBrush x:Key="TabControlWindowInactiveBackgroundBrush" Color="{DynamicResource SystemChromeLowColor}" />
+    <SolidColorBrush x:Key="TabItemBackgroundBrush" Color="{DynamicResource SystemChromeLowColor}" />
+    <SolidColorBrush x:Key="TabItemBackgroundBrushWindowInactive" Color="{DynamicResource SystemChromeLowColor}" />
+    <SolidColorBrush x:Key="SelectedTabItemBackgroundBrush" Color="{DynamicResource SystemRegionColor}" />
+    <SolidColorBrush x:Key="TabItemHeaderBackgroundUnselectedPointerOver" Color="{DynamicResource SystemChromeGrayColor}" />
+    <SolidColorBrush x:Key="TabItemHeaderBackgroundUnselectedPointerOverWindowInactive" Color="{DynamicResource SystemChromeGrayColor}" />
+    <SolidColorBrush x:Key="TabItemRightSeparatorBackgroundBrush" Color="{DynamicResource SystemBaseLowColor}" />
+
+    <!-- Tab scroll buttons (shown when the tabs overflow) -->
+    <SolidColorBrush x:Key="TabScrollNavigationButtonForegroundBrush" Color="{DynamicResource SystemBaseMediumHighColor}" />
+    <SolidColorBrush x:Key="TabScrollNavigationButtonForegroundPointerOverBrush" Color="{DynamicResource SystemBaseHighColor}" />
+    <SolidColorBrush x:Key="TabScrollNavigationButtonForegroundInactiveBrush" Color="{DynamicResource SystemBaseMediumLowColor}" />
+    <SolidColorBrush x:Key="TabScrollNavigationButtonForegroundDisabledBrush" Color="{DynamicResource SystemBaseLowColor}" />
+    <SolidColorBrush x:Key="TabScrollNavigationButtonBackgroundPointerOverBrush" Color="{DynamicResource SystemBaseLowColor}" />
+    <SolidColorBrush x:Key="TabScrollNavigationButtonBackgroundPressedBrush" Color="{DynamicResource SystemRegionColor}" />
+
+    <!-- Add-tab button. The hover glyph is Paper on a mid-tone fill; the pressed fill is a stronger step of the same. -->
+    <SolidColorBrush x:Key="AddItemCommandButtonForegroundPointerOverBrush" Color="{DynamicResource SystemAltHighColor}" />
+    <SolidColorBrush x:Key="AddItemCommandButtonBackgroundPointerOverBrush" Color="{DynamicResource SystemBaseLowColor}" />
+    <SolidColorBrush x:Key="AddItemCommandButtonBackgroundPressedBrush" Color="{DynamicResource SystemBaseMediumColor}" />
+    <SolidColorBrush x:Key="InactiveWindowAddCommandButtonForegroundBrush" Color="{DynamicResource SystemBaseMediumHighColor}" />
+    <SolidColorBrush x:Key="InactiveWindowAddCommandButtonPointerOverForegroundBrush" Color="{DynamicResource SystemBaseMediumHighColor}" />
+
+    <!-- Close-tab button. Hover only recolours the glyph; pressed draws a circle behind it. -->
+    <SolidColorBrush x:Key="CloseItemButtonForeground" Color="{DynamicResource SystemBaseHighColor}" />
+    <SolidColorBrush x:Key="CloseItemButtonPointerOverBrush" Color="{DynamicResource SystemBaseMediumLowColor}" />
+    <SolidColorBrush x:Key="CloseItemButtonInactiveWindowBrush" Color="{DynamicResource SystemBaseMediumLowColor}" />
+    <SolidColorBrush x:Key="CloseItemButtonInactiveWindowPointerOverBrush" Color="{DynamicResource SystemBaseMediumHighColor}" />
+    <SolidColorBrush x:Key="CloseItemButtonPressedBrush" Color="{DynamicResource SystemChromeMediumLowColor}" />
+
+    <!-- Selected drop-down items sit on the accent fill, so their text is ChromeWhite in every theme. -->
+    <SolidColorBrush x:Key="ComboBoxItemForegroundSelected" Color="{DynamicResource SystemChromeWhiteColor}" />
+    <SolidColorBrush x:Key="ComboBoxItemForegroundSelectedPointerOver" Color="{DynamicResource SystemChromeWhiteColor}" />
+    <SolidColorBrush x:Key="ComboBoxItemForegroundSelectedPressed" Color="{DynamicResource SystemChromeWhiteColor}" />
 
 </ResourceDictionary>

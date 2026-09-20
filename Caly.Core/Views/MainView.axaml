@@ -44,11 +44,14 @@
 
 			<SplitView.Content>
                 <Grid>
+                    <!-- Main Pdf Documents Control-->
+                    <controls:DocumentsTabsControl x:Name="PART_DocumentsTabsControl"/>
+
                     <!-- When no document -> 'Splash Screen' -->
                     <StackPanel Orientation="Vertical"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
-                                Opacity="0.5"
+                                TextElement.Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
                                 IsVisible="{Binding !PdfDocuments.Count}"
                                 IsEnabled="{Binding !PdfDocuments.Count}">
 
@@ -70,9 +73,6 @@
                                HorizontalAlignment="Center"
                                HorizontalContentAlignment="Center" Padding="0,15,0,0"/>
                     </StackPanel>
-          
-                    <!-- Main Pdf Documents Control-->
-                    <controls:DocumentsTabsControl x:Name="PART_DocumentsTabsControl"/>
                 </Grid>
                 
 			</SplitView.Content>
@@ -98,7 +98,7 @@
             <TextBlock DockPanel.Dock="Right"
                        IsVisible="{Binding PdfDocuments.Count, Mode=OneWay}"
                        VerticalAlignment="Center"
-                       Opacity="0.4">
+                       Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}">
                 <Run Text="{Binding SelectedDocumentIndex, Mode=OneWay, Converter={x:Static converters:ZeroToOneBasedIndexConverter.Instance}}" />
                 <Run Text="/" />
                 <Run Text="{Binding PdfDocuments.Count, Mode=OneWay}" />

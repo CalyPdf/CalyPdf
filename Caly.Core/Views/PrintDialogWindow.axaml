@@ -161,7 +161,7 @@
                    Text="{Binding StatusMessage}"
                    TextWrapping="Wrap"
                    Margin="0,0,0,8"
-                   Foreground="{DynamicResource SystemErrorTextColor}"
+                   Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}"
                    IsVisible="{Binding HasError}"/>
 
         <TextBlock DockPanel.Dock="Top"

@@ -35,49 +35,61 @@ public sealed partial class MainViewModel
 {
     public bool UseGpuRendering
     {
-        get => !GetSetting(static s => s.UseSoftwareRendering);
+        get => !GetSetting(static s => s.UseSoftwareRendering, false);
         set => SetSetting(static (s, v) => s.UseSoftwareRendering = !v, value);
     }
 
     public bool UseCompactTileFormat
     {
-        get => GetSetting(static s => s.UseCompactTileFormat);
+        get => GetSetting(static s => s.UseCompactTileFormat, false);
         set => SetSetting(static (s, v) => s.UseCompactTileFormat = v, value);
+    }
+
+    public CalyTheme[] ThemeOptions { get; } = Enum.GetValues<CalyTheme>();
+
+    public CalyTheme Theme
+    {
+        get => GetSetting(static s => s.Theme, CalyTheme.Dark);
+        set
+        {
+            SetSetting(static (s, v) => s.Theme = v, value);
+            App.ApplyTheme(value);
+        }
     }
 
     public bool LogRenderTimings
     {
-        get => GetSetting(static s => s.Debug?.LogRenderTimings ?? false);
+        get => GetSetting(static s => s.Debug?.LogRenderTimings ?? false, false);
         set => SetSetting(static (s, v) => (s.Debug ??= new CalySettings.CalySettingsDebug()).LogRenderTimings = v, value);
     }
 
     public bool ShowPdfLogs
     {
-        get => GetSetting(static s => s.ShowPdfLogs);
+        get => GetSetting(static s => s.ShowPdfLogs, false);
         set => SetSetting(static (s, v) => s.ShowPdfLogs = v, value);
     }
 
     public bool DebugRenderTimeGraph
     {
-        get => GetSetting(static s => s.Debug?.Render ?? false);
+        get => GetSetting(static s => s.Debug?.Render ?? false, false);
         set => SetSetting(static (s, v) => (s.Debug ??= new CalySettings.CalySettingsDebug()).Render = v, value);
     }
 
     public bool DebugLayoutTimeGraph
     {
-        get => GetSetting(static s => s.Debug?.Layout ?? false);
+        get => GetSetting(static s => s.Debug?.Layout ?? false, false);
         set => SetSetting(static (s, v) => (s.Debug ??= new CalySettings.CalySettingsDebug()).Layout = v, value);
     }
 
     public bool DebugFps
     {
-        get => GetSetting(static s => s.Debug?.Fps ?? false);
+        get => GetSetting(static s => s.Debug?.Fps ?? false, false);
         set => SetSetting(static (s, v) => (s.Debug ??= new CalySettings.CalySettingsDebug()).Fps = v, value);
     }
 
     public bool DebugDirtyRects
     {
-        get => GetSetting(static s => s.Debug?.DirtyRects ?? false);
+        get => GetSetting(static s => s.Debug?.DirtyRects ?? false, false);
         set => SetSetting(static (s, v) => (s.Debug ??= new CalySettings.CalySettingsDebug()).DirtyRects = v, value);
     }
 
@@ -88,13 +100,13 @@ public sealed partial class MainViewModel
         return CalyExtensions.OpenDirectory(JsonSettingsService.LogFilePath);
     }
 
-    private static bool GetSetting(Func<CalySettings, bool> read)
+    private static T GetSetting<T>(Func<CalySettings, T> read, T fallback)
     {
         var settings = App.Current?.Services?.GetService<ISettingsService>()?.GetSettings();
-        return settings is not null && read(settings);
+        return settings is null ? fallback : read(settings);
     }
 
-    private void SetSetting(Action<CalySettings, bool> write, bool value, [CallerMemberName] string? propertyName = null)
+    private void SetSetting<T>(Action<CalySettings, T> write, T value, [CallerMemberName] string? propertyName = null)
     {
         var service = App.Current?.Services?.GetService<ISettingsService>();
         var settings = service?.GetSettings();

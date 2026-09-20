@@ -31,7 +31,9 @@ using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform.Storage;
+using Avalonia.Styling;
 using Avalonia.Threading;
+using Caly.Core.Models;
 using Caly.Core.Services;
 using Caly.Core.Services.Interfaces;
 using Caly.Core.Utilities;
@@ -247,10 +249,31 @@ public partial class App : Application
         }
 
         // Load settings
-        Services.GetRequiredService<ISettingsService>().Load();
+        var settingsService = Services.GetRequiredService<ISettingsService>();
+        settingsService.Load();
+
+        // On desktop this runs before the window is shown, so a non-default theme does not
+        // flash. The Android activity lifetime defers it until the view is loaded, where a
+        // brief repaint is unavoidable.
+        ApplyTheme(settingsService.GetSettings().Theme);
 
         // We need to make sure IPdfDocumentsService singleton is initiated in UI thread
         _pdfDocumentsService = Services.GetRequiredService<IPdfDocumentsManagerService>();
+    }
+
+    internal static void ApplyTheme(CalyTheme theme)
+    {
+        if (Current is null)
+        {
+            return;
+        }
+
+        Current.RequestedThemeVariant = theme switch
+        {
+            CalyTheme.Light => ThemeVariant.Light,
+            CalyTheme.Dark => ThemeVariant.Dark,
+            _ => ThemeVariant.Default
+        };
     }
 
     protected virtual void OverrideRegisteredServices(IServiceCollection services)

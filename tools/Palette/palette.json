@@ -1,0 +1,69 @@
+{
+  // Colour picks for the two Fluent palettes in Caly.Core/App.axaml.
+  // Edit this file, then run:  dotnet run tools/Palette/GeneratePalette.cs
+  // Never edit the generated <ColorPaletteResources> attributes in App.axaml by hand.
+  //
+  // picks:
+  //   accent   Accent (Avalonia derives AccentDark1-3 / AccentLight1-3 from it)
+  //   ink      text and icons                      -> BaseHigh
+  //   surface  window background, the document view, the selected tab, the desk behind the pages
+  //                                                -> RegionColor
+  //   chrome   control and list-hover fills        -> ChromeMedium, ListLow
+  //   paper    input fields                        -> AltHigh (the other Alt* are paper at 80/60/40/20% alpha)
+  //   error    -> ErrorText: the invalid-input border (e.g. the page number box), the wrong-password
+  //            message and the print status. Optional; omit to keep Fluent's stock colour. Both
+  //            themes currently set Fluent's stock values (red in Light, yellow in Dark).
+  //
+  // ramps: how far each shade sits from surface towards ink (0 = surface, 1 = ink; negative = the
+  // other side of surface). Tuned per theme, because the same contrast needs different steps in
+  // light and dark.
+  //   chromeLow  the "frame" shade, a step darker than surface: tab strip, unselected tabs and the
+  //              navigation pane -> ChromeLow. It also sets how much the selected tab (= surface)
+  //              stands out against the strip: about 8.5 L* below surface in both themes.
+  //              Dark is the reference; Light is tuned to match it.
+  //   tabHover   where the hovered-tab shade sits between chromeLow (0) and surface (1) -> ChromeGray.
+  //              Unlike the other ramps this is not measured from surface towards ink.
+  //
+  // The tab and desk brushes in Caly.Core/CalyTheme.axaml are bound to palette keys identically in
+  // both themes, so these values are the only thing that sets a theme. See README.md.
+
+  "Light": {
+    "picks": {
+      "accent": "#636b8f",
+      "ink": "#120821",
+      "surface": "#eceaf0",
+      "chrome": "#dbd7e1",
+      "paper": "#ffffff",
+      "error": "#c50500"
+    },
+    "ramps": {
+      "baseMediumHigh": 0.815,
+      "baseMedium": 0.745,
+      "baseMediumLow": 0.6,
+      "baseLow": 0.4,
+      "chromeLow": 0.11,
+      "chromeMediumLow": 0.02,
+      "tabHover": 0.5
+    }
+  },
+
+  "Dark": {
+    "picks": {
+      "accent": "#565c77",
+      "ink": "#ffffff",
+      "surface": "#333333",
+      "chrome": "#6a6a6a",
+      "paper": "#000000",
+      "error": "#fff000"
+    },
+    "ramps": {
+      "baseMediumHigh": 0.72,
+      "baseMedium": 0.625,
+      "baseMediumLow": 0.435,
+      "baseLow": 0.25,
+      "chromeLow": -0.09,
+      "chromeMediumLow": 0.18,
+      "tabHover": 0.5
+    }
+  }
+}
