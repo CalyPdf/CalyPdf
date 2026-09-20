@@ -154,6 +154,16 @@ foreach (string theme in new[] { "Light", "Dark" })
     Contrast("D2", "BaseMediumLow", "BaseLow", 1.5, "disabled text on disabled fill");
     Contrast("D3", "TabScrollNavigationButtonForegroundDisabledBrush", "TabControlWindowActiveBackgroundBrush", 1.5, "disabled scroll glyph");
 
+    // Fluent paints the scrollbar track with ChromeMedium unless CalyTheme.axaml overrides the brush, and the thumb
+    // with BaseLow (rest), BaseMediumLow (hover) and BaseMedium (pressed).
+    foreach (string track in new[] { "ScrollBarTrackFill", "ScrollBarTrackFillPointerOver" })
+    {
+        string trackColour = bindings.ContainsKey(track) ? track : "ChromeMedium";
+        Contrast("D4", "BaseLow", trackColour, 1.5, $"scrollbar thumb on {track}");
+        Contrast("D4", "BaseMediumLow", trackColour, 1.5, $"scrollbar thumb, hover, on {track}");
+        Contrast("D4", "BaseMedium", trackColour, 1.5, $"scrollbar thumb, pressed, on {track}");
+    }
+
     // ---- Colour blindness (C) ----
     foreach (var (kind, m) in cvd)
     {

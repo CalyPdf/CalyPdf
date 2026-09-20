@@ -46,4 +46,8 @@
     <SolidColorBrush x:Key="ComboBoxItemForegroundSelectedPointerOver" Color="{DynamicResource SystemChromeWhiteColor}" />
     <SolidColorBrush x:Key="ComboBoxItemForegroundSelectedPressed" Color="{DynamicResource SystemChromeWhiteColor}" />
 
+    <!-- Scrollbar track. Fluent uses ChromeMedium, which in Dark is too close to the BaseLow thumb for the thumb to show. -->
+    <SolidColorBrush x:Key="ScrollBarTrackFill" Color="{DynamicResource SystemChromeLowColor}" />
+    <SolidColorBrush x:Key="ScrollBarTrackFillPointerOver" Color="{DynamicResource SystemChromeLowColor}" />
+
 </ResourceDictionary>
