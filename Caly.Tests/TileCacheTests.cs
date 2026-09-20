@@ -238,6 +238,62 @@ public class TileCacheTests
     }
 
     [Fact]
+    public void Clear_RemovesEveryPagesImagesAndBlanks_AndDisposesTheImagesItDrops()
+    {
+        using var cache = new TileCache();
+        var tile1 = CreateTile();
+        var tile2 = CreateTile();
+        cache.Add(Key(page: 1), tile1);
+        cache.Add(Key(page: 2), tile2);
+        cache.AddBlank(Key(page: 3));
+
+        cache.Clear();
+
+        Assert.Equal(TileCacheState.Missing, cache.Lookup(Key(page: 1)).State);
+        Assert.Equal(TileCacheState.Missing, cache.Lookup(Key(page: 2)).State);
+        Assert.Equal(TileCacheState.Missing, cache.Lookup(Key(page: 3)).State);
+        Assert.Null(cache.GetCachedLevelsAbove(1, -1));
+        Assert.Equal(IntPtr.Zero, tile1.Image.Handle);
+        Assert.Equal(IntPtr.Zero, tile2.Image.Handle);
+    }
+
+    [Fact]
+    public void Clear_ReleasesTheMemoryBudget()
+    {
+        // Two tiles exactly fill the budget: if Clear left the byte counter behind, the re-added
+        // pair would evict each other.
+        using var cache = new TileCache(maxMemoryBytes: TileBytes * 2);
+        cache.Add(Key(col: 0), CreateTile());
+        cache.Add(Key(col: 1), CreateTile());
+
+        cache.Clear();
+
+        cache.Add(Key(col: 0), CreateTile());
+        cache.Add(Key(col: 1), CreateTile());
+
+        foreach (var col in new[] { 0, 1 })
+        {
+            var result = cache.Lookup(Key(col: col));
+            Assert.Equal(TileCacheState.Cached, result.State);
+            result.Image!.Dispose();
+        }
+    }
+
+    [Fact]
+    public void Clear_LeavesAReusableCache()
+    {
+        using var cache = new TileCache();
+        cache.Add(Key(), CreateTile());
+        cache.Clear();
+
+        cache.Add(Key(), CreateTile());
+
+        var result = cache.Lookup(Key());
+        Assert.Equal(TileCacheState.Cached, result.State);
+        result.Image!.Dispose();
+    }
+
+    [Fact]
     public void EvictPageLevelsExcept_KeepsOnlyTheRequestedLevel()
     {
         using var cache = new TileCache();

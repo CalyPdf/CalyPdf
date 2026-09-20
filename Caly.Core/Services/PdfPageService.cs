@@ -809,6 +809,9 @@ namespace Caly.Core.Services
             // Caches - full clear, no buffer retained.
             EvictPicturesOutside(0, 0);
             EvictTextLayersOutside(0, 0);
+
+            // Tiles too
+            TileRenderService.Clear();
         }
 
         public async ValueTask DisposeAsync()
