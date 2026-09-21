@@ -153,10 +153,16 @@ public sealed partial class DocumentViewModel : ViewModelBase
     [ObservableProperty] private int _pageCount;
 
     [ObservableProperty] private string? _fileName;
-    
-    private readonly Lazy<Task> _loadPagesTask;
-    public Task LoadPagesTask => _loadPagesTask.Value;
-    
+
+    private readonly TaskCompletionSource<Task> _pagesLoadOutcome = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>
+    /// Completes once this document's page list has finished populating, or immediately if the
+    /// document failed to open. Safe to await regardless of whether <see cref="LoadDocument"/>
+    /// has been called yet, it just waits.
+    /// </summary>
+    public Task LoadPagesTask => _pagesLoadOutcome.Task.WaitAsync(_mainToken).Unwrap();
+
     private readonly IDisposable _searchResultsDisposable;
 
     private readonly ITextSearchService _textSearchService;
@@ -170,7 +176,6 @@ public sealed partial class DocumentViewModel : ViewModelBase
         }
 
         _mainToken = _mainCts.Token;
-        _loadPagesTask = null!;
         _searchResultsDisposable = null!;
         _propertiesTask = null!;
         _bookmarksTask = null!;
@@ -201,8 +206,6 @@ public sealed partial class DocumentViewModel : ViewModelBase
 
         _pdfService.PasswordPrompt = RequestPasswordAsync;
 
-        _loadPagesTask = new Lazy<Task>(LoadPages);
-        
         _buildSearchIndex = new Lazy<Task>(BuildSearchIndex);
 
         _bookmarksTask = new Lazy<Task<HierarchicalTreeDataGridSource<PdfBookmarkNode>?>>(GetBookmarks);
@@ -445,33 +448,24 @@ public sealed partial class DocumentViewModel : ViewModelBase
                     SelectedPageNumber = 1;
                 }
             }
+            else
+            {
+                IsPagesLoading = false;
+            }
         });
 
         if (state == DocumentOpeningState.Success)
         {
             _pdfPageService.Initialise();
+
+            _pagesLoadOutcome.TrySetResult(Task.Run(LoadPages, _mainToken));
+        }
+        else
+        {
+            _pagesLoadOutcome.TrySetResult(Task.CompletedTask);
         }
 
         return state;
-    }
-
-    /// <summary>
-    /// Wait for document to finish loading, or being cancelled.
-    /// </summary>
-    private async Task WaitForDocumentToLoad()
-    {
-        if (_loadDocumentTask is null)
-        {
-            // This should not happen, as LoadDocument should be called before any operation that requires it.
-            throw new InvalidOperationException("Document has not been loaded yet.");
-        }
-
-        var state = await _loadDocumentTask;
-        if (state != DocumentOpeningState.Success)
-        {
-            // We consider the operation was cancelled because we don't want to re-throw.
-            throw new OperationCanceledException("WaitForDocumentToLoad");
-        }
     }
 
     private async Task LoadPages()
@@ -481,9 +475,6 @@ public sealed partial class DocumentViewModel : ViewModelBase
         try
         {
             await Dispatcher.UIThread.InvokeAsync(() => IsPagesLoading = true);
-
-            // Make sure the doc is open before proceeding because we need TextSelection
-            await WaitForDocumentToLoad();
 
             System.Diagnostics.Debug.Assert(TextSelection is not null);
 
