@@ -22,6 +22,20 @@
         <Style Selector="tabalonia|TabsControl /template/ ContentPresenter#PART_SelectedContentHost">
             <Setter Property="Background" Value="{DynamicResource SystemRegionBrush}" />
         </Style>
+
+        <Style Selector="tabalonia|DragTabItem">
+            <Setter Property="ToolTip.Tip">
+                <Template>
+                    <controls:TabPreviewControl />
+                </Template>
+            </Setter>
+            <Setter Property="ToolTip.Placement" Value="Bottom" />
+            <Setter Property="ToolTip.ShowDelay" Value="500" />
+        </Style>
+
+        <Style Selector="tabalonia|DragTabItem:selected" x:DataType="vm:DocumentViewModel">
+            <Setter Property="ToolTip.Tip" Value="{Binding FileName}" />
+        </Style>
     </UserControl.Styles>
 
 	<tabalonia:TabsControl x:Name="PART_TabsControl"

@@ -675,6 +675,10 @@ public sealed partial class DocumentViewModel : ViewModelBase
             item?.Dispose();
         }
 
+        // Before CancelAndClear empties the picture cache: the pages have dropped their own
+        // references above, but the cache still holds its own, so this is still a downscale.
+        await CaptureTabPreview().ConfigureAwait(false);
+
         await _pdfPageService.CancelAndClear().ConfigureAwait(false);
 
         GC.Collect(GC.MaxGeneration, GCCollectionMode.Optimized, false);

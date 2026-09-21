@@ -31,7 +31,52 @@ internal sealed class RenderingPdfDocumentService : IPdfDocumentService
     public int NumberOfPages => _numberOfPages;
     public string? FileName => "rendering.pdf";
     public bool IsActive { get; set; }
-    public double PpiScale => 1.0;
+
+    /// <summary>
+    /// When set, reading <see cref="PpiScale"/> throws instead of returning a value - simulates
+    /// a rasterisation failure (e.g. an SKSurface allocation failure) inside
+    /// PdfPageService.RasterisePicture, which reads this as its last argument.
+    /// </summary>
+    public bool ThrowOnPpiScaleAccess { get; set; }
+
+    /// <summary>
+    /// When set, reading <see cref="PpiScale"/> blocks until <see cref="ReleaseHang"/> is
+    /// called - simulates a pathological page whose rasterisation never returns, so a timeout
+    /// can be exercised without waiting out a real one.
+    /// </summary>
+    public bool HangOnPpiScaleAccess { get; set; }
+
+    private readonly ManualResetEventSlim _hangGate = new(initialState: false);
+
+    /// <summary>
+    /// Lets a <see cref="PpiScale"/> read blocked on <see cref="HangOnPpiScaleAccess"/> return.
+    /// Always call this before the test ends, even after asserting a timeout fired: the render
+    /// that timed out is abandoned, not stopped, so its thread-pool thread is only freed once
+    /// this unblocks it.
+    /// </summary>
+    public void ReleaseHang() => _hangGate.Set();
+
+    /// <summary>The managed thread id observed the last time <see cref="PpiScale"/> was read.</summary>
+    public int? LastPpiScaleAccessThreadId { get; private set; }
+
+    public double PpiScale
+    {
+        get
+        {
+            if (ThrowOnPpiScaleAccess)
+            {
+                throw new InvalidOperationException("Simulated PpiScale failure.");
+            }
+
+            if (HangOnPpiScaleAccess)
+            {
+                _hangGate.Wait();
+            }
+
+            LastPpiScaleAccessThreadId = Environment.CurrentManagedThreadId;
+            return 1.0;
+        }
+    }
 
     public Task<IRef<SKPicture>?> GetRenderPageAsync(int pageNumber, CancellationToken token)
     {
@@ -94,9 +139,11 @@ internal static class DocumentTestHarness
     /// reading it.
     /// </summary>
     public static DocumentViewModel NewLoadedDocument(RenderingPdfDocumentService pdfService,
-        PdfPageService pageService, int pageCount = 2)
+        PdfPageService pageService, int pageCount = 2, Size? pageSize = null,
+        TimeSpan? tabPreviewTimeout = null)
     {
-        var document = new DocumentViewModel(pdfService, pageService, new NoopTextSearchService());
+        var document = new DocumentViewModel(pdfService, pageService, new NoopTextSearchService(),
+            tabPreviewTimeout);
 
         pdfService.Publish(pageCount);
         pageService.Initialise();
@@ -117,7 +164,7 @@ internal static class DocumentTestHarness
         {
             var page = new PageViewModel(p, document.TextSelection, pageService.TileRenderService,
                 pdfService.PpiScale, document.CopyTextCommand);
-            page.SetSize(new Size(100, 100));
+            page.SetSize(pageSize ?? new Size(100, 100));
             document.Pages.Add(page);
         }
 

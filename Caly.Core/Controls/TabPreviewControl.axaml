@@ -1,0 +1,47 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:Caly.Core.ViewModels"
+             xmlns:progRing="clr-namespace:AvaloniaProgressRing;assembly=AvaloniaProgressRing"
+             mc:Ignorable="d" d:DesignWidth="280" d:DesignHeight="320"
+             x:Class="Caly.Core.Controls.TabPreviewControl"
+             x:DataType="vm:DocumentViewModel">
+
+	<StackPanel Spacing="6" MaxWidth="320">
+
+		<Border IsVisible="{Binding TabPreview, Converter={x:Static ObjectConverters.IsNotNull}}"
+		        BorderThickness="1"
+		        BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+			<LayoutTransformControl>
+				<LayoutTransformControl.LayoutTransform>
+					<RotateTransform Angle="{Binding TabPreviewRotation}" />
+				</LayoutTransformControl.LayoutTransform>
+				<Image Source="{Binding TabPreview}"
+				       Stretch="Uniform"
+				       Height="256"
+				       MaxWidth="320" />
+			</LayoutTransformControl>
+		</Border>
+
+		<Border IsVisible="{Binding IsTabPreviewLoading}" Height="256">
+			<progRing:ProgressRing Width="32"
+			                       Height="32"
+			                       HorizontalAlignment="Center"
+			                       VerticalAlignment="Center"
+			                       Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+			                       IsActive="{Binding IsTabPreviewLoading}"
+			                       IsVisible="{Binding IsTabPreviewLoading}" />
+		</Border>
+
+		<TextBlock Text="{Binding FileName}"
+		           FontWeight="SemiBold"
+		           TextTrimming="CharacterEllipsis" />
+
+		<TextBlock Text="{Binding TabPreviewCaption}"
+		           IsVisible="{Binding TabPreviewCaption, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+		           Opacity="0.7" />
+
+	</StackPanel>
+
+</UserControl>
