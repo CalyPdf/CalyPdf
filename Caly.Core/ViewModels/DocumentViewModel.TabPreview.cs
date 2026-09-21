@@ -18,7 +18,7 @@ public partial class DocumentViewModel
     /// "stop the work" - the abandoned render keeps running until it (if ever) returns.
     /// TODO - The last sentence is very problematic, and needs to be addressed.
     /// </summary>
-    private static readonly TimeSpan _tabPreviewTimeout = TimeSpan.FromSeconds(5);
+    private readonly TimeSpan _tabPreviewTimeout;
 
     /// <summary>
     /// Snapshot of the page the user was last on, shown in this document's tab hover preview.

@@ -20,6 +20,7 @@
 using System;
 using Avalonia.Controls;
 using Avalonia.Controls.Notifications;
+using Avalonia.Interactivity;
 using Caly.Core.Models;
 using Caly.Core.Services;
 using Caly.Core.Services.Interfaces;
@@ -73,6 +74,54 @@ public sealed partial class DocumentsTabsControl : UserControl
                 registry.CloseWindowIfEmpty(viewModel);
             }
         };
+
+        // Live crash: "TabPreviewControl already has a visual parent... while trying to add it
+        // as a child" from ToolTip.Open, hit by rapidly sweeping the pointer across tabs. The
+        // base tabalonia|DragTabItem style's ToolTip.Tip Setter materialises one TabPreviewControl
+        // per tab and ToolTip.IsOpenChanged then caches and reuses that same instance (and its
+        // ToolTip wrapper) across every hover, closing then immediately reopening it when a fast
+        // sweep re-hovers a tab within ToolTip.BetweenShowDelay. A control that has only just
+        // begun detaching from its closing popup can still be attached when that reopen tries to
+        // reparent it. Handled here rather than removing the XAML Setter: ToolTipOpeningEvent
+        // fires - and a handler can still replace ToolTip.Tip - before IsOpenChanged reads it, so
+        // a control that has never been parented is what actually opens each time.
+        tabsControl.ContainerPrepared += (_, e) =>
+        {
+            if (e.Container is DragTabItem tabItem)
+            {
+                ToolTip.AddToolTipOpeningHandler(tabItem, OnTabTooltipOpening);
+            }
+        };
+
+        tabsControl.ContainerClearing += (_, e) =>
+        {
+            if (e.Container is DragTabItem tabItem)
+            {
+                ToolTip.RemoveToolTipOpeningHandler(tabItem, OnTabTooltipOpening);
+            }
+        };
+    }
+
+    /// <summary>
+    /// Swaps in a fresh <see cref="TabPreviewControl"/> right before the tooltip opens, so the
+    /// popup never reattaches an instance that may still be detaching from a previous one.
+    /// Skipped for the selected tab, whose <c>ToolTip.Tip</c> is a plain file-name string (see
+    /// the <c>:selected</c> style below) that this must not clobber.
+    /// <para>
+    /// <see cref="AvaloniaObject.SetCurrentValue(AvaloniaProperty, object?)"/>, not
+    /// <see cref="ToolTip.SetTip"/>: that sets a local value, which outranks every style -
+    /// including the <c>:selected</c> style below - and would permanently pin this tab's tip to
+    /// a <see cref="TabPreviewControl"/> even after it becomes selected. SetCurrentValue updates
+    /// today's effective value without acquiring that priority, so the base style's Setter (and
+    /// the higher-priority <c>:selected</c> one, when it applies) still govern normally.
+    /// </para>
+    /// </summary>
+    private static void OnTabTooltipOpening(object? sender, CancelRoutedEventArgs e)
+    {
+        if (sender is Control control && ToolTip.GetTip(control) is TabPreviewControl)
+        {
+            control.SetCurrentValue(ToolTip.TipProperty, new TabPreviewControl());
+        }
     }
 
     /// <summary>
