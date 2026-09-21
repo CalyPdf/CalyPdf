@@ -89,8 +89,9 @@ public sealed partial class DocumentViewModel : ViewModelBase
     [ObservableProperty] private bool _isPagesLoading = true; // Start state is true, even if pages have not started loading just yet
 
     /// <summary>
-    /// Starts at <c>1</c>, ends at <see cref="PageCount"/>.
-    /// <para><c>null</c> if not selected.</para>
+    /// <c>null</c> until the document has finished loading (there is nothing valid to select
+    /// while <see cref="PageCount"/> is still <c>0</c>) or if not selected. Set to <c>1</c> once
+    /// loading succeeds; ends at <see cref="PageCount"/>.
     /// </summary>
     public int? SelectedPageNumber
     {
@@ -120,7 +121,7 @@ public sealed partial class DocumentViewModel : ViewModelBase
             GoToNextPageCommand.NotifyCanExecuteChanged();
             QueueActiveBookmarkUpdate();
         }
-    } = 1;
+    }
 
     /// <summary>
     /// Starts at <c>0</c>, ends at <see cref="PageCount"/> <c>- 1</c>.
@@ -439,6 +440,10 @@ public sealed partial class DocumentViewModel : ViewModelBase
             {
                 PageCount = numberOfPages;
                 TextSelection = new TextSelection(numberOfPages);
+                if (numberOfPages > 0)
+                {
+                    SelectedPageNumber = 1;
+                }
             }
         });
 

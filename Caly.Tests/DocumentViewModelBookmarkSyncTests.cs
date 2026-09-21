@@ -91,6 +91,14 @@ public class DocumentViewModelBookmarkSyncTests
             TextSelection = new TextSelection(pageCount)
         };
 
+        // Mirrors LoadDocumentCore's own post-success assignment - SelectedPageNumber has no
+        // field initialiser any more (it must stay null until PageCount is real), so this
+        // helper has to set it explicitly to reproduce "a document the user has already opened".
+        if (pageCount > 0)
+        {
+            doc.SelectedPageNumber = 1;
+        }
+
         for (int p = 1; p <= pageCount; ++p)
         {
             doc.Pages.Add(new PageViewModel(p, doc.TextSelection!, pageService.TileRenderService, 1.0, doc.CopyTextCommand)
