@@ -351,21 +351,20 @@ namespace Caly.Core.Services
             }
         }
 
-        private async Task SetThumbnail(PageViewModel vm, SKPicture picture, CancellationToken token)
+        /// <summary>
+        /// Draws <paramref name="picture"/> into a <paramref name="target"/>-sized bitmap.
+        /// </summary>
+        /// <remarks>
+        /// Rgb565 (2 bytes/pixel, no alpha): the colour-depth loss is invisible at these sizes.
+        /// </remarks>
+        private static WriteableBitmap RasterisePicture(SKPicture picture, PixelSize target,
+            Size pageSize, double ppiScale)
         {
-            Debug.ThrowOnUiThread();
+            var skImageInfo = new SKImageInfo(target.Width, target.Height,
+                SKColorType.Rgb565, SKAlphaType.Opaque);
 
-            token.ThrowIfCancellationRequested();
-            int tWidth = vm.ThumbnailSize.Width;
-            int tHeight = vm.ThumbnailSize.Height;
-
-            // A thumbnail's colour depth loss (Rgb565) is far less noticeable at that size.
-            var skImageInfo = new SKImageInfo(tWidth, tHeight, SKColorType.Rgb565, SKAlphaType.Opaque);
-
-            SKMatrix scale = SKMatrix.CreateScale(tWidth / (float)(vm.Size.Width / vm.PpiScale),
-                tHeight / (float)(vm.Size.Height / vm.PpiScale));
-
-            token.ThrowIfCancellationRequested();
+            SKMatrix scale = SKMatrix.CreateScale(target.Width / (float)(pageSize.Width / ppiScale),
+                target.Height / (float)(pageSize.Height / ppiScale));
 
             using (var surface = SKSurface.Create(skImageInfo))
             {
@@ -374,28 +373,96 @@ namespace Caly.Core.Services
                 canvas.DrawPicture(picture, in scale);
 
 #if DEBUG
-                using (var skFont = SKTypeface.Default.ToFont(tHeight * (float)_pdfDocumentService.PpiScale / 5f, 1f))
+                using (var skFont = SKTypeface.Default.ToFont(target.Height * (float)ppiScale / 5f, 1f))
                 using (var paint = new SKPaint())
                 {
                     paint.Style = SKPaintStyle.Fill;
                     paint.Color = SKColors.Blue.WithAlpha(150);
-                    canvas.DrawText(picture.UniqueId.ToString(), tWidth / 4f, tHeight / 2f, skFont, paint);
+                    canvas.DrawText(picture.UniqueId.ToString(), target.Width / 4f, target.Height / 2f, skFont, paint);
                 }
 #endif
 
-                var thumbnail = new WriteableBitmap(
-                    new PixelSize(tWidth, tHeight),
+                var bitmap = new WriteableBitmap(
+                    target,
                     new Vector(96, 96),
                     PixelFormat.Rgb565,
                     AlphaFormat.Opaque);
 
-                using (var fb = thumbnail.Lock())
+                using (var fb = bitmap.Lock())
                 {
                     surface.ReadPixels(skImageInfo, fb.Address, fb.RowBytes, 0, 0);
                 }
 
-                await Dispatcher.UIThread.InvokeAsync(() => vm.Thumbnail = thumbnail, DispatcherPriority.Background);
+                return bitmap;
             }
+        }
+
+        private async Task SetThumbnail(PageViewModel vm, SKPicture picture, CancellationToken token)
+        {
+            Debug.ThrowOnUiThread();
+
+            token.ThrowIfCancellationRequested();
+
+            var thumbnail = RasterisePicture(picture, vm.ThumbnailSize, vm.Size, vm.PpiScale);
+
+            await Dispatcher.UIThread.InvokeAsync(() => vm.Thumbnail = thumbnail, DispatcherPriority.Background);
+        }
+
+        /// <summary>
+        /// Rasterises <paramref name="pageNumber"/> for a tab hover preview, but only if its
+        /// picture is already cached. Returns <c>null</c> otherwise.
+        /// </summary>
+        /// <remarks>
+        /// Deliberately not <see cref="GetPicture"/>: the caller is a document being torn down,
+        /// and rendering there would defeat the teardown it is part of.
+        /// </remarks>
+        public WriteableBitmap? TryCapturePreview(int pageNumber, PixelSize target, Size pageSize)
+        {
+            if (!_cachePictures.TryGetValue(pageNumber, out var cached))
+            {
+                return null;
+            }
+
+            IRef<SKPicture>? picture = null;
+            try
+            {
+                picture = cached.Clone();
+                return RasterisePicture(picture.Item, target, pageSize, _pdfDocumentService.PpiScale);
+            }
+            catch (ObjectDisposedException)
+            {
+                return null;
+            }
+            finally
+            {
+                picture?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Renders <paramref name="pageNumber"/> for a tab hover preview, rendering the page
+        /// itself if it is not cached.
+        /// </summary>
+        /// <remarks>
+        /// Only for the hover fallback, where the user has asked for a preview a deactivation
+        /// could not capture. It leaves the page in the picture cache, so an inactive caller
+        /// must clear up after it.
+        /// </remarks>
+        public async Task<WriteableBitmap?> RenderPreviewAsync(int pageNumber, PixelSize target,
+            Size pageSize, CancellationToken token)
+        {
+            Debug.ThrowOnUiThread();
+
+            using var picture = await GetPicture(pageNumber, token).ConfigureAwait(false);
+
+            if (picture is null)
+            {
+                return null;
+            }
+
+            token.ThrowIfCancellationRequested();
+
+            return RasterisePicture(picture.Item, target, pageSize, _pdfDocumentService.PpiScale);
         }
 
         private async Task ProcessTextLayerRequest(RenderRequest renderRequest)
