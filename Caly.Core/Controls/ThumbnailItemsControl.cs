@@ -205,7 +205,6 @@ public sealed class ThumbnailItemsControl : ListBox
         if (change.Property == DataContextProperty)
         {
             ResetState();
-            _visibilityTracker.EnsureValidContainersVisibility();
         }
         else if (change.Property == IsVisibleProperty)
         {
@@ -221,7 +220,6 @@ public sealed class ThumbnailItemsControl : ListBox
                     _isScrollingToPage = false;
                 }
 
-                _visibilityTracker.EnsureValidContainersVisibility();
                 _visibilityTracker.PostUpdateVisibility();
             }
             else if (change is { OldValue: true, NewValue: false })

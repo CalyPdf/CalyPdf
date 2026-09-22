@@ -62,8 +62,7 @@ public sealed class PageItemsControl : ItemsControl
     private readonly TextSelectionInputHandler _textSelectionHandler;
 
     /// <summary>
-    /// Shared visibility-tracking machinery (debounced updates, realized-range
-    /// queries, container-visibility workaround).
+    /// Shared visibility-tracking machinery (debounced updates, realized-range queries).
     /// </summary>
     private readonly VirtualizedVisibilityTracker _visibilityTracker;
 
@@ -829,7 +828,6 @@ public sealed class PageItemsControl : ItemsControl
             ResetState();
             _pendingScrollToPage = true;
             Scroll?.Focus();
-            _visibilityTracker.EnsureValidContainersVisibility();
             ItemsPanelRoot?.LayoutUpdated -= ItemsPanelRoot_LayoutUpdated;
             ItemsPanelRoot?.LayoutUpdated += ItemsPanelRoot_LayoutUpdated;
         }
