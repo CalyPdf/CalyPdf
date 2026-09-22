@@ -3,7 +3,8 @@
                     xmlns:controls="using:Caly.Core.Controls"
                     xmlns:vm="clr-namespace:Caly.Core.ViewModels"
                     xmlns:utilities="clr-namespace:Caly.Core.Utilities"
-                    xmlns:rendering="clr-namespace:Caly.Core.Controls.Rendering">
+                    xmlns:rendering="clr-namespace:Caly.Core.Controls.Rendering"
+                    xmlns:converters="clr-namespace:Caly.Core.Converters">
 
 
     <Design.PreviewWith>
@@ -18,7 +19,13 @@
                   TargetType="controls:PageItem"
                   x:DataType="vm:PageViewModel">
 
-        <Setter Property="Margin" Value="0,0,0,5"/>
+        <Setter Property="Margin"
+                Value="{Binding $parent[controls:PageItemsControl].ZoomLevel,
+                                 Converter={x:Static converters:ZoomToPageSpacingConverter.Instance},
+                                 ConverterParameter=5}"/>
+
+        <!-- Need UseLayoutRounding=False because margin above shrinks below a device pixel at high zoom -->
+        <Setter Property="UseLayoutRounding" Value="False"/>
         <Setter Property="Exception" Value="{Binding Exception}"/>
 		<Setter Property="Width" Value="{Binding DisplayWidth}"/>
 		<Setter Property="Height" Value="{Binding DisplayHeight}"/>
