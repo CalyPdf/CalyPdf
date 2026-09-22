@@ -19,8 +19,6 @@
 // SOFTWARE.
 
 using System;
-using System.Linq;
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
 
@@ -29,9 +27,8 @@ namespace Caly.Core.Controls;
 /// <summary>
 /// Shared visibility-tracking machinery for the virtualized items controls
 /// (<see cref="PageItemsControl"/> and <see cref="ThumbnailItemsControl"/>):
-/// debounced visibility updates, realized-index range queries against the
-/// <see cref="VirtualizingStackPanel"/>, and the realized-containers visibility
-/// workaround for https://github.com/CalyPdf/Caly/issues/11.
+/// debounced visibility updates and realized-index range queries against the
+/// <see cref="VirtualizingStackPanel"/>.
 /// </summary>
 internal sealed class VirtualizedVisibilityTracker
 {
@@ -131,26 +128,5 @@ internal sealed class VirtualizedVisibilityTracker
     {
         return _owner.ItemsPanelRoot is VirtualizingStackPanel vsp &&
                vsp.FirstRealizedIndex != -1 && vsp.LastRealizedIndex != -1;
-    }
-
-    /// <summary>
-    /// Hides panel children that are still visible but no longer realized.
-    /// This is a hack to ensure only valid containers (realised) are visible.
-    /// See https://github.com/CalyPdf/Caly/issues/11
-    /// </summary>
-    public void EnsureValidContainersVisibility()
-    {
-        if (_owner.ItemsPanelRoot is null)
-        {
-            return;
-        }
-
-        var realised = _owner.GetRealizedContainers();
-        var visibleChildren = _owner.ItemsPanelRoot.Children.Where(c => c.IsVisible);
-
-        foreach (var child in visibleChildren.Except(realised))
-        {
-            child.SetCurrentValue(Visual.IsVisibleProperty, false);
-        }
     }
 }
