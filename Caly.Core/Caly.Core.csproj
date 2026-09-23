@@ -5,7 +5,7 @@
 		<LangVersion>latest</LangVersion>
 		<AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
 		<ApplicationIcon>Assets\caly-logo.ico</ApplicationIcon>
-		<Version>0.2.0.0</Version>
+		<Version>0.4.0.0</Version>
 		<SignAssembly>True</SignAssembly>
 		<AssemblyOriginatorKeyFile>..\Caly.snk</AssemblyOriginatorKeyFile>
 	</PropertyGroup>
