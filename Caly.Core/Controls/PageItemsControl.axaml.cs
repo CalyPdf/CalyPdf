@@ -638,72 +638,82 @@ public sealed class PageItemsControl : ItemsControl
             return null;
         }
 
-        int minPageIndex = _visibilityTracker.GetFirstRealizedIndex();
-        int maxPageIndex = _visibilityTracker.GetLastRealizedIndex();
+        // Strictly over the page: not in the gap below it, nor beside it.
+        return GetRealizedPageItemAtY(point.Y, out _) is { } pageItem && pageItem.Bounds.Contains(point)
+            ? pageItem
+            : null;
+    }
 
-        if (minPageIndex == -1 || maxPageIndex == -1)
+    /// <summary>
+    /// Finds the realized page whose vertical band contains <paramref name="y"/>, in
+    /// <see cref="ItemsControl.Presenter"/> (unscaled panel) coordinates. A page's band runs
+    /// from its top to the next page's top, i.e. it includes the gap below it. The horizontal
+    /// position is ignored.
+    /// <para>
+    /// Realized pages are laid out in index order, so this is a binary search over the
+    /// realized index range, without allocation.
+    /// </para>
+    /// </summary>
+    /// <param name="y">The Y coordinate, in presenter coordinates.</param>
+    /// <param name="index">The page index (0-based), or -1 if no realized page contains <paramref name="y"/>.</param>
+    internal PageItem? GetRealizedPageItemAtY(double y, out int index)
+    {
+        int lo = _visibilityTracker.GetFirstRealizedIndex();
+        int hi = _visibilityTracker.GetLastRealizedIndex() - 1; // Exclusive to inclusive
+
+        while (lo >= 0 && lo <= hi)
         {
-            return null;
-        }
-
-        int startIndex = SelectedPageNumber.HasValue ? SelectedPageNumber.Value - 1 : 0; // Switch from one-indexed to zero-indexed
-
-        bool isAfterSelectedPage = false;
-
-        // Check selected current page
-        if (ContainerFromIndex(startIndex) is PageItem presenter)
-        {
-            if (presenter.Bounds.Contains(point))
+            int mid = lo + ((hi - lo) >> 1);
+            if (ContainerFromIndex(mid) is not PageItem pageItem)
             {
-                return presenter;
+                // A transient hole in the realized range (e.g. during a collection
+                // change) breaks the ordering the binary search relies on.
+                return GetRealizedPageItemAtYLinear(y, lo, hi, out index);
             }
 
-            isAfterSelectedPage = point.Y > presenter.Bounds.Bottom;
-        }
-
-        if (isAfterSelectedPage)
-        {
-            // Start with checking forward
-            for (int p = startIndex + 1; p < maxPageIndex; ++p)
+            Rect bounds = pageItem.Bounds;
+            if (y < bounds.Top)
             {
-                if (ContainerFromIndex(p) is not PageItem cp)
-                {
-                    continue;
-                }
-
-                if (cp.Bounds.Contains(point))
-                {
-                    return cp;
-                }
-
-                if (point.Y < cp.Bounds.Top)
-                {
-                    return null;
-                }
+                hi = mid - 1;
             }
-        }
-        else
-        {
-            // Continue with checking backward
-            for (int p = startIndex - 1; p >= minPageIndex; --p)
+            else if (y >= bounds.Bottom + pageItem.Margin.Bottom)
             {
-                if (ContainerFromIndex(p) is not PageItem cp)
-                {
-                    continue;
-                }
-
-                if (cp.Bounds.Contains(point))
-                {
-                    return cp;
-                }
-
-                if (point.Y > cp.Bounds.Bottom)
-                {
-                    return null;
-                }
+                lo = mid + 1;
+            }
+            else
+            {
+                index = mid;
+                return pageItem;
             }
         }
 
+        index = -1;
+        return null;
+    }
+
+    private PageItem? GetRealizedPageItemAtYLinear(double y, int first, int last, out int index)
+    {
+        for (int p = first; p <= last; ++p)
+        {
+            if (ContainerFromIndex(p) is not PageItem pageItem)
+            {
+                continue;
+            }
+
+            Rect bounds = pageItem.Bounds;
+            if (y < bounds.Top)
+            {
+                break; // Pages are ordered, no later page can contain y
+            }
+
+            if (y < bounds.Bottom + pageItem.Margin.Bottom)
+            {
+                index = p;
+                return pageItem;
+            }
+        }
+
+        index = -1;
         return null;
     }
 
@@ -833,7 +843,7 @@ public sealed class PageItemsControl : ItemsControl
         }
         else if (change.Property == ZoomLevelProperty)
         {
-            _zoomPanController.HandleExternalZoomLevelChanged(change);
+            _zoomPanController.HandleExternalZoomLevelChanged();
         }
     }
 
