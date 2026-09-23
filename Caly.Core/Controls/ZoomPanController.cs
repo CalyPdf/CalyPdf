@@ -22,6 +22,7 @@ using System;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Layout;
 using Avalonia.Media.Transformation;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -76,27 +77,36 @@ internal sealed class ZoomPanController
     /// commands), zooming around the viewport centre. Changes produced by the
     /// wheel/pinch/programmatic handlers have already updated the layout transform, so
     /// the scale comparison below turns them into no-ops.
+    /// <para>
+    /// This is called from <see cref="PageItemsControl"/>'s <c>OnPropertyChanged</c>, which
+    /// runs before bindings to <see cref="PageItemsControl.ZoomLevel"/> are notified, so the
+    /// zoom-dependent page gap margin (see <see cref="Converters.ZoomToPageSpacingConverter"/>)
+    /// still holds its old value. The zoom is therefore applied at
+    /// <see cref="DispatcherPriority.Send"/>, once bindings are up to date but still ahead of
+    /// the next layout pass.
+    /// </para>
     /// </summary>
-    public void HandleExternalZoomLevelChanged(AvaloniaPropertyChangedEventArgs change)
+    public void HandleExternalZoomLevelChanged()
+    {
+        Dispatcher.UIThread.Post(ApplyExternalZoomLevel, DispatcherPriority.Send);
+    }
+
+    private void ApplyExternalZoomLevel()
     {
         var layoutTransform = _owner.LayoutTransform;
-        if (layoutTransform is null || change.NewValue is not double newZoom)
+        if (layoutTransform is null || !layoutTransform.IsAttachedToVisualTree())
         {
             return;
         }
 
-        if (!layoutTransform.IsAttachedToVisualTree())
-        {
-            return;
-        }
-
-        var currentScale = layoutTransform.LayoutTransform?.Value.M11;
-        if (currentScale.HasValue && Math.Abs(currentScale.Value - newZoom) < 1e-9)
+        double newZoom = _owner.ZoomLevel;
+        double currentScale = layoutTransform.LayoutTransform?.Value.M11 ?? 1.0;
+        if (Math.Abs(currentScale - newZoom) < 1e-9)
         {
             return; // Ignore as no change in zoom level
         }
 
-        double dZoom = newZoom / (double?)change.OldValue ?? 1.0;
+        double dZoom = newZoom / currentScale;
 
         double w = 0, h = 0;
         if (!_owner.DesiredSize.IsEmpty())
@@ -146,7 +156,6 @@ internal sealed class ZoomPanController
             IsZooming = true;
             double dZoom = Math.Round(Math.Pow(ZoomFactor, e.Delta.Y), 4); // If IsScrollInertiaEnabled = false, Y is only 1 or -1
             ZoomToInternal(dZoom, e.GetPosition(_owner.LayoutTransform));
-            _owner.SetCurrentValue(PageItemsControl.ZoomLevelProperty, _owner.LayoutTransform.LayoutTransform?.Value.M11);
         }
         finally
         {
@@ -224,19 +233,91 @@ internal sealed class ZoomPanController
             dZoom = newZoom / oldZoom;
         }
 
+        // Capture the zoom origin relative to the page under it before the layout changes.
+        var anchor = GetPageAnchor(layoutTransform, point);
+        double viewportY = point.Y - scroll.Offset.Y;
+
         var builder = TransformOperations.CreateBuilder(1);
         builder.AppendScale(newZoom, newZoom);
         layoutTransform.LayoutTransform = builder.Build();
 
-        var offset = scroll.Offset - GetOffset(dZoom, point.X, point.Y);
-        if (newZoom > oldZoom)
+        // Publish the new zoom level now, so zoom-dependent page layout (the page gap
+        // margin, see ZoomToPageSpacingConverter) changes in the same layout pass as
+        // the transform. A no-op when the change came from ZoomLevel itself.
+        double appliedZoom = layoutTransform.LayoutTransform?.Value.M11 ?? newZoom;
+        if (Math.Abs(_owner.ZoomLevel - appliedZoom) > 1e-9)
         {
-            // When zooming-in, we need to re-arrange the scroll viewer
-            scroll.Measure(Size.Infinity);
-            scroll.Arrange(new Rect(scroll.DesiredSize));
+            _owner.SetCurrentValue(PageItemsControl.ZoomLevelProperty, appliedZoom);
+        }
+
+        var offset = scroll.Offset - GetOffset(dZoom, point.X, point.Y);
+
+        // Lay out now so the scroll extent is up to date before setting the offset
+        // (which is coerced against it), and so the anchor page has its new position.
+        // Only the scroll viewer is measured and arranged, rather than a full UpdateLayout():
+        // that would also update the panel's effective viewport with the old offset at the
+        // new scale which, deep in a document, is many pages away from the zoom origin. The
+        // panel would then recycle the visible pages' containers onto those pages and back
+        // again once the offset is set (flicker). Here the panel keeps its pre-zoom viewport,
+        // which covers the pages around the zoom origin.
+        // The chain from the panel up is invalidated explicitly: outside a layout pass, only
+        // the pages (margin) and the layout transform control are invalid, so measuring the
+        // scroll viewer with an unchanged constraint would otherwise be a no-op.
+        for (var visual = _owner.ItemsPanelRoot as Visual; visual is not null && visual != scroll; visual = visual.GetVisualParent())
+        {
+            (visual as Layoutable)?.InvalidateMeasure();
+        }
+
+        scroll.InvalidateMeasure();
+        scroll.Measure(LayoutInformation.GetPreviousMeasureConstraint(scroll) ?? scroll.Bounds.Size);
+        scroll.Arrange(LayoutInformation.GetPreviousArrangeBounds(scroll) ?? scroll.Bounds);
+
+        // The page gap changes every page's size in panel space, which makes the
+        // VirtualizingStackPanel re-estimate page positions (as index * average size).
+        // Content positions therefore do not simply scale with the zoom, so re-anchor
+        // vertically on the page that was under the zoom origin.
+        if (anchor.HasValue && GetAnchorContentY(layoutTransform, anchor.Value) is { } anchorY)
+        {
+            offset = offset.WithY(anchorY - viewportY);
         }
 
         scroll.SetCurrentValue(ScrollViewer.OffsetProperty, offset);
+    }
+
+    /// <summary>
+    /// Finds the realized page under <paramref name="point"/> (in <paramref name="layoutTransform"/>
+    /// coordinates) and returns its index and the unscaled Y of the point within that page.
+    /// The gap below a page counts as part of that page, and the horizontal position is
+    /// ignored, so zooming with the pointer beside or between pages still anchors.
+    /// </summary>
+    private (int Index, double YInPage)? GetPageAnchor(LayoutTransformControl layoutTransform, Point point)
+    {
+        if (_owner.Presenter is not { } presenter ||
+            layoutTransform.TranslatePoint(point, presenter) is not { } presenterPoint ||
+            _owner.GetRealizedPageItemAtY(presenterPoint.Y, out int index) is not { } pageItem)
+        {
+            return null;
+        }
+
+        return (index, presenterPoint.Y - pageItem.Bounds.Top);
+    }
+
+    /// <summary>
+    /// Gets the current Y, in <paramref name="layoutTransform"/> coordinates, of the anchor
+    /// captured by <see cref="GetPageAnchor"/>, realizing the anchor page if the re-layout
+    /// recycled it.
+    /// </summary>
+    private double? GetAnchorContentY(LayoutTransformControl layoutTransform, (int Index, double YInPage) anchor)
+    {
+        var container = _owner.ContainerFromIndex(anchor.Index);
+        if (container is null)
+        {
+            _owner.ScrollIntoView(anchor.Index);
+            _owner.UpdateLayout();
+            container = _owner.ContainerFromIndex(anchor.Index);
+        }
+
+        return container?.TranslatePoint(new Point(0, anchor.YInPage), layoutTransform)?.Y;
     }
 
     private static Vector GetOffset(double scale, double x, double y)
@@ -299,7 +380,6 @@ internal sealed class ZoomPanController
             // TODO - Origin still not correct
             var point = _owner.LayoutTransform.PointToClient(new PixelPoint((int)e.ScaleOrigin.X, (int)e.ScaleOrigin.Y));
             ZoomToInternal(dZoom, point);
-            _owner.SetCurrentValue(PageItemsControl.ZoomLevelProperty, _owner.LayoutTransform.LayoutTransform?.Value.M11);
         }
         finally
         {
