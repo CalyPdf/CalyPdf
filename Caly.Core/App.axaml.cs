@@ -290,45 +290,7 @@ public partial class App : Application
 
         // Resolving the service is thread-safe; reading the registry is not, so that happens
         // inside BringToFront, on the UI thread.
-        return BringToFront(Services?.GetService<ICalyWindowRegistry>());
-    }
-
-    /// <summary>
-    /// Raises the window the user last worked in.
-    /// </summary>
-    internal static bool BringToFront(ICalyWindowRegistry? registry)
-    {
-        if (registry is null)
-        {
-            return false;
-        }
-
-        try
-        {
-            return Dispatcher.UIThread.Invoke(() =>
-            {
-                // Null once every window has closed
-                if (registry.Active?.Window is not { } window)
-                {
-                    return false;
-                }
-
-                window.Activate(); // Bring window to front
-
-                // Popup from taskbar
-                if (window.WindowState == WindowState.Minimized)
-                {
-                    window.WindowState = WindowState.Normal;
-                }
-
-                return true;
-            });
-        }
-        catch
-        {
-            // Includes the dispatcher having shut down under a request that arrived during exit.
-            return false;
-        }
+        return Helpers.BringWindowToFront(Services?.GetService<ICalyWindowRegistry>());
     }
 
     private async void Desktop_Startup(object? sender, ControlledApplicationLifetimeStartupEventArgs e)

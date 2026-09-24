@@ -4,6 +4,7 @@ using Avalonia.Threading;
 using Caly.Core;
 using Caly.Core.Services;
 using Caly.Core.Services.Interfaces;
+using Caly.Core.Utilities;
 using Caly.Core.ViewModels;
 
 namespace Caly.Tests;
@@ -98,7 +99,7 @@ public class BringToFrontThreadingTests
         {
             var registry = new ThreadRecordingWindowRegistry(NewContext(window));
 
-            bool raised = await Task.Run(() => App.BringToFront(registry));
+            bool raised = await Task.Run(() => Helpers.BringWindowToFront(registry));
 
             Assert.True(raised);
             Assert.NotEmpty(registry.ActiveReadOnUiThread);
@@ -125,7 +126,7 @@ public class BringToFrontThreadingTests
         {
             var registry = new ThreadRecordingWindowRegistry(NewContext(window), throwOnRead: true);
 
-            Assert.False(await Task.Run(() => App.BringToFront(registry)));
+            Assert.False(await Task.Run(() => Helpers.BringWindowToFront(registry)));
         }
         finally
         {
@@ -142,14 +143,14 @@ public class BringToFrontThreadingTests
     {
         var registry = new ThreadRecordingWindowRegistry(active: null);
 
-        Assert.False(await Task.Run(() => App.BringToFront(registry)));
+        Assert.False(await Task.Run(() => Helpers.BringWindowToFront(registry)));
         Assert.All(registry.ActiveReadOnUiThread, Assert.True);
     }
 
     [AvaloniaFact]
     public void WithNoRegistry_ReportsNothingToRaise()
     {
-        Assert.False(App.BringToFront(null));
+        Assert.False(Helpers.BringWindowToFront(null));
     }
 
     /// <summary>
@@ -167,7 +168,7 @@ public class BringToFrontThreadingTests
             window.WindowState = WindowState.Minimized;
             Dispatcher.UIThread.RunJobs();
 
-            Assert.True(await Task.Run(() => App.BringToFront(new ThreadRecordingWindowRegistry(NewContext(window)))));
+            Assert.True(await Task.Run(() => Helpers.BringWindowToFront(new ThreadRecordingWindowRegistry(NewContext(window)))));
             Dispatcher.UIThread.RunJobs();
 
             Assert.Equal(WindowState.Normal, window.WindowState);
