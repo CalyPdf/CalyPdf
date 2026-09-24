@@ -18,6 +18,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using Avalonia.Controls;
+using Avalonia.Threading;
+using Caly.Core.Services;
+using Caly.Core.Services.Interfaces;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -159,5 +163,55 @@ internal static class Helpers
         }
 
         return builder.ToString();
+    }
+
+    /// <summary>
+    /// Bring the window associated with the given document to the front.
+    /// If no document is provided, bring the active or primary window to the front.
+    /// </summary>
+    internal static bool BringWindowToFront(this ICalyWindowRegistry? registry, CalyWindowContext? context = null)
+    {
+        if (registry is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            return Dispatcher.UIThread.Invoke(() =>
+            {
+                // Readingg the registry needs to be done on the UI thread
+                Window? window = null;
+                if (context is not null)
+                {
+                    window = context.Window;
+                }
+                else
+                {
+                    window = registry.Active?.Window ?? registry.Primary?.Window;
+                }
+
+                if (window is null)
+                {
+                    return false;
+                }
+
+                // Popup from taskbar
+                if (window.WindowState == WindowState.Minimized)
+                {
+                    window.WindowState = WindowState.Normal;
+                }
+
+                window.Activate(); // Bring window to front
+
+                return true;
+            });
+        }
+        catch (Exception ex)
+        {
+            // Includes the dispatcher having shut down under a request that arrived during exit.
+            Debug.WriteExceptionToFile(ex);
+            return false;
+        }
     }
 }

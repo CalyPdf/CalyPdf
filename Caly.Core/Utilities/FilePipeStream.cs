@@ -154,7 +154,8 @@ public sealed class FilePipeStream : IDisposable, IAsyncDisposable
             }
             catch (OperationCanceledException)
             {
-                // Handled below: cancellation ends the enumeration
+                // Handled below: main token cancellation ends the enumeration.
+                // Timeouts are logged and ignored, so the server keeps listening.
             }
             catch (EndOfStreamException)
             {

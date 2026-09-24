@@ -435,9 +435,7 @@ internal sealed partial class PdfDocumentsManagerService : IPdfDocumentsManagerS
             ownerContext.ViewModel.SelectedDocumentIndex = index;
         }
 
-        // Reopening a file that lives in another window should bring that window
-        // forward rather than silently doing nothing in the active one.
-        ownerContext.Window?.Activate();
+        _windowRegistry.BringWindowToFront(ownerContext);
 
         return OpenedFileState.Shown;
     }
