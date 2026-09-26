@@ -121,6 +121,29 @@
 			</TextBlock>
 
 			<controls:VerticalSeparator/>
+            
+            <!-- Single page / continuous view -->
+			<ToggleButton DockPanel.Dock="Left"
+                                      Focusable="False"
+                                      VerticalAlignment="Stretch"
+                                      Background="Transparent"
+                                      IsChecked="{Binding IsSinglePageMode, Mode=TwoWay}">
+				<!-- The icon and tooltip describe the mode the button is in. -->
+				<ToggleButton.Styles>
+					<Style Selector="ToggleButton > PathIcon">						
+                        <Setter Property="Data" Value="{StaticResource document_page_break_regular}" />
+                        <Setter Property="ToolTip.Tip" Value="Continuous Scrolling View" />
+					</Style>
+					<Style Selector="ToggleButton:checked > PathIcon">
+                        <Setter Property="Data" Value="{StaticResource document_regular}" />
+                        <Setter Property="ToolTip.Tip" Value="Single Page View" />
+					</Style>
+				</ToggleButton.Styles>
+
+				<PathIcon Width="17" Height="17"/>
+			</ToggleButton>
+
+			<controls:VerticalSeparator/>
 
 			<!-- Rotate pages -->
 			<Button DockPanel.Dock="Left"

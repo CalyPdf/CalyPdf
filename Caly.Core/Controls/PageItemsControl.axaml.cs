@@ -56,6 +56,11 @@ public sealed class PageItemsControl : ItemsControl
     });
 
     /// <summary>
+    /// Items panel for <see cref="Models.PageDisplayMode.SinglePage"/>.
+    /// </summary>
+    private static readonly FuncTemplate<Panel?> SinglePagePanel = new(() => new SinglePageVirtualizingPanel());
+
+    /// <summary>
     /// Handles pointer input over the pages' interactive layers (text selection,
     /// annotations, links, hover feedback).
     /// </summary>
@@ -71,6 +76,13 @@ public sealed class PageItemsControl : ItemsControl
     /// in-flight zoom/pan state.
     /// </summary>
     private readonly ZoomPanController _zoomPanController;
+
+    private readonly WheelPageFlipGate _wheelFlipGate = new();
+
+    /// <summary>
+    /// How close to the top or bottom edge, in pixels, still counts as being at it.
+    /// </summary>
+    private const double PageEdgeTolerance = 0.5;
 
     private bool _isSettingPageVisibility;
     private bool _pendingScrollToPage;
@@ -155,6 +167,12 @@ public sealed class PageItemsControl : ItemsControl
     public static readonly StyledProperty<Range?> VisiblePagesProperty =
         AvaloniaProperty.Register<PageItemsControl, Range?>(nameof(VisiblePages), defaultBindingMode: BindingMode.TwoWay);
 
+    /// <summary>
+    /// Defines the <see cref="PageDisplayMode"/> property.
+    /// </summary>
+    public static readonly StyledProperty<PageDisplayMode> PageDisplayModeProperty =
+        AvaloniaProperty.Register<PageItemsControl, PageDisplayMode>(nameof(PageDisplayMode));
+
     public static readonly StyledProperty<ICommand?> RefreshPagesProperty =
         AvaloniaProperty.Register<PageItemsControl, ICommand?>(nameof(RefreshPages));
 
@@ -167,6 +185,14 @@ public sealed class PageItemsControl : ItemsControl
         KeyboardNavigation.TabNavigationProperty.OverrideDefaultValue(typeof(PageItemsControl),
             KeyboardNavigationMode.Once);
     }
+
+    public PageDisplayMode PageDisplayMode
+    {
+        get => GetValue(PageDisplayModeProperty);
+        set => SetValue(PageDisplayModeProperty, value);
+    }
+
+    private bool IsSinglePage => PageDisplayMode == PageDisplayMode.SinglePage;
 
     public ICommand? RefreshPages
     {
@@ -202,6 +228,7 @@ public sealed class PageItemsControl : ItemsControl
         // and avoid unwanted event scrolls by 50px before we can reject them.
         // No need to RemoveHandler() as it is on 'this', so it's GC'd with the control.
         AddHandler(PointerWheelChangedEvent, _zoomPanController.OnPointerWheelChanged, RoutingStrategies.Tunnel);
+        AddHandler(PointerWheelChangedEvent, OnSinglePageWheel, RoutingStrategies.Tunnel); // After zoom: ctrl+wheel stays a zoom
         AddHandler(KeyDownEvent, OnKeyDownHandler, RoutingStrategies.Tunnel, handledEventsToo: true);
         AddHandler(KeyUpEvent, OnKeyUpHandler, RoutingStrategies.Tunnel, handledEventsToo: true);
         AddHandler(PointerPressedEvent, OnInteractiveLayerPointerPressed, RoutingStrategies.Tunnel);
@@ -372,17 +399,74 @@ public sealed class PageItemsControl : ItemsControl
     /// <para><c>false</c> if the offset is in Avalonia coordinates (top = 0, increasing downward, unscaled pixels).</para>
     /// Default is <c>false</c>.
     /// </param>
-    public void GoToPage(int pageNumber, double? yOffset = null, bool offsetPdfCoord = false)
+    public bool GoToPage(int pageNumber, double? yOffset = null, bool offsetPdfCoord = false)
     {
         if (_isSettingPageVisibility || pageNumber <= 0 || pageNumber > PageCount || ItemsView.Count == 0)
+        {
+            return false;
+        }
+
+        ScrollIntoView(pageNumber - 1);
+
+        if (IsSinglePage)
+        {
+            yOffset ??= 0;
+            _visibilityTracker.PostUpdateVisibility();
+        }
+
+        if (yOffset.HasValue)
+        {
+            ApplyYOffset(pageNumber, yOffset.Value, offsetPdfCoord);
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Single-page view: turns to the next (<paramref name="direction"/> = 1) or previous (-1)
+    /// page, landing at its top going forward and at its bottom going back, so reading carries
+    /// on across the turn.
+    /// <para>
+    /// The current page is read from the panel, not <see cref="SelectedPageNumber"/>, which only
+    /// catches up after the posted visibility pass: repeated turns (key auto-repeat) must each
+    /// advance one page.
+    /// </para>
+    /// </summary>
+    internal void GoToAdjacentPage(int direction)
+    {
+        if (!IsSinglePage)
         {
             return;
         }
 
-        ScrollIntoView(pageNumber - 1);
-        if (yOffset.HasValue)
+        int current = _visibilityTracker.GetFirstRealizedIndex() + 1;
+        int target = current + direction;
+        if (current < 1 || target < 1 || target > PageCount)
         {
-            ApplyYOffset(pageNumber, yOffset.Value, offsetPdfCoord);
+            return;
+        }
+
+        // ApplyScrollOffsets clamps the offset to the page height.
+        GoToPage(target, direction > 0 ? 0 : double.MaxValue);
+    }
+
+    private void OnSinglePageWheel(object? sender, PointerWheelEventArgs e)
+    {
+        if (!IsSinglePage || e.Handled || Scroll is null || e.Delta.Y == 0 ||
+            e.KeyModifiers != KeyModifiers.None)
+        {
+            return;
+        }
+
+        bool forward = e.Delta.Y < 0;
+        double maxOffsetY = Math.Max(0, Scroll.Extent.Height - Scroll.Viewport.Height);
+        bool atBoundary = forward
+            ? Scroll.Offset.Y >= maxOffsetY - PageEdgeTolerance
+            : Scroll.Offset.Y <= PageEdgeTolerance;
+
+        if (_wheelFlipGate.ShouldFlip(e.Timestamp, atBoundary, Math.Abs(e.Delta.Y), forward))
+        {
+            GoToAdjacentPage(forward ? 1 : -1);
+            e.Handled = true;
         }
     }
 
@@ -760,15 +844,76 @@ public sealed class PageItemsControl : ItemsControl
     protected override void OnLoaded(RoutedEventArgs e)
     {
         base.OnLoaded(e);
-        ItemsPanelRoot!.DataContextChanged += ItemsPanelRoot_DataContextChanged;
-        ItemsPanelRoot.LayoutUpdated += ItemsPanelRoot_LayoutUpdated;
+        HookItemsPanelRoot();
     }
 
     protected override void OnUnloaded(RoutedEventArgs e)
     {
         base.OnUnloaded(e);
-        ItemsPanelRoot!.DataContextChanged -= ItemsPanelRoot_DataContextChanged;
-        ItemsPanelRoot.LayoutUpdated -= ItemsPanelRoot_LayoutUpdated;
+        UnhookItemsPanelRoot();
+    }
+
+    private void HookItemsPanelRoot()
+    {
+        if (ItemsPanelRoot is not { } root)
+        {
+            return;
+        }
+
+        // -= first: the panel swap and OnLoaded can both reach here for the same panel.
+        root.DataContextChanged -= ItemsPanelRoot_DataContextChanged;
+        root.DataContextChanged += ItemsPanelRoot_DataContextChanged;
+        root.LayoutUpdated -= ItemsPanelRoot_LayoutUpdated;
+        root.LayoutUpdated += ItemsPanelRoot_LayoutUpdated;
+    }
+
+    private void UnhookItemsPanelRoot()
+    {
+        if (ItemsPanelRoot is not { } root)
+        {
+            return;
+        }
+
+        root.DataContextChanged -= ItemsPanelRoot_DataContextChanged;
+        root.LayoutUpdated -= ItemsPanelRoot_LayoutUpdated;
+    }
+
+    /// <summary>
+    /// Swaps the items panel for <paramref name="mode"/>, then restores the reading position on
+    /// the new panel through the same path as a tab switch (<see cref="ScrollOffset"/> holds the
+    /// position relative to <see cref="SelectedPageNumber"/>).
+    /// </summary>
+    private void ApplyPageDisplayMode(PageDisplayMode mode)
+    {
+        var template = mode == PageDisplayMode.SinglePage ? SinglePagePanel : DefaultPanel;
+        if (ReferenceEquals(ItemsPanel, template))
+        {
+            return;
+        }
+
+        if (Presenter is null)
+        {
+            // Template not applied yet: the presenter builds the right panel when it is.
+            SetCurrentValue(ItemsPanelProperty, template);
+            return;
+        }
+
+        // VirtualizingPanel.Detach drops the old panel's containers without clearing them,
+        // so their pages would otherwise keep reporting themselves visible.
+        foreach (var container in GetRealizedContainers())
+        {
+            container.SetCurrentValue(PageItem.VisibleAreaProperty, null);
+        }
+
+        UnhookItemsPanelRoot();
+        SetCurrentValue(ItemsPanelProperty, template);
+        Presenter.ApplyTemplate(); // Builds the new panel now, so it can be hooked
+
+        _pendingScrollToPage = true;
+        if (IsLoaded)
+        {
+            HookItemsPanelRoot();
+        }
     }
 
     private void ItemsPanelRoot_LayoutUpdated(object? sender, EventArgs e)
@@ -844,6 +989,10 @@ public sealed class PageItemsControl : ItemsControl
         else if (change.Property == ZoomLevelProperty)
         {
             _zoomPanController.HandleExternalZoomLevelChanged();
+        }
+        else if (change.Property == PageDisplayModeProperty)
+        {
+            ApplyPageDisplayMode(change.GetNewValue<PageDisplayMode>());
         }
     }
 
@@ -1173,63 +1322,79 @@ public sealed class PageItemsControl : ItemsControl
         switch (e.Key)
         {
             case Key.Home:
-            {
-                Scroll.ScrollToHome();
-                e.Handled = true;
-                break;
-            }
+                {
+                    bool went = GoToPage(1, 0);
+                    e.Handled = went;
+                    break;
+                }
             case Key.End:
-            {
-                Scroll.ScrollToEnd();
-                e.Handled = true;
-                break;
-            }
+                {
+                    bool went = GoToPage(PageCount, 0);
+                    e.Handled = went;
+                    break;
+                }
             case Key.PageUp:
-            {
-                int? pageNumber = SelectedPageNumber;
-                if (pageNumber.HasValue)
                 {
-                    GoToPage(pageNumber.Value - 1, 0);
-                    e.Handled = true;
-                }
+                    int? pageNumber = SelectedPageNumber;
+                    if (pageNumber.HasValue)
+                    {
+                        bool went = GoToPage(pageNumber.Value - 1, 0);
+                        e.Handled = went;
+                    }
 
-                break;
-            }
+                    break;
+                }
             case Key.PageDown:
-            {
-                int? pageNumber = SelectedPageNumber;
-                if (pageNumber.HasValue)
                 {
-                    GoToPage(pageNumber.Value + 1, 0);
-                    e.Handled = true;
-                }
+                    int? pageNumber = SelectedPageNumber;
+                    if (pageNumber.HasValue)
+                    {
+                        bool went = GoToPage(pageNumber.Value + 1, 0);
+                        e.Handled = went;
+                    }
 
-                break;
-            }
+                    break;
+                }
             case Key.Right:
-            {
-                Scroll.PageDown();
-                e.Handled = true;
-                break;
-            }
+                {
+                    if (IsSinglePage)
+                    {
+                        GoToAdjacentPage(1);
+                    }
+                    else
+                    {
+                        Scroll.PageDown();
+                    }
+
+                    e.Handled = true;
+                    break;
+                }
             case Key.Down:
-            {
-                Scroll.LineDown();
-                e.Handled = true;
-                break;
-            }
+                {
+                    Scroll.LineDown();
+                    e.Handled = true;
+                    break;
+                }
             case Key.Left:
-            {
-                Scroll.PageUp();
-                e.Handled = true;
-                break;
-            }
+                {
+                    if (IsSinglePage)
+                    {
+                        GoToAdjacentPage(-1);
+                    }
+                    else
+                    {
+                        Scroll.PageUp();
+                    }
+
+                    e.Handled = true;
+                    break;
+                }
             case Key.Up:
-            {
-                Scroll.LineUp();
-                e.Handled = true;
-                break;
-            }
+                {
+                    Scroll.LineUp();
+                    e.Handled = true;
+                    break;
+                }
         }
     }
 
@@ -1238,6 +1403,7 @@ public sealed class PageItemsControl : ItemsControl
         SetCurrentValue(VisiblePagesProperty, null);
         _textSelectionHandler.Reset();
         _zoomPanController.Reset();
+        _wheelFlipGate.Reset();
         _isSettingPageVisibility = false;
         _pendingScrollToPage = false;
         _isApplyingPendingScroll = false;

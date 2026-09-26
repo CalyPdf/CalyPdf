@@ -1,4 +1,4 @@
-﻿// Copyright (c) BobLd
+// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,26 +18,20 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-using Caly.Core.ViewModels;
-using System;
-
 namespace Caly.Core.Models;
 
-public sealed class RefreshPagesRequestMessage
+/// <summary>
+/// How a document's pages are laid out in the reading view.
+/// </summary>
+public enum PageDisplayMode : byte
 {
-    public required DocumentViewModel Document { get; init; }
-
-    public Range? VisiblePages { get; init; }
-
-    public Range? RealisedPages { get; init; }
-
-    public Range? VisibleThumbnails { get; init; }
-
-    public Range? RealisedThumbnails { get; init; }
+    /// <summary>
+    /// All pages stacked vertically, scrolled continuously.
+    /// </summary>
+    Continuous = 0,
 
     /// <summary>
-    /// How the pages are laid out. Single-page view prefetches neighbours and keeps a wider cache
-    /// window, as nothing off the current page is ever visible there.
+    /// One page at a time; the reader turns pages.
     /// </summary>
-    public PageDisplayMode DisplayMode { get; init; }
+    SinglePage = 1
 }
