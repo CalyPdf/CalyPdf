@@ -6,17 +6,20 @@
 		<TargetFramework>net10.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
-		<AssemblyName>Caly</AssemblyName>
+		<AssemblyName>caly</AssemblyName>
 		<Version>0.4.0.0</Version>
 		<JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
 		<Deterministic>true</Deterministic>
 		<Configurations>Debug;Release;Portable</Configurations>
 		<SignAssembly>True</SignAssembly>
 		<AssemblyOriginatorKeyFile>..\Caly.snk</AssemblyOriginatorKeyFile>
+		<Company>Caly Pdf</Company>
+		<Description>A Fast, Cross-Platform Pdf Reader</Description>
+		<PackageTags>pdf</PackageTags>
 	</PropertyGroup>
 
 	<!-- Begin AOT publish -->
-	<PropertyGroup Condition="'$(Configuration)'!='Debug'">
+	<PropertyGroup Condition="'$(Configuration)'=='Portable'">
 		<PublishAot>true</PublishAot>
 		<Optimize>True</Optimize>
 		<OptimizationPreference>Speed</OptimizationPreference>

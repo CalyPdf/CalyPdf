@@ -117,7 +117,7 @@ New-Item -ItemType Directory -Force $calyDir | Out-Null
 # maximised, positioned wherever Caly's own CenterScreen logic puts it. 1600 (rather than a
 # narrower 1280) was picked empirically so FileC's first page renders at full width with no
 # horizontal scrollbar at 100% zoom.
-[System.IO.File]::WriteAllText($settingsPath, '{"Width":1600,"Height":720,"IsMaximised":false,"PaneSize":323,"Debug":{"LogRenderTimings":true}}')
+[System.IO.File]::WriteAllText($settingsPath, '{"Width":1600,"Height":720,"IsMaximised":false,"PaneSize":323,"UseSoftwareRendering":false,"Debug":{"LogRenderTimings":true}}')
 
 # --- Coordinates: fractions of the actual window rect, mapped by hand against a 1600x720-DIP /
 # 2422x1091-physical window on a 150%-scaled display. The left icon rail and side panel are a
