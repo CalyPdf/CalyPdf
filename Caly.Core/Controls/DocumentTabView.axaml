@@ -53,65 +53,65 @@
 				</ToggleButton.Styles>
 
 				<PathIcon Width="17"
-                                      Height="17"
-                                      Classes.opened="{Binding #PART_Root.IsPaneOpen}"
+                          Height="17"
+                          Classes.opened="{Binding #PART_Root.IsPaneOpen}"
 						  Classes.closed="{Binding !#PART_Root.IsPaneOpen}">
 					<ToolTip.Tip>Toggle Sidebar Menu</ToolTip.Tip>
 				</PathIcon>
 			</ToggleButton>
 
 			<!-- Page navigation -->
-                        <Button DockPanel.Dock="Left"
-                                Focusable="False"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Stretch"
-                                Background="Transparent"
-                                Command="{Binding GoToPreviousPageCommand}">
-                            <PathIcon Width="14"
-                                      Height="14"
-                                      Data="{StaticResource chevron_up_regular}">
-                                <ToolTip.Tip>Previous Page</ToolTip.Tip>
-                            </PathIcon>
-                        </Button>
+            <Button DockPanel.Dock="Left"
+                    Focusable="False"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Stretch"
+                    Background="Transparent"
+                    Command="{Binding GoToPreviousPageCommand}">
+                <PathIcon Width="14"
+                            Height="14"
+                            Data="{StaticResource chevron_up_regular}">
+                    <ToolTip.Tip>Previous Page</ToolTip.Tip>
+                </PathIcon>
+            </Button>
 
-                        <Button DockPanel.Dock="Left"
-                                Focusable="False"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Stretch"
-                                Background="Transparent"
-                                Command="{Binding GoToNextPageCommand}">
-                            <PathIcon Width="14"
-                                      Height="14"
-                                      Data="{StaticResource chevron_down_regular}">
-                                <ToolTip.Tip>Next Page</ToolTip.Tip>
-                            </PathIcon>
-                        </Button>
+            <Button DockPanel.Dock="Left"
+                    Focusable="False"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Stretch"
+                    Background="Transparent"
+                    Command="{Binding GoToNextPageCommand}">
+                <PathIcon Width="14"
+                            Height="14"
+                            Data="{StaticResource chevron_down_regular}">
+                    <ToolTip.Tip>Next Page</ToolTip.Tip>
+                </PathIcon>
+            </Button>
 
 			<TextBox Name="PART_TextBoxPageNumber"
-                                 MinWidth="50"
-                                 MaxWidth="50"
-                                 TextAlignment="Center"
-                                 HorizontalContentAlignment="Center"
-                                 VerticalContentAlignment="Center"
-                                 VerticalAlignment="Center"
-					 KeyDown="PageNumberTextBox_OnKeyDown"
-                                 Text="{Binding SelectedPageNumber, UpdateSourceTrigger=Explicit}"
-                                 AcceptsReturn="False">
+                     MinWidth="50"
+                     MaxWidth="50"
+                     TextAlignment="Center"
+                     HorizontalContentAlignment="Center"
+                     VerticalContentAlignment="Center"
+                     VerticalAlignment="Center"
+                     KeyDown="PageNumberTextBox_OnKeyDown"
+                     Text="{Binding SelectedPageNumber, UpdateSourceTrigger=Explicit}"
+                     AcceptsReturn="False">
 				<TextBox.Styles>
-                                <Style Selector="DataValidationErrors">
-                                    <Setter Property="Template">
-                                        <ControlTemplate>
-                                            <ContentPresenter DockPanel.Dock="Left"
-                                                              Content="{TemplateBinding Content}"
-                                                              Margin="0"/>
-                                        </ControlTemplate>
-                                    </Setter>
-                                </Style>
-                            </TextBox.Styles>
-                        </TextBox>
+                    <Style Selector="DataValidationErrors">
+                        <Setter Property="Template">
+                            <ControlTemplate>
+                                <ContentPresenter DockPanel.Dock="Left"
+                                                    Content="{TemplateBinding Content}"
+                                                    Margin="0"/>
+                            </ControlTemplate>
+                        </Setter>
+                    </Style>
+                </TextBox.Styles>
+            </TextBox>
 
 			<TextBlock DockPanel.Dock="Left"
-                                   Focusable="False"
+                       Focusable="False"
 					   VerticalAlignment="Center"
 					   HorizontalAlignment="Center"
 					   TextAlignment="Center"
@@ -124,10 +124,10 @@
             
             <!-- Single page / continuous view -->
 			<ToggleButton DockPanel.Dock="Left"
-                                      Focusable="False"
-                                      VerticalAlignment="Stretch"
-                                      Background="Transparent"
-                                      IsChecked="{Binding IsSinglePageMode, Mode=TwoWay}">
+                          Focusable="False"
+                          VerticalAlignment="Stretch"
+                          Background="Transparent"
+                          IsChecked="{Binding IsSinglePageMode, Mode=TwoWay}">
 				<!-- The icon and tooltip describe the mode the button is in. -->
 				<ToggleButton.Styles>
 					<Style Selector="ToggleButton > PathIcon">						
@@ -147,27 +147,27 @@
 
 			<!-- Rotate pages -->
 			<Button DockPanel.Dock="Left"
-                                Focusable="False"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Stretch"
-                                Background="Transparent"
-                                Command="{Binding RotateAllPagesCounterclockwiseCommand}">
+                    Focusable="False"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Stretch"
+                    Background="Transparent"
+                    Command="{Binding RotateAllPagesCounterclockwiseCommand}">
 				<PathIcon Width="17"
-                                      Height="17"
-                                      Data="{StaticResource arrow_rotate_counterclockwise_regular}">
+                          Height="17"
+                          Data="{StaticResource arrow_rotate_counterclockwise_regular}">
 					<ToolTip.Tip>Rotate Pages Counterclockwise</ToolTip.Tip>
 				</PathIcon>
 			</Button>
 
 			<Button DockPanel.Dock="Left"
-                                Focusable="False"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Stretch"
-                                Background="Transparent"
-                                Command="{Binding RotateAllPagesClockwiseCommand}">
+                    Focusable="False"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Stretch"
+                    Background="Transparent"
+                    Command="{Binding RotateAllPagesClockwiseCommand}">
 				<PathIcon Width="17"
-                                      Height="17"
-                                      Data="{StaticResource arrow_rotate_clockwise_regular}">
+                          Height="17"
+                          Data="{StaticResource arrow_rotate_clockwise_regular}">
 					<ToolTip.Tip>Rotate Pages Clockwise</ToolTip.Tip>
 				</PathIcon>
 			</Button>
@@ -176,7 +176,7 @@
 
 			<!-- Zoom in / out -->
 			<Button DockPanel.Dock="Left"
-                                Focusable="False"
+                    Focusable="False"
 					HorizontalAlignment="Center"
 					VerticalAlignment="Stretch"
 					Background="Transparent"
@@ -189,7 +189,7 @@
 			</Button>
 
 			<Button DockPanel.Dock="Left"
-                                Focusable="False"
+                    Focusable="False"
 					HorizontalAlignment="Center"
 					VerticalAlignment="Stretch"
 					Background="Transparent"
@@ -202,9 +202,11 @@
 			</Button>
 
 			<TextBlock DockPanel.Dock="Left"
-                                   Focusable="False"
+                       Focusable="False"
 					   Margin="5,0"
+                       Width="50"
 					   Text="{Binding ZoomLevel, StringFormat={}{0:0.#%}}"
+                       TextAlignment="Center"
 					   VerticalAlignment="Center"
 					   HorizontalAlignment="Center"/>
 
@@ -212,8 +214,8 @@
 
 			<!-- Print -->
 			<Button DockPanel.Dock="Right"
-                                Focusable="False"
-                                Margin="0,0,5,0"
+                    Focusable="False"
+                    Margin="0,0,5,0"
 					HorizontalAlignment="Center"
 					VerticalAlignment="Stretch"
 					Background="Transparent"
@@ -230,25 +232,24 @@
 		</DockPanel>
 
 		<SplitView Grid.Row="1"
-				   Name="PART_SplitView"
-				   IsPaneOpen="{Binding #PART_Root.IsPaneOpen, Mode=TwoWay}"
-				   OpenPaneLength="{Binding #PART_Root.PaneSize, Mode=TwoWay}"
-				   CompactPaneLength="0"
-				   DisplayMode="CompactInline">
+                   Name="PART_SplitView"
+                   IsPaneOpen="{Binding #PART_Root.IsPaneOpen, Mode=TwoWay}"
+                   OpenPaneLength="{Binding #PART_Root.PaneSize, Mode=TwoWay}"
+                   CompactPaneLength="0"
+                   DisplayMode="CompactInline">
 
-                        <!-- Document control -->
-                        <SplitView.Content>
-                            <controls:DocumentControl />
-                        </SplitView.Content>
+            <!-- Document control -->
+            <SplitView.Content>
+                <controls:DocumentControl />
+            </SplitView.Content>
 
 			<!-- Left navigation bar -->
 			<SplitView.Pane>
 
 				<Grid ColumnDefinitions="*,5"
-                                  IsVisible="{Binding #PART_Root.IsPaneOpen}">
-
-                                <Border Grid.Column="0"
-                                        BorderThickness="1">
+                      IsVisible="{Binding #PART_Root.IsPaneOpen}">
+                    
+                    <Border Grid.Column="0" BorderThickness="1">
 
 						<TabControl Name="PART_TabControlNavigation"
 									TabStripPlacement="Left"
@@ -269,62 +270,63 @@
 										</PathIcon.RenderTransform>
 									</PathIcon>
 								</TabItem.Header>
-								<Grid>
-                                                <controls:ThumbnailItemsControl
-                                                    IsVisible="{Binding #PART_Root.IsPaneOpen}"
-                                                    RefreshThumbnails="{Binding RefreshThumbnailsCommand}"
-										RealisedThumbnails="{Binding RealisedThumbnails}"
-										VisibleThumbnails="{Binding VisibleThumbnails}"
-                                                    Background="Transparent"
-                                                    SelectionMode="Single,AlwaysSelected"
-                                                    HorizontalAlignment="Stretch"
-                                                    VerticalAlignment="Stretch"
-                                                    BorderThickness="0"
-                                                    ItemsSource="{Binding Pages}"
-                                                    SelectedIndex="{Binding SelectedPageIndex, Mode=TwoWay}">
 
-                                                    <controls:ThumbnailItemsControl.Styles>
-                                                        <Style Selector="ListBoxItem">
-                                                            <Setter Property="HorizontalAlignment" Value="Center" />
-                                                        </Style>
-                                                    </controls:ThumbnailItemsControl.Styles>
+                                <Grid>
+                                    <controls:ThumbnailItemsControl
+                                        IsVisible="{Binding #PART_Root.IsPaneOpen}"
+                                        RefreshThumbnails="{Binding RefreshThumbnailsCommand}"
+                                        RealisedThumbnails="{Binding RealisedThumbnails}"
+                                        VisibleThumbnails="{Binding VisibleThumbnails}"
+                                        Background="Transparent"
+                                        SelectionMode="Single,AlwaysSelected"
+                                        HorizontalAlignment="Stretch"
+                                        VerticalAlignment="Stretch"
+                                        BorderThickness="0"
+                                        ItemsSource="{Binding Pages}"
+                                        SelectedIndex="{Binding SelectedPageIndex, Mode=TwoWay}">
 
-                                                    <controls:ThumbnailItemsControl.ItemTemplate>
-                                                        <DataTemplate x:DataType="vm:PageViewModel">
+                                        <controls:ThumbnailItemsControl.Styles>
+                                            <Style Selector="ListBoxItem">
+                                                <Setter Property="HorizontalAlignment" Value="Center" />
+                                            </Style>
+                                        </controls:ThumbnailItemsControl.Styles>
+
+                                        <controls:ThumbnailItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:PageViewModel">
                                                             
-                                                            <Grid Margin="3,4"
-                                                                  Width="{Binding ThumbnailSize.Width}"
-                                                                  Height="{Binding ThumbnailSize.Height}">
-                                                                <controls:ThumbnailControl VisibleArea="{Binding VisibleArea}"
-                                                                        ThumbnailSize="{Binding ThumbnailSize}"
-                                                                        PageSize="{Binding Size}"
-                                                                        HorizontalAlignment="Stretch"
-                                                                        VerticalAlignment="Stretch"/>
-                                                                <Label Content="{Binding PageNumber}"
-                                                                       MinWidth="25"
-                                                                       HorizontalAlignment="Center"
-                                                                       HorizontalContentAlignment="Center"
-                                                                       VerticalAlignment="Bottom"
-                                                                       Padding="3,0"
-                                                                       Margin="3"
-                                                                       Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
-                                                                       BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
-                                                                       BorderThickness="1"
-                                                                       CornerRadius="7"/>
-                                                            </Grid>
+                                                <Grid Margin="3,4"
+                                                      Width="{Binding ThumbnailSize.Width}"
+                                                      Height="{Binding ThumbnailSize.Height}">
+                                                    <controls:ThumbnailControl VisibleArea="{Binding VisibleArea}"
+                                                            ThumbnailSize="{Binding ThumbnailSize}"
+                                                            PageSize="{Binding Size}"
+                                                            HorizontalAlignment="Stretch"
+                                                            VerticalAlignment="Stretch"/>
+                                                    <Label Content="{Binding PageNumber}"
+                                                            MinWidth="25"
+                                                            HorizontalAlignment="Center"
+                                                            HorizontalContentAlignment="Center"
+                                                            VerticalAlignment="Bottom"
+                                                            Padding="3,0"
+                                                            Margin="3"
+                                                            Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                                                            BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="7"/>
+                                                </Grid>
 
-                                                        </DataTemplate>
-                                                    </controls:ThumbnailItemsControl.ItemTemplate>
+                                            </DataTemplate>
+                                        </controls:ThumbnailItemsControl.ItemTemplate>
 
-                                                </controls:ThumbnailItemsControl>
-                                            </Grid>
+                                    </controls:ThumbnailItemsControl>
+                                </Grid>
 							</TabItem>
 
 							<!-- Bookmarks tab -->
 							<TabItem MinHeight="40"
-                                                 Focusable="False"
-                                                 IsVisible="{Binding BookmarksSource^, Converter={x:Static ObjectConverters.IsNotNull}}"
-                                                 IsEnabled="{Binding BookmarksSource^, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                     Focusable="False"
+                                     IsVisible="{Binding BookmarksSource^, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                     IsEnabled="{Binding BookmarksSource^, Converter={x:Static ObjectConverters.IsNotNull}}">
 								<TabItem.Header>
 									<PathIcon Width="17"
 											  Height="17"
@@ -333,17 +335,16 @@
 									</PathIcon>
 								</TabItem.Header>
 
-                                            <TreeDataGrid Source="{Binding BookmarksSource^}"
-                                                          ShowColumnHeaders="False"
-                                                          CanUserSortColumns="False"
-                                                          HorizontalAlignment="Stretch"
-                                                          AutoScrollHorizontally="False"
-                                                          AutoScrollSelectionIntoView="True"/>
+                                <TreeDataGrid Source="{Binding BookmarksSource^}"
+                                              ShowColumnHeaders="False"
+                                              CanUserSortColumns="False"
+                                              HorizontalAlignment="Stretch"
+                                              AutoScrollHorizontally="False"
+                                              AutoScrollSelectionIntoView="True"/>
 							</TabItem>
 
 							<!-- Search tab -->
-							<TabItem MinHeight="40"
-                                                 Focusable="False">
+							<TabItem MinHeight="40" Focusable="False">
 								<TabItem.Header>
 									<PathIcon Width="17"
 											  Height="17"
@@ -356,8 +357,7 @@
 							</TabItem>
 
 							<!-- Doc information tab -->
-							<TabItem MinHeight="40"
-                                                 Focusable="False">
+							<TabItem MinHeight="40" Focusable="False">
 								<TabItem.Header>
 									<PathIcon Width="17"
 											  Height="17"
@@ -370,90 +370,89 @@
 
 							</TabItem>
 
-                                        <!-- Embedded files tab -->
-                                        <TabItem MinHeight="40"
-                                                 Focusable="False"
-                                                 IsVisible="{Binding !!EmbeddedFiles^.Count}"
-                                                 IsEnabled="{Binding !!EmbeddedFiles^.Count}">
-                                            <TabItem.Header>
-                                                <PathIcon Width="17"
-                                                          Height="17"
-                                                          Data="{StaticResource attach_text_regular}">
-                                                    <ToolTip.Tip>Embedded Files</ToolTip.Tip>
-                                                </PathIcon>
-                                            </TabItem.Header>
+                            <!-- Embedded files tab -->
+                            <TabItem MinHeight="40"
+                                     Focusable="False"
+                                     IsVisible="{Binding !!EmbeddedFiles^.Count}"
+                                     IsEnabled="{Binding !!EmbeddedFiles^.Count}">
+                                <TabItem.Header>
+                                    <PathIcon Width="17"
+                                              Height="17"
+                                              Data="{StaticResource attach_text_regular}">
+                                        <ToolTip.Tip>Embedded Files</ToolTip.Tip>
+                                    </PathIcon>
+                                </TabItem.Header>
 								
-                                            <ListBox ItemsSource="{Binding EmbeddedFiles^}"
-                                                     Background="Transparent">
-                                                <ListBox.Styles>
-                                                    <Style Selector="ListBoxItem">
-                                                        <Setter Property="Padding" Value="5,0" />
-                                                    </Style>
-                                                </ListBox.Styles>
+                                <ListBox ItemsSource="{Binding EmbeddedFiles^}"
+                                         Background="Transparent">
+                                    <ListBox.Styles>
+                                        <Style Selector="ListBoxItem">
+                                            <Setter Property="Padding" Value="5,0" />
+                                        </Style>
+                                    </ListBox.Styles>
 
 
-                                                <ListBox.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <DockPanel Background="Transparent"
-                                                                   HorizontalSpacing="5"
-                                                                   HorizontalAlignment="Stretch"
-													   VerticalAlignment="Stretch"
-                                                                   PointerPressed="EmbeddedFiles_OnPointerPressed"
-                                                                   MinHeight="20">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <DockPanel Background="Transparent"
+                                                       HorizontalSpacing="5"
+                                                       HorizontalAlignment="Stretch"
+                                                       VerticalAlignment="Stretch"
+                                                       PointerPressed="EmbeddedFiles_OnPointerPressed"
+                                                       MinHeight="20">
 
-                                                            <TextBlock DockPanel.Dock="Left"
-                                                                       Text="{Binding Name}"
-                                                                       HorizontalAlignment="Left"
-                                                                       VerticalAlignment="Center"/>
+                                                <TextBlock DockPanel.Dock="Left"
+                                                            Text="{Binding Name}"
+                                                            HorizontalAlignment="Left"
+                                                            VerticalAlignment="Center"/>
 
-                                                            <TextBlock DockPanel.Dock="Right"
-                                                                       Text="{Binding FileSize}"
-                                                                       HorizontalAlignment="Right"
-                                                                       VerticalAlignment="Center"/>
+                                                <TextBlock DockPanel.Dock="Right"
+                                                            Text="{Binding FileSize}"
+                                                            HorizontalAlignment="Right"
+                                                            VerticalAlignment="Center"/>
 
-                                                            <DockPanel.ContextFlyout>
-                                                                <MenuFlyout>
-                                                                    <MenuItem Header="Open" Command="{Binding OpenCommand}">
-                                                                        <MenuItem.Icon>
-                                                                            <PathIcon Width="15" Height="15" Data="{StaticResource open_regular}"/>
-                                                                        </MenuItem.Icon>
-                                                                    </MenuItem>
+                                                <DockPanel.ContextFlyout>
+                                                    <MenuFlyout>
+                                                        <MenuItem Header="Open" Command="{Binding OpenCommand}">
+                                                            <MenuItem.Icon>
+                                                                <PathIcon Width="15" Height="15" Data="{StaticResource open_regular}"/>
+                                                            </MenuItem.Icon>
+                                                        </MenuItem>
 
-                                                                    <MenuItem Header="Save As..." Command="{Binding SaveAsCommand}">
-                                                                        <MenuItem.Icon>
-                                                                            <PathIcon Width="15" Height="15" Data="{StaticResource save_regular}"/>
-                                                                        </MenuItem.Icon>
-                                                                    </MenuItem>
-                                                                </MenuFlyout>
-                                                            </DockPanel.ContextFlyout>
+                                                        <MenuItem Header="Save As..." Command="{Binding SaveAsCommand}">
+                                                            <MenuItem.Icon>
+                                                                <PathIcon Width="15" Height="15" Data="{StaticResource save_regular}"/>
+                                                            </MenuItem.Icon>
+                                                        </MenuItem>
+                                                    </MenuFlyout>
+                                                </DockPanel.ContextFlyout>
 
-                                                        </DockPanel>
-                                                    </DataTemplate>
-                                                </ListBox.ItemTemplate>
-                                            </ListBox>
-                                        </TabItem>
+                                            </DockPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </TabItem>
 
 						</TabControl>
 					</Border>
 
 					<!-- Resize left navigation bar -->
-                                <Grid Grid.Column="1"
-						  Background="Transparent"
-                                      PointerMoved="Resize_OnPointerMoved"
-                                      PointerEntered="Resize_OnPointerEntered"
-                                      PointerExited="Resize_OnPointerExited"
-                                      PointerPressed="Resize_OnPointerPressed"
-                                      PointerReleased="Resize_OnPointerReleased">
-                                    <Rectangle Width="{DynamicResource CalySplitViewHandleWidth}"
-                                               HorizontalAlignment="Center"
-                                               Fill="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"/>
-                                </Grid>
+                    <Grid Grid.Column="1"
+                            Background="Transparent"
+                            PointerMoved="Resize_OnPointerMoved"
+                            PointerEntered="Resize_OnPointerEntered"
+                            PointerExited="Resize_OnPointerExited"
+                            PointerPressed="Resize_OnPointerPressed"
+                            PointerReleased="Resize_OnPointerReleased">
+                        <Rectangle Width="{DynamicResource CalySplitViewHandleWidth}"
+                                   HorizontalAlignment="Center"
+                                   Fill="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"/>
+                    </Grid>
 				</Grid>
 			</SplitView.Pane>
 
 		</SplitView>
 
 	</Grid>
-
 
 </UserControl>
