@@ -84,6 +84,19 @@ public sealed partial class DocumentViewModel : ViewModelBase
 
     [ObservableProperty] private Range? _realisedThumbnails;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsSinglePageMode))]
+    public partial PageDisplayMode PageDisplayMode { get; set; }
+
+    /// <summary>
+    /// Toolbar toggle for <see cref="PageDisplayMode"/>.
+    /// </summary>
+    public bool IsSinglePageMode
+    {
+        get => PageDisplayMode == PageDisplayMode.SinglePage;
+        set => PageDisplayMode = value ? PageDisplayMode.SinglePage : PageDisplayMode.Continuous;
+    }
+
     [ObservableProperty] private string? _interactiveActionOver;
 
     [ObservableProperty] private bool _isPagesLoading = true; // Start state is true, even if pages have not started loading just yet
@@ -596,7 +609,8 @@ public sealed partial class DocumentViewModel : ViewModelBase
                 VisiblePages = VisiblePages,
                 RealisedPages = RealisedPages,
                 VisibleThumbnails = VisibleThumbnails,
-                RealisedThumbnails = RealisedThumbnails
+                RealisedThumbnails = RealisedThumbnails,
+                DisplayMode = PageDisplayMode
             });
         }
         catch (OperationCanceledException)
@@ -618,7 +632,8 @@ public sealed partial class DocumentViewModel : ViewModelBase
                 VisiblePages = VisiblePages,
                 RealisedPages = RealisedPages,
                 VisibleThumbnails = VisibleThumbnails,
-                RealisedThumbnails = RealisedThumbnails
+                RealisedThumbnails = RealisedThumbnails,
+                DisplayMode = PageDisplayMode
             });
         }
         catch (OperationCanceledException)

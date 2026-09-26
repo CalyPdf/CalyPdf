@@ -28,7 +28,7 @@ namespace Caly.Core.Controls;
 /// Shared visibility-tracking machinery for the virtualized items controls
 /// (<see cref="PageItemsControl"/> and <see cref="ThumbnailItemsControl"/>):
 /// debounced visibility updates and realized-index range queries against the
-/// <see cref="VirtualizingStackPanel"/>.
+/// <see cref="VirtualizingStackPanel"/> or <see cref="SinglePageVirtualizingPanel"/>.
 /// </summary>
 internal sealed class VirtualizedVisibilityTracker
 {
@@ -81,12 +81,12 @@ internal sealed class VirtualizedVisibilityTracker
     /// </summary>
     public int GetFirstRealizedIndex()
     {
-        if (_owner.ItemsPanelRoot is VirtualizingStackPanel v)
+        return _owner.ItemsPanelRoot switch
         {
-            return v.FirstRealizedIndex;
-        }
-
-        return 0;
+            VirtualizingStackPanel v => v.FirstRealizedIndex,
+            SinglePageVirtualizingPanel s => s.RealizedIndex,
+            _ => 0
+        };
     }
 
     /// <summary>
@@ -95,17 +95,19 @@ internal sealed class VirtualizedVisibilityTracker
     /// </summary>
     public int GetLastRealizedIndex()
     {
-        if (_owner.ItemsPanelRoot is VirtualizingStackPanel v)
+        int lastInclusive = _owner.ItemsPanelRoot switch
         {
-            if (v.LastRealizedIndex == -1)
-            {
-                return -1;
-            }
+            VirtualizingStackPanel v => v.LastRealizedIndex,
+            SinglePageVirtualizingPanel s => s.RealizedIndex,
+            _ => _owner.ItemCount
+        };
 
-            return Math.Min(_owner.ItemCount, v.LastRealizedIndex + 1);
+        if (lastInclusive == -1)
+        {
+            return -1;
         }
 
-        return _owner.ItemCount;
+        return Math.Min(_owner.ItemCount, lastInclusive + 1);
     }
 
     /// <summary>
@@ -126,7 +128,11 @@ internal sealed class VirtualizedVisibilityTracker
 
     public bool HasRealizedItems()
     {
-        return _owner.ItemsPanelRoot is VirtualizingStackPanel vsp &&
-               vsp.FirstRealizedIndex != -1 && vsp.LastRealizedIndex != -1;
+        return _owner.ItemsPanelRoot switch
+        {
+            VirtualizingStackPanel vsp => vsp.FirstRealizedIndex != -1 && vsp.LastRealizedIndex != -1,
+            SinglePageVirtualizingPanel s => s.RealizedIndex != -1,
+            _ => false
+        };
     }
 }

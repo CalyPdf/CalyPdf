@@ -20,8 +20,14 @@ internal enum RenderRequestTypes : byte
     /// <summary>Text selection and search on that page.</summary>
     TextLayer = 2,
 
+    /// <summary>
+    /// A neighbour of the page on screen in single-page view, rendered into the cache ahead of a
+    /// page turn. The reader is about to need it, so it beats thumbnails.
+    /// </summary>
+    PrefetchPicture = 3,
+
     /// <summary>Sidebar thumbnails. Useful, but nobody is waiting on them to read.</summary>
-    Thumbnail = 3
+    Thumbnail = 4
 }
 
 /// <summary>

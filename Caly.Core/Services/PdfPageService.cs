@@ -51,6 +51,22 @@ namespace Caly.Core.Services
         private readonly CancellationGenerations _thumbnailsGenerations;
         private readonly CancellationGenerations _pagesGenerations;
 
+        /// <summary>
+        /// Single-page view prefetches live in their own generation, not the pages one: a page turn
+        /// starts a new pages generation, and must not cancel the prefetch of the page it turns to.
+        /// Only <see cref="CancelAndClear"/> and disposal end it; a prefetch whose page has left the
+        /// cache window is skipped instead (see <see cref="_pictureKeepWindow"/>).
+        /// </summary>
+        private readonly CancellationGenerations _prefetchGenerations;
+        private readonly Lock _prefetchTokenLock = new();
+        private CancellationToken _prefetchToken = new(canceled: true);
+
+        /// <summary>
+        /// The [start, end) page window <see cref="_cachePictures"/> was last trimmed to, packed as
+        /// start in the high 32 bits and end in the low 32 bits so it is read and written atomically.
+        /// </summary>
+        private long _pictureKeepWindow;
+
         private async Task ProcessingLoop()
         {
             Debug.ThrowOnUiThread();
@@ -91,6 +107,10 @@ namespace Caly.Core.Services
 
                             case RenderRequestTypes.TextLayer:
                                 await ProcessTextLayerRequest(r);
+                                break;
+
+                            case RenderRequestTypes.PrefetchPicture:
+                                await ProcessPrefetchPictureRequest(r);
                                 break;
 
                             default:
@@ -135,6 +155,7 @@ namespace Caly.Core.Services
             _mainToken = _mainCts.Token;
             _pagesGenerations = new CancellationGenerations(_mainToken);
             _thumbnailsGenerations = new CancellationGenerations(_mainToken);
+            _prefetchGenerations = new CancellationGenerations(_mainToken);
             _processingLoopTask = Task.Run(ProcessingLoop, _mainToken);
         }
 
@@ -166,7 +187,17 @@ namespace Caly.Core.Services
         /// Number of pages to keep cached in <see cref="_cachePictures"/> and
         /// <see cref="_cacheTextLayers"/> beyond the realised range on each side.
         /// </summary>
-        private const int PageCacheBuffer = 1;
+        private const int ContinuousPageCacheBuffer = 1;
+
+        /// <summary>
+        /// <see cref="ContinuousPageCacheBuffer"/> for single-page view. Only one page is realised there, and
+        /// evicting a picture also drops its tiles (<see cref="Rendering.TileRenderService.InvalidatePage"/>),
+        /// so this wider window is what lets the tile cache serve a turn back to a recently read page.
+        /// </summary>
+        private const int SinglePageCacheBuffer = 3;
+
+        private static int GetCacheBuffer(PageDisplayMode mode)
+            => mode == PageDisplayMode.SinglePage ? SinglePageCacheBuffer : ContinuousPageCacheBuffer;
 
         private SemaphoreSlim[]? _renderLocks;
 
@@ -548,11 +579,11 @@ namespace Caly.Core.Services
                     }
                 }
 
-                UpdatePictureCache(m.RealisedPages, m.VisiblePages);
+                UpdatePictureCache(m.RealisedPages, m.VisiblePages, GetCacheBuffer(m.DisplayMode));
             }, token);
         }
 
-        private void UpdatePictureCache(Range? realisedPages, Range? visiblePages)
+        private void UpdatePictureCache(Range? realisedPages, Range? visiblePages, int cacheBuffer)
         {
             if (!realisedPages.HasValue)
             {
@@ -564,9 +595,10 @@ namespace Caly.Core.Services
             int realisedStart = realised.Start.GetOffset(NumberOfPages);
             int realisedEnd = realised.End.GetOffset(NumberOfPages);
 
-            int keepStart = Math.Max(1, realisedStart - PageCacheBuffer);
-            int keepEnd = Math.Min(NumberOfPages + 1, realisedEnd + PageCacheBuffer);
+            int keepStart = Math.Max(1, realisedStart - cacheBuffer);
+            int keepEnd = Math.Min(NumberOfPages + 1, realisedEnd + cacheBuffer);
 
+            SetPictureKeepWindow(keepStart, keepEnd);
             EvictPicturesOutside(keepStart, keepEnd);
         }
 
@@ -594,7 +626,7 @@ namespace Caly.Core.Services
             }
         }
 
-        private void UpdateTextLayerCache(Range? realisedPages, Range? visiblePages)
+        private void UpdateTextLayerCache(Range? realisedPages, Range? visiblePages, int cacheBuffer)
         {
             if (!realisedPages.HasValue)
             {
@@ -606,8 +638,8 @@ namespace Caly.Core.Services
             int realisedStart = realised.Start.GetOffset(NumberOfPages);
             int realisedEnd = realised.End.GetOffset(NumberOfPages);
 
-            int keepStart = Math.Max(1, realisedStart - PageCacheBuffer);
-            int keepEnd = Math.Min(NumberOfPages + 1, realisedEnd + PageCacheBuffer);
+            int keepStart = Math.Max(1, realisedStart - cacheBuffer);
+            int keepEnd = Math.Min(NumberOfPages + 1, realisedEnd + cacheBuffer);
 
             EvictTextLayersOutside(keepStart, keepEnd);
         }
@@ -727,10 +759,10 @@ namespace Caly.Core.Services
                 }
 
                 // Picture Cache
-                UpdatePictureCache(m.RealisedPages, m.VisiblePages);
+                UpdatePictureCache(m.RealisedPages, m.VisiblePages, GetCacheBuffer(m.DisplayMode));
 
                 // Text Cache
-                UpdateTextLayerCache(m.RealisedPages, m.VisiblePages);
+                UpdateTextLayerCache(m.RealisedPages, m.VisiblePages, GetCacheBuffer(m.DisplayMode));
 
                 var visible = m.VisiblePages.Value;
                 int visibleStart = visible.Start.Value;
@@ -798,15 +830,96 @@ namespace Caly.Core.Services
                         }
                     }
                 }
+
+                if (m.DisplayMode == PageDisplayMode.SinglePage)
+                {
+                    // Nothing off the current page is ever visible in single-page view, so
+                    // without this every page turn would be a cold render.
+                    var prefetchToken = await GetPrefetchToken();
+                    EnqueuePrefetch(document, visibleStart - 1, prefetchToken);
+                    EnqueuePrefetch(document, visibleEnd, prefetchToken);
+                }
             }, token);
+        }
+
+        /// <summary>
+        /// The live prefetch generation's token, starting one if none is live.
+        /// </summary>
+        private async Task<CancellationToken> GetPrefetchToken()
+        {
+            lock (_prefetchTokenLock)
+            {
+                if (!_prefetchToken.IsCancellationRequested)
+                {
+                    return _prefetchToken;
+                }
+            }
+
+            var token = await _prefetchGenerations.BeginAsync();
+            lock (_prefetchTokenLock)
+            {
+                _prefetchToken = token;
+            }
+
+            return token;
+        }
+
+        private void SetPictureKeepWindow(int keepStart, int keepEnd)
+        {
+            Interlocked.Exchange(ref _pictureKeepWindow, ((long)keepStart << 32) | (uint)keepEnd);
+        }
+
+        private bool IsInPictureKeepWindow(int pageNumber)
+        {
+            long window = Interlocked.Read(ref _pictureKeepWindow);
+            int keepStart = (int)(window >> 32);
+            int keepEnd = (int)(window & 0xFFFFFFFF);
+            return pageNumber >= keepStart && pageNumber < keepEnd;
+        }
+
+        private void EnqueuePrefetch(DocumentViewModel document, int pageNumber, CancellationToken token)
+        {
+            if (pageNumber < 1 || pageNumber > NumberOfPages || _cachePictures.ContainsKey(pageNumber))
+            {
+                return;
+            }
+
+            var page = document.GetPage(pageNumber);
+            if (page is null)
+            {
+                return; // Pages might still be loading
+            }
+
+            var request = new RenderRequest(page, RenderRequestTypes.PrefetchPicture, token);
+            if (!_requestsWriter.TryWrite(request))
+            {
+                throw new Exception("Could not write request to channel."); // Should never happen as unbounded channel
+            }
+        }
+
+        /// <summary>
+        /// Renders the page's picture into <see cref="_cachePictures"/> without handing it to the
+        /// page: <see cref="RefreshPages"/> picks it up from the cache when the page is turned to.
+        /// </summary>
+        private async Task ProcessPrefetchPictureRequest(RenderRequest renderRequest)
+        {
+            if (!IsInPictureKeepWindow(renderRequest.Page.PageNumber))
+            {
+                return; // Turned or jumped away since this was queued
+            }
+
+            using var picture = await GetPicture(renderRequest.Page.PageNumber, renderRequest.Token)
+                .ConfigureAwait(false);
         }
 
         public async Task CancelAndClear()
         {
             await _pagesGenerations.CancelCurrentAsync();
             await _thumbnailsGenerations.CancelCurrentAsync();
+            await _prefetchGenerations.CancelCurrentAsync();
 
             // Caches - full clear, no buffer retained.
+            SetPictureKeepWindow(0, 0);
             EvictPicturesOutside(0, 0);
             EvictTextLayersOutside(0, 0);
 
@@ -820,9 +933,11 @@ namespace Caly.Core.Services
 
             await _pagesGenerations.CancelCurrentAsync();
             await _thumbnailsGenerations.CancelCurrentAsync();
+            await _prefetchGenerations.CancelCurrentAsync();
 
             _pagesGenerations.Dispose();
             _thumbnailsGenerations.Dispose();
+            _prefetchGenerations.Dispose();
 
             try
             {

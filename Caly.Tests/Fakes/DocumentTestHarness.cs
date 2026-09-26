@@ -28,15 +28,34 @@ internal sealed class RenderingPdfDocumentService : IPdfDocumentService
     /// <summary>How many times a page picture has actually been rendered.</summary>
     public int RenderCount => Volatile.Read(ref _renderCount);
 
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, int> _renderCounts = new();
+
+    /// <summary>
+    /// How many times page <paramref name="pageNumber"/>'s picture has been rendered.
+    /// </summary>
+    public int RenderCountFor(int pageNumber) => _renderCounts.GetValueOrDefault(pageNumber);
+
     public int NumberOfPages => _numberOfPages;
     public string? FileName => "rendering.pdf";
     public bool IsActive { get; set; }
     public double PpiScale => 1.0;
 
-    public Task<IRef<SKPicture>?> GetRenderPageAsync(int pageNumber, CancellationToken token)
+    /// <summary>
+    /// When set, every render (counted as started) waits for it before completing, honouring the
+    /// request's token - the stand-in for a slow page.
+    /// </summary>
+    public TaskCompletionSource? RenderGate { get; set; }
+
+    public async Task<IRef<SKPicture>?> GetRenderPageAsync(int pageNumber, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         Interlocked.Increment(ref _renderCount);
+        _renderCounts.AddOrUpdate(pageNumber, 1, static (_, count) => count + 1);
+
+        if (RenderGate is { } gate)
+        {
+            await gate.Task.WaitAsync(token);
+        }
 
         using var recorder = new SKPictureRecorder();
         var canvas = recorder.BeginRecording(new SKRect(0, 0, 100, 100));
@@ -45,7 +64,7 @@ internal sealed class RenderingPdfDocumentService : IPdfDocumentService
             canvas.DrawRect(new SKRect(0, 0, 100, 100), paint);
         }
 
-        return Task.FromResult<IRef<SKPicture>?>(RefCountable.Create(recorder.EndRecording()));
+        return RefCountable.Create(recorder.EndRecording());
     }
 
     // Page sizes are set up front by the tests, so the render path never asks for one.
