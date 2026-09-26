@@ -26,6 +26,8 @@ using Avalonia.Threading;
 using Caly.Core.Models;
 using Caly.Core.Services;
 using Caly.Core.Services.Interfaces;
+using Caly.Core.Utilities;
+using Caly.Pdf.Models;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
@@ -163,9 +165,14 @@ public sealed partial class DocumentViewModel : ViewModelBase
         }
     }
 
-    [ObservableProperty] private int _pageCount;
+    [ObservableProperty]
+    public partial int PageCount { get; set; }
 
-    [ObservableProperty] private string? _fileName;
+    [ObservableProperty]
+    public partial string? FileName { get; set; }
+
+    [ObservableProperty]
+    public partial string? Title { get; set; }
 
     private readonly TaskCompletionSource<Task> _pagesLoadOutcome = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -451,6 +458,8 @@ public sealed partial class DocumentViewModel : ViewModelBase
         {
             IsPasswordProtected = isPasswordProtected;
             FileName = fileName;
+            Title = _pdfService.Title ?? fileName;
+            ApplyPreferences(_pdfService.Preferences);
 
             if (state == DocumentOpeningState.Success)
             {
@@ -479,6 +488,68 @@ public sealed partial class DocumentViewModel : ViewModelBase
         }
 
         return state;
+    }
+
+    private void ApplyPreferences(PdfPreferences? preferences)
+    {
+        Debug.ThrowNotOnUiThread();
+
+        if (preferences is null)
+        {
+            return;
+        }
+
+        switch (preferences.PageLayout)
+        {
+            case PdfPageLayout.SinglePage:
+                PageDisplayMode = PageDisplayMode.SinglePage;
+                break;
+
+            default:
+                PageDisplayMode = PageDisplayMode.Continuous;
+                break;
+        }
+
+        // The Bookmarks and Embedded Files tabs are hidden when empty, so only switch to them once
+        // their content is known to exist. Many PDFs set /UseOutlines without any outline.
+        SelectedTabIndex = (int)LeftNavBarTabIndex.Thumbnails;
+        switch (preferences.PageMode)
+        {
+            // Fire-and-forget is okay here
+            case PdfPageMode.UseOutlines:
+                _ = SelectTabIfNotEmpty(LeftNavBarTabIndex.Bookmarks,
+                    async () => await BookmarksSource is not null);
+                break;
+            case PdfPageMode.UseAttachments:
+                _ = SelectTabIfNotEmpty(LeftNavBarTabIndex.EmbeddedFiles,
+                    async () => (await EmbeddedFiles).Count > 0);
+                break;
+        }
+    }
+
+    private async Task SelectTabIfNotEmpty(LeftNavBarTabIndex tab, Func<Task<bool>> hasContent)
+    {
+        Debug.ThrowNotOnUiThread();
+
+        try
+        {
+            if (!await hasContent())
+            {
+                return;
+            }
+
+            // Resumes on the UI thread. Do not override a tab the user picked while loading.
+            if (SelectedTabIndex == (int)LeftNavBarTabIndex.Thumbnails)
+            {
+                SelectedTabIndex = (int)tab;
+            }
+        }
+        catch (OperationCanceledException)
+        { /* No op */ }
+        catch (Exception e)
+        {
+            Debug.WriteExceptionToFile(e);
+        }
     }
 
     private async Task LoadPages()

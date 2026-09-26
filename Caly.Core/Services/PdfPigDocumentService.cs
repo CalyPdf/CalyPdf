@@ -33,8 +33,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml;
+using System.Xml.Linq;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Exceptions;
 using UglyToad.PdfPig.Outline;
@@ -57,17 +60,22 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
     private IStorageFile? _storageFile;
     private Stream? _fileStream;
     private PdfDocument? _document;
+
     private Uri? _filePath;
 
     public string? LocalPath => _filePath?.LocalPath;
 
     public string? FileName => Path.GetFileNameWithoutExtension(LocalPath);
+    
+    public string? Title { get; private set; }
 
     public long? FileSize => _fileStream?.Length;
 
     public int NumberOfPages { get; private set; }
 
     public bool IsPasswordProtected { get; private set; } = false;
+
+    public PdfPreferences? Preferences { get; private set; }
 
     public Func<CancellationToken, Task<string?>>? PasswordPrompt { get; set; }
 
@@ -146,7 +154,7 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
                     _fileStream = ms;
                 }
 
-                return await Task.Run(() =>
+                return await Task.Run(async () =>
                 {
                     var pdfParsingOptions = new ParsingOptions()
                     {
@@ -169,6 +177,8 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
                     _document = PdfDocument.Open(_fileStream, pdfParsingOptions);
 
                     token.ThrowIfCancellationRequested();
+
+                    await ApplyPreferences(ct);
 
                     // We store the PPI as an indirect object so that it can be accessed in the TextLayerFactory.
                     // This is very hacky but PdfPig does not provide a better way to pass such information
@@ -238,6 +248,80 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
                 }
             }
         }, () => DocumentOpeningState.Error, () => DocumentOpeningState.Canceled, token);
+    }
+
+    private async Task ApplyPreferences(CancellationToken token)
+    {
+        if (_document is null)
+        {
+            throw new InvalidOperationException("Document has not been opened yet.");
+        }
+
+        Preferences = PdfPreferences.GetPdfPreferences(_document);
+
+        if (!Preferences.DisplayDocTitle)
+        {
+            return;
+        }
+
+        // PDF 2.0 takes the title from XMP dc:title. PDF 1.7 took it from the Info dictionary's
+        // /Title, which many older producers write without any XMP: fall back to it.
+        var title = await GetXmpTitle(_document, token);
+        if (string.IsNullOrEmpty(title))
+        {
+            title = _document.Information.Title?.Trim();
+        }
+
+        if (!string.IsNullOrEmpty(title))
+        {
+            Title = title;
+        }
+    }
+
+    private static readonly TimeSpan XmpTimeout = TimeSpan.FromSeconds(20);
+
+    private static async Task<string?> GetXmpTitle(PdfDocument document, CancellationToken token)
+    {
+        // Only the XML parsing observes the token: reading and decoding the XMP stream is synchronous.
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+        timeoutCts.CancelAfter(XmpTimeout);
+
+        try
+        {
+            if (document.TryGetXmpMetadata(out var xmpMetadata))
+            {
+                // see https://github.com/UglyToad/PdfPig/issues/1372
+                var xmpData = xmpMetadata.GetXmlMemory();
+
+                if (MemoryMarshal.TryGetArray(xmpData, out ArraySegment<byte> segment))
+                {
+                    using var ms = new MemoryStream(
+                        segment.Array!,
+                        segment.Offset,
+                        segment.Count,
+                        writable: false,
+                        publiclyVisible: false);
+                    using var reader = XmlReader.Create(ms, new XmlReaderSettings
+                    {
+                        DtdProcessing = DtdProcessing.Prohibit,
+                        XmlResolver = null,
+                        MaxCharactersInDocument = 4 * 1024 * 1024,
+                        Async = true
+                    });
+
+                    var metadata = await XDocument.LoadAsync(reader, LoadOptions.None, timeoutCts.Token);
+                    return PdfPreferences.GetXmpTitle(metadata);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        { /* No op */ }
+        catch (Exception ex)
+        {
+            Debug.WriteExceptionToFile(ex);
+        }
+
+        return null;
     }
 
     /// <summary>

@@ -70,11 +70,15 @@ public interface IPdfDocumentService : IAsyncDisposable
 
     string? FileName { get; }
 
+    string? Title { get; }
+
     long? FileSize { get; }
 
     string? LocalPath { get; }
 
     bool IsPasswordProtected { get; }
+
+    PdfPreferences? Preferences { get; }
 
     /// <summary>
     /// Invoked when the document turns out to be password protected, to ask the owner for a

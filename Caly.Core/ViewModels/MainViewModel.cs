@@ -19,11 +19,14 @@
 // SOFTWARE.
 
 using Avalonia.Collections;
-using Caly.Core.Services;
+using Avalonia.Threading;
 using Caly.Core.Models;
+using Caly.Core.Services;
 using Caly.Core.Services.Interfaces;
+using Caly.Core.Utilities;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.ObjectModel;
@@ -33,8 +36,6 @@ using System.Reactive.Concurrency;
 using System.Reactive.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Avalonia.Threading;
-using CommunityToolkit.Mvvm.Messaging;
 using Tabalonia.Controls;
 
 namespace Caly.Core.ViewModels;
@@ -264,7 +265,7 @@ public sealed partial class MainViewModel : ViewModelBase, IDisposable
     private void ActivateSearchTextTab()
     {
         IsDocumentPaneOpen = true;
-        SelectedDocument?.SelectedTabIndex = 2;
+        SelectedDocument?.SelectedTabIndex = (int)LeftNavBarTabIndex.Search;
     }
 
     [RelayCommand]
