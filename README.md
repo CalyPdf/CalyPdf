@@ -15,7 +15,7 @@
 > [!IMPORTANT]
 > The development is currently in alpha.
 
-https://github.com/user-attachments/assets/8f1e1c0e-cdb0-4663-829b-98c8afdc76cf
+https://github.com/user-attachments/assets/676777a9-17bf-4ca2-900b-2aa2202bbe12
 
 ### Cross-Platform Compatibility
 
