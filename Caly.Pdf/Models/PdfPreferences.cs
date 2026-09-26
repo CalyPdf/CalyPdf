@@ -206,7 +206,7 @@ public enum PdfPageMode : byte
     /// <summary>
     /// Neither document outline nor thumbnail images visible.
     /// </summary>
-    None = 0,
+    UseNone = 0,
 
     /// <summary>
     /// Document outline visible.
