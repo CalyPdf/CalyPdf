@@ -13,7 +13,17 @@
         "Version": {
             "$type": "msbuild",
             "property": "Version"
-        }
+        },
+        "Icon": "../Logo/Favicon Transparent_2.png",
+        "Company": "Caly Pdf",
+        "FileTypes": [
+            {
+                "Name": "pdf",
+                "Extension": "pdf",
+                "MimeType": "application/pdf",
+                "NormalizedExtension": "pdf"
+            }
+        ]
     },
     "LinuxSettings": {
         "AppIcon": "../Logo/Favicon Transparent_2.png",
