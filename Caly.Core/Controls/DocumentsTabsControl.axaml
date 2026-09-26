@@ -36,7 +36,7 @@
 		<TabControl.ItemTemplate>
 			<DataTemplate>
 				<TextBlock DockPanel.Dock="Left"
-						   Text="{Binding FileName}"
+						   Text="{Binding Title}"
 						   TextTrimming="CharacterEllipsis"/>
 			</DataTemplate>
 		</TabControl.ItemTemplate>
