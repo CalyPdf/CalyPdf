@@ -84,6 +84,58 @@ public class PageItemsControlRotationOffsetTests
     }
 
     [Theory]
+    [MemberData(nameof(ExpectedDisplayPoints))]
+    public void ToUnrotatedPagePoint_IsTheInverseOfToDisplayOffsets(int rotation, double displayX, double displayY)
+    {
+        // The page is placed away from the document origin: the mapping is relative to its bounds.
+        var bounds = new Rect(new Point(1000, 2000), DisplaySize(rotation));
+
+        Point unrotated = PageItemsControl.ToUnrotatedPagePoint(rotation, bounds,
+            new Point(bounds.Left + displayX, bounds.Top + displayY));
+
+        Assert.Equal(U, unrotated.X, 6);
+        Assert.Equal(V, unrotated.Y, 6);
+    }
+
+    [Fact]
+    public void ToUnrotatedPagePoint_ClampsToThePage()
+    {
+        var bounds = new Rect(0, 1000, UnrotatedWidth, UnrotatedHeight);
+
+        Point unrotated = PageItemsControl.ToUnrotatedPagePoint(0, bounds, new Point(-50, 5000));
+
+        Assert.Equal(new Point(0, UnrotatedHeight), unrotated);
+    }
+
+    // Same stand-in as below: 100 x 1000 pages, which are 1000 x 100 landscape pages at 90 and 270.
+    // GoToPage(3, 300) puts the viewport (400 high) over 2300..2700: its centre is 500 into page 3.
+    // Horizontally, the page is centred in the wider viewport: the centre is 50 from its left edge.
+    [AvaloniaTheory]
+    [InlineData(0, 50, 500)]
+    [InlineData(90, 500, 100 - 50)]
+    [InlineData(180, 100 - 50, 1000 - 500)]
+    [InlineData(270, 1000 - 500, 50)]
+    public void ReadingPoint_IsTheViewportCentreOnTheUnrotatedPage(int rotation, double expectedX, double expectedY)
+    {
+        const double pageHeight = 1000;
+        var control = Create(10, pageHeight);
+        control.Styles.Add(new Style(x => x.OfType<PageItem>())
+        {
+            Setters = { new Setter(PageItem.RotationProperty, rotation) }
+        });
+        Show(control);
+
+        control.GoToPage(3, 300);
+        RunLayout();
+
+        Assert.Equal(2 * pageHeight + 300, control.Scroll!.Offset.Y, 1);
+        Assert.NotNull(control.ReadingPoint);
+        Assert.Equal(3, control.ReadingPoint.Value.PageNumber);
+        Assert.Equal(expectedX, control.ReadingPoint.Value.Position.X, 1);
+        Assert.Equal(expectedY, control.ReadingPoint.Value.Position.Y, 1);
+    }
+
+    [Theory]
     [InlineData(0)]
     [InlineData(90)]
     [InlineData(180)]
@@ -121,7 +173,8 @@ public class PageItemsControlRotationOffsetTests
         control.GoToPage(3, yOffset: 300, xOffset: 30, offsetPdfCoord: true);
         RunLayout();
 
-        Assert.Equal(2 * pageHeight + expectedYInPage, control.Scroll!.Offset.Y, 1);
+        // The target is centred in the viewport.
+        Assert.Equal(2 * pageHeight + expectedYInPage - control.Scroll!.Viewport.Height / 2, control.Scroll.Offset.Y, 1);
     }
 
     [AvaloniaTheory]
@@ -130,6 +183,7 @@ public class PageItemsControlRotationOffsetTests
     public void GoToPage_PdfYOnly_OnSidewaysPage_LandsAtThePageTop(int rotation)
     {
         // A bookmark only has a PDF y, which a 90 / 270 rotation lays along the horizontal axis.
+        // With no vertical target, the page top is aligned with the viewport top, not centred.
         const double pageHeight = 1000;
         var control = Create(10, pageHeight);
         control.Styles.Add(new Style(x => x.OfType<PageItem>())
