@@ -89,41 +89,151 @@
                 array[i] = new KdTreeElement<T>(i, elementsPointFunc(el), el);
             }
 
-            Root = BuildTree(new Span<KdTreeElement<T>>(array))!;
+            Root = BuildTree(array, 0, Count, 0)!;
         }
 
-        private static CalyKdTreeNode<T>? BuildTree(Span<KdTreeElement<T>> P, int depth = 0)
+        /// <summary>
+        /// Build the tree from <c>elements[start..end)</c>, split on the median along X (even depth) or Y (odd depth).
+        /// <para>Only the median needs to be in place, not the whole range sorted, so the elements are partitioned
+        /// with a quickselect. Ties are broken by index, so the tree is the same as if the range was sorted.</para>
+        /// </summary>
+        private static CalyKdTreeNode<T>? BuildTree(KdTreeElement<T>[] elements, int start, int end, int depth)
         {
-            if (P.Length == 0)
+            int count = end - start;
+            if (count == 0)
             {
                 return null;
             }
 
-            if (P.Length == 1)
+            if (count == 1)
             {
-                return new CalyKdTreeLeaf<T>(P[0], depth);
+                return new CalyKdTreeLeaf<T>(elements[start], depth);
             }
 
-            if (depth % 2 == 0)
-            {
-                P.Sort((p0, p1) => p0.Value.X.CompareTo(p1.Value.X));
-            }
-            else
-            {
-                P.Sort((p0, p1) => p0.Value.Y.CompareTo(p1.Value.Y));
-            }
+            bool byX = depth % 2 == 0;
 
-            if (P.Length == 2)
+            if (count == 2)
             {
-                return new CalyKdTreeNode<T>(new CalyKdTreeLeaf<T>(P[0], depth + 1), null, P[1], depth);
+                if (Compare(elements[start + 1], elements[start], byX) < 0)
+                {
+                    Swap(elements, start, start + 1);
+                }
+
+                return new CalyKdTreeNode<T>(new CalyKdTreeLeaf<T>(elements[start], depth + 1), null, elements[start + 1], depth);
             }
 
-            int median = P.Length / 2;
+            int median = start + count / 2;
+            Select(elements, start, end - 1, median, byX);
 
-            CalyKdTreeNode<T>? vLeft = BuildTree(P.Slice(0, median), depth + 1);
-            CalyKdTreeNode<T>? vRight = BuildTree(P.Slice(median + 1), depth + 1);
+            CalyKdTreeNode<T>? vLeft = BuildTree(elements, start, median, depth + 1);
+            CalyKdTreeNode<T>? vRight = BuildTree(elements, median + 1, end, depth + 1);
 
-            return new CalyKdTreeNode<T>(vLeft, vRight, P[median], depth);
+            return new CalyKdTreeNode<T>(vLeft, vRight, elements[median], depth);
+        }
+
+        /// <summary>
+        /// Partition <c>elements[left..right]</c> (inclusive) so that the element at <paramref name="k"/> is the one
+        /// that would be there if the range was sorted, with smaller elements before it and larger ones after it.
+        /// <para>Quickselect with a median of three pivot, falling back to sorting the range if it does not converge.</para>
+        /// </summary>
+        private static void Select(KdTreeElement<T>[] elements, int left, int right, int k, bool byX)
+        {
+            // Each partition should roughly halve the range, allow for twice as many before giving up
+            int maxIterations = 2 * (int)Math.Ceiling(Math.Log2(right - left + 1)) + 2;
+
+            while (right > left)
+            {
+                if (maxIterations-- == 0)
+                {
+                    Array.Sort(elements, left, right - left + 1, byX ? KdTreeElementComparer.X : KdTreeElementComparer.Y);
+                    return;
+                }
+
+                // Median of three, also ordering the first, middle and last elements
+                int middle = left + (right - left) / 2;
+                if (Compare(elements[middle], elements[left], byX) < 0)
+                {
+                    Swap(elements, left, middle);
+                }
+
+                if (Compare(elements[right], elements[left], byX) < 0)
+                {
+                    Swap(elements, left, right);
+                }
+
+                if (Compare(elements[right], elements[middle], byX) < 0)
+                {
+                    Swap(elements, middle, right);
+                }
+
+                var pivot = elements[middle];
+
+                // Hoare partition: elements[left..j] <= pivot <= elements[i..right]
+                int i = left;
+                int j = right;
+                while (i <= j)
+                {
+                    while (Compare(elements[i], pivot, byX) < 0)
+                    {
+                        i++;
+                    }
+
+                    while (Compare(elements[j], pivot, byX) > 0)
+                    {
+                        j--;
+                    }
+
+                    if (i <= j)
+                    {
+                        Swap(elements, i, j);
+                        i++;
+                        j--;
+                    }
+                }
+
+                if (k <= j)
+                {
+                    right = j;
+                }
+                else if (k >= i)
+                {
+                    left = i;
+                }
+                else
+                {
+                    // j < k < i: elements[k] is the pivot
+                    return;
+                }
+            }
+        }
+
+        private static int Compare(in KdTreeElement<T> p0, in KdTreeElement<T> p1, bool byX)
+        {
+            int comparison = byX ? p0.Value.X.CompareTo(p1.Value.X) : p0.Value.Y.CompareTo(p1.Value.Y);
+            return comparison != 0 ? comparison : p0.Index.CompareTo(p1.Index);
+        }
+
+        private static void Swap(KdTreeElement<T>[] elements, int i, int j)
+        {
+            (elements[i], elements[j]) = (elements[j], elements[i]);
+        }
+
+        private sealed class KdTreeElementComparer : IComparer<KdTreeElement<T>>
+        {
+            public static readonly KdTreeElementComparer X = new KdTreeElementComparer(true);
+            public static readonly KdTreeElementComparer Y = new KdTreeElementComparer(false);
+
+            private readonly bool byX;
+
+            private KdTreeElementComparer(bool byX)
+            {
+                this.byX = byX;
+            }
+
+            public int Compare(KdTreeElement<T> p0, KdTreeElement<T> p1)
+            {
+                return CalyKdTree<T>.Compare(p0, p1, byX);
+            }
         }
 
         #region NN
@@ -140,76 +250,70 @@
         public T FindNearestNeighbour(T pivot, Func<T, PdfPoint> pivotPointFunc, Func<PdfPoint, PdfPoint, float> distanceMeasure, out int index, out float distance)
         {
             var pivotPoint = pivotPointFunc(pivot);
-            var result = FindNearestNeighbour(Root, pivot, pivotPoint, distanceMeasure);
-            index = result.Item1 != null ? result.Item1.Index : -1;
-            distance = result.Item2 ?? float.NaN;
-            return result.Item1 != null ? result.Item1.Element : default;
+
+            CalyKdTreeNode<T>? nearest = null;
+            float nearestDistance = float.PositiveInfinity;
+            FindNearestNeighbour(Root, pivot, pivotPoint, distanceMeasure, ref nearest, ref nearestDistance);
+
+            if (nearest is null)
+            {
+                index = -1;
+                distance = float.NaN;
+                return default!;
+            }
+
+            index = nearest.Index;
+            distance = nearestDistance;
+            return nearest.Element;
         }
 
-        private static (CalyKdTreeNode<T>, float?) FindNearestNeighbour(CalyKdTreeNode<T> node, T pivot, PdfPoint pivotPoint, Func<PdfPoint, PdfPoint, float> distance)
+        /// <summary>
+        /// Depth-first search visiting the node, then the child on the pivot's side, then the other child if it can
+        /// contain a point as near as the nearest found so far. A point at the same distance replaces the nearest
+        /// found so far, i.e. the last visited wins.
+        /// </summary>
+        private static void FindNearestNeighbour(CalyKdTreeNode<T> node, T pivot, PdfPoint pivotPoint, Func<PdfPoint, PdfPoint, float> distance,
+            ref CalyKdTreeNode<T>? nearest, ref float nearestDistance)
         {
-            if (node == null)
+            // The pivot is not a candidate, otherwise it could be returned as its own neighbour
+            if (!EqualityComparer<T>.Default.Equals(node.Element, pivot))
             {
-                return (null, null);
-            }
-            else if (node.IsLeaf)
-            {
-                if (node.Element.Equals(pivot))
+                float nodeDistance = distance(node.Value, pivotPoint);
+                if (nodeDistance <= nearestDistance)
                 {
-                    return (null, null);
+                    nearest = node;
+                    nearestDistance = nodeDistance;
                 }
-                return (node, distance(node.Value, pivotPoint));
+            }
+
+            var pointValue = node.IsAxisCutX ? pivotPoint.X : pivotPoint.Y;
+            var split = node.L;
+
+            if (pointValue < split)
+            {
+                // start left
+                if (node.LeftChild != null)
+                {
+                    FindNearestNeighbour(node.LeftChild, pivot, pivotPoint, distance, ref nearest, ref nearestDistance);
+                }
+
+                if (node.RightChild != null && pointValue + nearestDistance >= split)
+                {
+                    FindNearestNeighbour(node.RightChild, pivot, pivotPoint, distance, ref nearest, ref nearestDistance);
+                }
             }
             else
             {
-                var currentNearestNode = node;
-                var currentDistance = distance(node.Value, pivotPoint);
-
-                CalyKdTreeNode<T> newNode = null;
-                float? newDist = null;
-
-                var pointValue = node.IsAxisCutX ? pivotPoint.X : pivotPoint.Y;
-
-                if (pointValue < node.L)
+                // start right
+                if (node.RightChild != null)
                 {
-                    // start left
-                    (newNode, newDist) = FindNearestNeighbour(node.LeftChild, pivot, pivotPoint, distance);
-
-                    if (newDist.HasValue && newDist <= currentDistance && !newNode.Element.Equals(pivot))
-                    {
-                        currentDistance = newDist.Value;
-                        currentNearestNode = newNode;
-                    }
-
-                    if (node.RightChild != null && pointValue + currentDistance >= node.L)
-                    {
-                        (newNode, newDist) = FindNearestNeighbour(node.RightChild, pivot, pivotPoint, distance);
-                    }
-                }
-                else
-                {
-                    // start right
-                    (newNode, newDist) = FindNearestNeighbour(node.RightChild, pivot, pivotPoint, distance);
-
-                    if (newDist.HasValue && newDist <= currentDistance && !newNode.Element.Equals(pivot))
-                    {
-                        currentDistance = newDist.Value;
-                        currentNearestNode = newNode;
-                    }
-
-                    if (node.LeftChild != null && pointValue - currentDistance <= node.L)
-                    {
-                        (newNode, newDist) = FindNearestNeighbour(node.LeftChild, pivot, pivotPoint, distance);
-                    }
+                    FindNearestNeighbour(node.RightChild, pivot, pivotPoint, distance, ref nearest, ref nearestDistance);
                 }
 
-                if (newDist.HasValue && newDist <= currentDistance && !newNode.Element.Equals(pivot))
+                if (node.LeftChild != null && pointValue - nearestDistance <= split)
                 {
-                    currentDistance = newDist.Value;
-                    currentNearestNode = newNode;
+                    FindNearestNeighbour(node.LeftChild, pivot, pivotPoint, distance, ref nearest, ref nearestDistance);
                 }
-
-                return (currentNearestNode, currentDistance);
             }
         }
         #endregion
