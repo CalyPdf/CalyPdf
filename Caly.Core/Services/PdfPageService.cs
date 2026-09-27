@@ -138,8 +138,13 @@ namespace Caly.Core.Services
         {
             // Read once per document, not live: changing the setting mid-document would leave already
             // cached tiles in the old format sitting alongside new ones in the new format.
-            bool useCompactTileFormat = settingsService?.GetSettings().UseCompactTileFormat ?? false;
-            TileRenderService = new TileRenderService(new TileCache(), startProcessingLoop: true, useCompactTileFormat);
+            var settings = settingsService?.GetSettings();
+            bool useCompactTileFormat = settings?.UseCompactTileFormat ?? false;
+            int tileCacheSizeMB = settings is not null && CalySettings.IsValidTileCacheSize(settings.TileCacheSizeMB)
+                ? settings.TileCacheSizeMB
+                : CalySettings.DefaultTileCacheSizeMB;
+            TileRenderService = new TileRenderService(new TileCache(tileCacheSizeMB * 1024L * 1024),
+                startProcessingLoop: true, useCompactTileFormat);
             _pdfDocumentService = pdfDocumentService;
 
             var channel = Channel.CreateUnboundedPrioritized(new UnboundedPrioritizedChannelOptions<RenderRequest>()

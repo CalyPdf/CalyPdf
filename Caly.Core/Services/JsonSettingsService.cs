@@ -525,6 +525,11 @@ public sealed class JsonSettingsService : ISettingsService
         {
             settings.Height = Default.Height;
         }
+
+        if (!IsValidTileCacheSize(settings.TileCacheSizeMB))
+        {
+            settings.TileCacheSizeMB = DefaultTileCacheSizeMB;
+        }
     }
 
     private void SetDefaultSettings()

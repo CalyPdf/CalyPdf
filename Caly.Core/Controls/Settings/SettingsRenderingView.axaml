@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:Caly.Core.ViewModels"
+             xmlns:sys="using:System"
              x:Class="Caly.Core.Controls.Settings.SettingsRenderingView"
              x:DataType="vm:MainViewModel"
              x:CompileBindings="True">
@@ -24,6 +25,29 @@
         <CheckBox Content="Reduce tile memory (beta)"
                   IsChecked="{Binding UseCompactTileFormat, Mode=TwoWay}"
                   ToolTip.Tip="Uses a smaller pixel format for page tiles, cutting memory use at the cost of a very slightly coarser colour depth."/>
+
+        <TextBlock Text="Applies to the next document opened."
+                   FontSize="11"
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
+
+        <Separator Margin="0,4"/>
+
+        <StackPanel Orientation="Horizontal"
+                    Spacing="6"
+                    ToolTip.Tip="Memory each open document may keep for page tiles. Larger values re-render less when scrolling back or zooming; on-screen tiles are always kept.">
+            <TextBlock Text="Tile cache size"
+                       VerticalAlignment="Center"/>
+            <ComboBox MinWidth="110"
+                      ItemsSource="{Binding TileCacheSizeOptions}"
+                      SelectedItem="{Binding TileCacheSizeMB, Mode=TwoWay}">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="sys:Int32">
+                        <TextBlock Text="{Binding StringFormat={}{0} MB}"/>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+        </StackPanel>
 
         <TextBlock Text="Applies to the next document opened."
                    FontSize="11"

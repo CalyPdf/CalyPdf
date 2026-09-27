@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System;
 using System.Text.Json.Serialization;
 
 namespace Caly.Core.Models;
@@ -29,8 +30,18 @@ public sealed class CalySettings
         Width = 1000,
         Height = 500,
         PaneSize = 350,
+        TileCacheSizeMB = DefaultTileCacheSizeMB,
         Debug = null
     };
+
+    public const int DefaultTileCacheSizeMB = 128;
+
+    /// <summary>
+    /// The only values <see cref="TileCacheSizeMB"/> may take.
+    /// </summary>
+    public static readonly int[] TileCacheSizeOptionsMB = [64, 128, 256, 512, 1024, 2048];
+
+    public static bool IsValidTileCacheSize(int megabytes) => Array.IndexOf(TileCacheSizeOptionsMB, megabytes) >= 0;
 
     // TODO - Add version for compatibility checks
 
@@ -56,6 +67,11 @@ public sealed class CalySettings
     /// instead of <c>Bgra8888</c> (4 bytes/pixel).
     /// </summary>
     public bool UseCompactTileFormat { get; set; } // TODO - Might be a good default for mobile platform
+
+    /// <summary>
+    /// Memory budget of each open document's tile cache, in megabytes.
+    /// </summary>
+    public int TileCacheSizeMB { get; set; }
 
     public CalySettingsDebug? Debug { get; set; }
 
