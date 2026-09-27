@@ -404,7 +404,8 @@ public sealed class PageItemsControl : ItemsControl
         var word = textLayer[wordIndex];
         // NB: We are NOT in pdf coordinates, words y-axis is already inverted. The text layer
         // lives inside the page's rotation transform, so the coordinates are in the unrotated page.
-        GoToPage(pageNumber, word.BoundingBox.Bottom, word.BoundingBox.Left, PageOffsetSpace.UnrotatedPage);
+        var centroid = word.BoundingBox.Centroid;
+        GoToPage(pageNumber, centroid.Y, centroid.X, PageOffsetSpace.UnrotatedPage);
     }
 
     /// <summary>
