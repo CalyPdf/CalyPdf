@@ -125,7 +125,7 @@ public class TileCacheStressTests
         Assert.All(borrowed, b => Assert.NotNull(b.Ref));
 
         // Flood the cache with 490 tiles from other pages: every visible tile above is now the
-        // least-recently-used content and is evicted from the cache's own bookkeeping.
+        // least-recently-used content, but still on screen, so the flood must evict around it.
         for (int page = 2; page <= 50; page++)
         {
             for (int col = 0; col < 10; col++)
@@ -135,18 +135,30 @@ public class TileCacheStressTests
             }
         }
 
-        foreach (var key in visible)
-        {
-            Assert.Equal(TileCacheState.Missing, cache.Lookup(key).State);
-        }
-
-        // No flicker, no artefact: every borrowed reference is still alive and still shows the
-        // exact pixels it had when the frame started drawing it.
+        // No hole, no flicker, no artefact: every visible tile is still cached, every borrowed
+        // reference is still alive, and both show the exact pixels the frame started drawing.
         foreach (var (key, imageRef) in borrowed)
         {
+            var cached = cache.Lookup(key);
+            Assert.Equal(TileCacheState.Cached, cached.State);
+            Assert.True(MatchesExpectedColor(cached.Image!, key));
+            cached.Image!.Dispose();
+
             Assert.True(imageRef.IsAlive);
             Assert.True(MatchesExpectedColor(imageRef, key));
             imageRef.Dispose();
+        }
+
+        // Once the frame lets go, the visible tiles are ordinary LRU victims again.
+        for (int col = 0; col < tileCapacity; col++)
+        {
+            var key = new TileKey(51, 0, col, 0);
+            cache.Add(key, CreateTile(key));
+        }
+
+        foreach (var key in visible)
+        {
+            Assert.Equal(TileCacheState.Missing, cache.Lookup(key).State);
         }
     }
 
