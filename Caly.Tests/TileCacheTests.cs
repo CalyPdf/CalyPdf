@@ -83,14 +83,22 @@ public class TileCacheTests
     }
 
     [Fact]
-    public void Add_TileLargerThanWholeBudget_IsRejectedAndDisposed()
+    public void Add_TileLargerThanWholeBudget_IsStillCached()
     {
+        // A tile is only rendered because it is needed on screen; refusing it would leave a hole
+        // that nothing repairs, whatever the budget.
         using var cache = new TileCache(maxMemoryBytes: TileBytes - 1);
         var tile = CreateTile();
 
-        cache.Add(Key(), tile);
+        cache.Add(Key(col: 0), tile);
 
-        Assert.Equal(TileCacheState.Missing, cache.Lookup(Key()).State);
+        var result = cache.Lookup(Key(col: 0));
+        Assert.Equal(TileCacheState.Cached, result.State);
+        result.Image!.Dispose();
+
+        // Once nothing draws it, it is the first thing the budget reclaims.
+        cache.Add(Key(col: 1), CreateTile());
+        Assert.Equal(TileCacheState.Missing, cache.Lookup(Key(col: 0)).State);
         Assert.Equal(IntPtr.Zero, tile.Image.Handle);
     }
 
@@ -136,28 +144,36 @@ public class TileCacheTests
     }
 
     [Fact]
-    public void EvictedTile_StaysAliveWhileTheRenderPassStillHoldsIt()
+    public void TileHeldByTheRenderPass_IsNotEvicted_AndTheCacheGrowsPastItsBudgetInstead()
     {
-        // This is the contract TileDrawEntry.DrawTile relies on: a draw entry owns its reference
-        // for the whole draw, so eviction on another thread cannot free the image under it.
+        // A tile a draw operation still holds is on screen. Evicting it would free nothing (the
+        // draw's reference keeps the pixels alive) and leave a hole the next frame.
         using var cache = new TileCache(maxMemoryBytes: TileBytes);
         var tile = CreateTile();
         cache.Add(Key(col: 0), tile);
 
         var borrowed = cache.Lookup(Key(col: 0));
 
-        // Force the borrowed tile out of the cache.
         cache.Add(Key(col: 1), CreateTile());
+
+        var held = cache.Lookup(Key(col: 0));
+        var added = cache.Lookup(Key(col: 1));
+        Assert.Equal(TileCacheState.Cached, held.State);
+        Assert.Equal(TileCacheState.Cached, added.State);
+        held.Image!.Dispose();
+        added.Image!.Dispose();
+
+        // Released by the render pass, it is evictable again and the cache returns to budget.
+        borrowed.Image!.Dispose();
+        cache.Add(Key(col: 2), CreateTile());
+
         Assert.Equal(TileCacheState.Missing, cache.Lookup(Key(col: 0)).State);
-
-        // The cache dropped its reference, but ours keeps the native image alive.
-        Assert.True(borrowed.Image!.IsAlive);
-        Assert.NotEqual(IntPtr.Zero, tile.Image.Handle);
-        Assert.Equal(TileSide, borrowed.Image.Item.Width);
-
-        // Releasing the last reference is what actually frees it.
-        borrowed.Image.Dispose();
+        Assert.Equal(TileCacheState.Missing, cache.Lookup(Key(col: 1)).State);
         Assert.Equal(IntPtr.Zero, tile.Image.Handle);
+
+        var survivor = cache.Lookup(Key(col: 2));
+        Assert.Equal(TileCacheState.Cached, survivor.State);
+        survivor.Image!.Dispose();
     }
 
     [Fact]

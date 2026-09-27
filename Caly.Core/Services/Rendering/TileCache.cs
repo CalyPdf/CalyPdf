@@ -83,6 +83,12 @@ public readonly struct TileCacheResult
 /// Tiles that have pixel data are stored as ref-counted <see cref="TileImage"/> instances and
 /// participate in the memory budget and LRU eviction.
 /// <para>
+/// The budget bounds what the cache keeps beyond what is on screen, not what is on screen: a tile
+/// still referenced by a draw operation is never evicted, so when the visible tiles alone exceed
+/// the budget (a large screen at high zoom) the cache grows past it rather than punch holes in the
+/// page, and shrinks back as those tiles leave the screen.
+/// </para>
+/// <para>
 /// Tiles that rendered to nothing are not stored as images at all: a blank tile is one bit of
 /// knowledge ("this tile was rendered and is empty"), not a resource. Keeping it as a ref-counted
 /// cache entry would allocate a ref counter, a cache entry and an LRU node - and a fresh
@@ -215,8 +221,9 @@ public sealed class TileCache : IDisposable
     }
 
     /// <summary>
-    /// Adds a tile image to the cache. If adding exceeds the memory budget,
-    /// LRU tiles are evicted. If the key already exists, the call is ignored.
+    /// Adds a tile image to the cache. If adding exceeds the memory budget, LRU tiles that are
+    /// not being drawn are evicted; the tile is added even if that is not enough.
+    /// If the key already exists, the call is ignored.
     /// The cache takes ownership of the image.
     /// </summary>
     /// <param name="key">The tile key.</param>
@@ -242,29 +249,32 @@ public sealed class TileCache : IDisposable
                 return;
             }
 
-            // Reject tiles that exceed the entire budget — adding them would evict
-            // everything and still blow past the limit.
-            if (memorySize > _maxMemoryBytes)
+            // Evict least recently used tiles until under budget, collecting entries to dispose
+            // outside the lock. The tile is added even if the budget cannot be met: it was
+            // requested because it is needed on screen, and refusing it would leave a hole.
+            var node = _lruList.Last;
+            while (_currentMemoryBytes + memorySize > _maxMemoryBytes && node is not null)
             {
-                imageRef.Dispose();
-                return;
-            }
+                var previous = node.Previous;
+                var entry = _entries[node.Value];
 
-            // Evict until under budget, collecting entries to dispose outside the lock
-            while (_currentMemoryBytes + memorySize > _maxMemoryBytes && _lruList.Count > 0)
-            {
-                var evictedEntry = EvictOldestLocked();
-                if (evictedEntry is not null)
+                // A tile still held elsewhere is being drawn by the current frame. Evicting it frees
+                // nothing - the frame's reference keeps its pixels alive - but it would leave a hole
+                // on screen the next frame, so the budget only ever reclaims tiles nobody is using.
+                // References are only cloned under _lock, so a count of one cannot rise concurrently.
+                if (entry.Image.RefCount == 1)
                 {
-                    (evicted ??= []).Add(evictedEntry);
+                    RemoveEntryLocked(entry);
+                    (evicted ??= []).Add(entry);
                 }
+
+                node = previous;
             }
 
-            var entry = new CacheEntry(imageRef, key, memorySize);
-            var node = _lruList.AddFirst(key);
-            entry.LruNode = node;
+            var newEntry = new CacheEntry(imageRef, key, memorySize);
+            newEntry.LruNode = _lruList.AddFirst(key);
 
-            _entries[key] = entry;
+            _entries[key] = newEntry;
             _currentMemoryBytes += memorySize;
 
             // Update secondary indexes
@@ -555,23 +565,6 @@ public sealed class TileCache : IDisposable
             above.CopyTo(snapshot);
             return snapshot;
         }
-    }
-
-    /// <summary>
-    /// Removes the oldest entry from the cache and returns it for disposal outside the lock.
-    /// Returns null if the LRU list is empty.
-    /// </summary>
-    private CacheEntry? EvictOldestLocked()
-    {
-        var oldest = _lruList.Last;
-        if (oldest is null)
-        {
-            return null;
-        }
-
-        var entry = _entries[oldest.Value];
-        RemoveEntryLocked(entry);
-        return entry;
     }
 
     /// <summary>

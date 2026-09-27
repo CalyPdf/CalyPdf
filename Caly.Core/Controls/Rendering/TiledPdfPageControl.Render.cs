@@ -148,6 +148,14 @@ public partial class TiledPdfPageControl
         bool allVisibleTilesCached = ComposeTileDrawEntries(service.Cache, pageNumber, tileLevel,
             startCol, startRow, endCol, endRow, in pageDisplaySize, _renderTileEntries);
 
+        if (!allVisibleTilesCached)
+        {
+            // Tiles are otherwise only requested when the tile range changes, so a tile evicted
+            // after it was rendered but before a frame drew it would never be asked for again and
+            // stay a hole. Tiles already queued or cached are filtered out, so this is cheap.
+            RequestVisibleTiles();
+        }
+
         // Evict stale tile levels only after all visible+margin tiles at the current level
         // are cached, so old tiles remain available as fallbacks during the transition.
         // Eviction runs on a background thread to avoid lock acquisition and bitmap
