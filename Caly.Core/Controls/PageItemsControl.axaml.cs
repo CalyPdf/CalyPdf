@@ -376,30 +376,39 @@ public sealed class PageItemsControl : ItemsControl
     /// <param name="wordIndex">The word index to focus on, if possible.</param>
     public void GoToWord(int pageNumber, int wordIndex)
     {
-        double yOffset = 0; // Top of page
-
         var textLayer = GetPageItem(pageNumber)?.InteractiveLayer?.PdfTextLayer;
-        if (textLayer is not null)
+        if (textLayer is null)
         {
-            var word = textLayer[wordIndex];
-            // NB: We are NOT in pdf coordinates, words y-axis is already inverted.
-            yOffset = word.BoundingBox.Bottom;
+            // We don't attempt to get the text layer if it's not available
+            GoToPage(pageNumber, 0); // Top of page
+            return;
         }
 
-        // We don't attempt to get the text layer if it's not available
-        GoToPage(pageNumber, yOffset);
+        var word = textLayer[wordIndex];
+        // NB: We are NOT in pdf coordinates, words y-axis is already inverted. The text layer
+        // lives inside the page's rotation transform, so the coordinates are in the unrotated page.
+        GoToPage(pageNumber, word.BoundingBox.Bottom, word.BoundingBox.Left, PageOffsetSpace.UnrotatedPage);
     }
 
     /// <summary>
-    /// Scrolls to the page number, optionally scrolling to a specific Y position within the page.
+    /// Scrolls to the page number, optionally scrolling to a specific X/Y position within the page.
     /// </summary>
     /// <param name="pageNumber">The page number.<para>Starts at 1.</para></param>
     /// <param name="yOffset">Optional Y offset within the page.</param>
-    /// <param name="offsetPdfCoord"><c>true</c> if the offset is in PDF coordinates (bottom = 0, increasing upward).
-    /// <para><c>false</c> if the offset is in Avalonia coordinates (top = 0, increasing downward, unscaled pixels).</para>
+    /// <param name="xOffset">Optional X offset within the page (left = 0, increasing rightward, unscaled pixels).
+    /// <para><c>null</c> keeps the current horizontal scroll position.</para></param>
+    /// <param name="offsetPdfCoord"><c>true</c> if the offsets are in PDF coordinates (bottom-left = 0, y increasing upward),
+    /// relative to the unrotated page: they follow the page when it is rotated.
+    /// <para><c>false</c> if the offsets are in Avalonia coordinates (top-left = 0, y increasing downward, unscaled pixels),
+    /// relative to the page as displayed, i.e. after rotation.</para>
     /// Default is <c>false</c>.
     /// </param>
-    public bool GoToPage(int pageNumber, double? yOffset = null, bool offsetPdfCoord = false)
+    public bool GoToPage(int pageNumber, double? yOffset = null, double? xOffset = null, bool offsetPdfCoord = false)
+    {
+        return GoToPage(pageNumber, yOffset, xOffset, offsetPdfCoord ? PageOffsetSpace.Pdf : PageOffsetSpace.Display);
+    }
+
+    private bool GoToPage(int pageNumber, double? yOffset, double? xOffset, PageOffsetSpace space)
     {
         if (_isSettingPageVisibility || pageNumber <= 0 || pageNumber > PageCount || ItemsView.Count == 0)
         {
@@ -410,13 +419,13 @@ public sealed class PageItemsControl : ItemsControl
 
         if (IsSinglePage)
         {
-            yOffset ??= 0;
             _visibilityTracker.PostUpdateVisibility();
         }
 
-        if (yOffset.HasValue)
+        // Single-page view always lands on an explicit Y (the page top by default).
+        if (yOffset.HasValue || xOffset.HasValue || IsSinglePage)
         {
-            ApplyYOffset(pageNumber, yOffset.Value, offsetPdfCoord);
+            ApplyScrollOffsets(pageNumber, yOffset, xOffset, space, xOffsetInPage: true);
         }
         return true;
     }
@@ -470,22 +479,39 @@ public sealed class PageItemsControl : ItemsControl
         }
     }
 
-    private void ApplyYOffset(int pageNumber, double yOffset, bool offsetPdfCoord)
+    /// <summary>
+    /// Coordinate space of the offsets given to <see cref="ApplyScrollOffsets"/>. All are unscaled
+    /// (independent of the zoom level) and relative to the page.
+    /// </summary>
+    private enum PageOffsetSpace : byte
     {
-        ApplyScrollOffsets(pageNumber, yOffset, offsetPdfCoord, xOffsetUnscaled: null);
+        /// <summary>
+        /// The page as displayed, i.e. after rotation: top-left = 0, y increasing downward.
+        /// </summary>
+        Display,
+
+        /// <summary>
+        /// The unrotated page (e.g. the text layer): top-left = 0, y increasing downward.
+        /// </summary>
+        UnrotatedPage,
+
+        /// <summary>
+        /// PDF coordinates of the unrotated page: bottom-left = 0, y increasing upward.
+        /// </summary>
+        Pdf
     }
 
     /// <summary>
-    /// Sets the scroll position to the given page, with an optional Y offset inside the page
-    /// and an optional horizontal offset.
+    /// Sets the scroll position to the given page, with optional X/Y offsets inside the page.
     /// </summary>
     /// <param name="pageNumber">The page number. Starts at 1.</param>
-    /// <param name="yOffset">Y offset within the page.</param>
-    /// <param name="offsetPdfCoord"><c>true</c> if <paramref name="yOffset"/> is in PDF coordinates
-    /// (bottom = 0, increasing upward); <c>false</c> for Avalonia coordinates (top = 0, increasing downward, unscaled).</param>
-    /// <param name="xOffsetUnscaled">Horizontal scroll offset in unscaled document coordinates,
-    /// or <c>null</c> to keep the current horizontal offset.</param>
-    private void ApplyScrollOffsets(int pageNumber, double yOffset, bool offsetPdfCoord, double? xOffsetUnscaled)
+    /// <param name="yOffset">Y offset, or <c>null</c> to keep the current vertical offset.</param>
+    /// <param name="xOffset">X offset, or <c>null</c> to keep the current horizontal offset.</param>
+    /// <param name="space">The coordinate space of the offsets.</param>
+    /// <param name="xOffsetInPage"><c>true</c> if <paramref name="xOffset"/> is relative to the page's
+    /// left edge; <c>false</c> if it is relative to the document's left edge (<see cref="PageOffsetSpace.Display"/> only).</param>
+    private void ApplyScrollOffsets(int pageNumber, double? yOffset, double? xOffset, PageOffsetSpace space,
+        bool xOffsetInPage = false)
     {
         if (Scroll is null || LayoutTransform is null)
         {
@@ -497,35 +523,75 @@ public sealed class PageItemsControl : ItemsControl
             return;
         }
 
-        if (yOffset > pageItem.Bounds.Height)
-        {
-            yOffset = pageItem.Bounds.Height; // Max offset is page height
-        }
+        Rect bounds = GetAlignedBounds(pageItem);
+        double? x = xOffset;
+        double? y = yOffset;
 
-        if (offsetPdfCoord)
+        if (space != PageOffsetSpace.Display)
         {
-            switch (pageItem.Rotation)
-            {
-                case 0:
-                    // Upright: distance from the top edge.
-                    yOffset = pageItem.Bounds.Height - yOffset;
-                    break;
-                case 180:
-                    // The PDF bottom is now at the page top, so the offset is already the distance from the top.
-                    break;
-                default:
-                    // 90 / 270: the offset maps to the horizontal axis, which we cannot honour. Scroll to the top.
-                    yOffset = 0;
-                    break;
-            }
+            (x, y) = ToDisplayOffsets(pageItem.Rotation, bounds.Size, x, y, space == PageOffsetSpace.Pdf);
+
+            // On a 90 / 270 rotation a lone X or Y offset lands on the other display axis; land at
+            // the page top rather than wherever ScrollIntoView left it. The offset is on the page, never above it.
+            y = Math.Max(0, y ?? 0);
+        }
+        else if (IsSinglePage)
+        {
+            y ??= 0;
         }
 
         double scale = LayoutTransform.LayoutTransform?.Value.M11 ?? 1.0;
-        double newOffsetY = (pageItem.Bounds.Top + yOffset) * scale;
-        double newOffsetX = xOffsetUnscaled.HasValue
-            ? Math.Max(0, xOffsetUnscaled.Value * scale)
-            : Scroll.Offset.X;
+
+        double newOffsetY = Scroll.Offset.Y;
+        if (y.HasValue)
+        {
+            // Max offset is page height. No lower bound: a restored Display offset can sit in the margin above the page.
+            double clampedY = Math.Min(y.Value, bounds.Height);
+            newOffsetY = (bounds.Top + clampedY) * scale;
+        }
+
+        double newOffsetX = Scroll.Offset.X;
+        if (x.HasValue)
+        {
+            double absoluteX = xOffsetInPage
+                ? bounds.Left + Math.Clamp(x.Value, 0, bounds.Width)
+                : x.Value;
+            newOffsetX = Math.Max(0, absoluteX * scale);
+        }
+
         Scroll.SetCurrentValue(ScrollViewer.OffsetProperty, new Vector(newOffsetX, newOffsetY));
+    }
+
+    /// <summary>
+    /// Maps offsets on the unrotated page to offsets on the page as displayed.
+    /// <para>
+    /// Each display axis comes from exactly one source axis, so a <c>null</c> source offset gives a
+    /// <c>null</c> display offset on whichever axis it lands on. Inverse of <see cref="ComputeVisibleArea"/>.
+    /// </para>
+    /// </summary>
+    /// <param name="rotation">The page's clockwise rotation, in degrees (0, 90, 180 or 270).</param>
+    /// <param name="displaySize">The page size as displayed, i.e. after rotation.</param>
+    /// <param name="x">X offset on the unrotated page.</param>
+    /// <param name="y">Y offset on the unrotated page.</param>
+    /// <param name="isPdf"><c>true</c> if <paramref name="y"/> increases upward from the page bottom (PDF);
+    /// <c>false</c> if it increases downward from the page top.</param>
+    internal static (double? X, double? Y) ToDisplayOffsets(int rotation, Size displaySize, double? x, double? y, bool isPdf)
+    {
+        double w = displaySize.Width;
+        double h = displaySize.Height;
+        bool isPortrait = rotation is 0 or 180;
+        double unrotatedHeight = isPortrait ? h : w;
+
+        // Distance from the unrotated page's top edge.
+        double? v = isPdf ? unrotatedHeight - y : y;
+
+        return rotation switch
+        {
+            90 => (w - v, x),
+            180 => (w - x, h - v),
+            270 => (v, h - x),
+            _ => (x, v)
+        };
     }
 
     /// <summary>
@@ -952,7 +1018,7 @@ public sealed class PageItemsControl : ItemsControl
                     try
                     {
                         ScrollIntoView(SelectedPageNumber.Value - 1); // Can cause stack overflow without _isApplyingPendingScroll
-                        ApplyScrollOffsets(SelectedPageNumber.Value, savedOffset.Y, offsetPdfCoord: false, savedOffset.X);
+                        ApplyScrollOffsets(SelectedPageNumber.Value, savedOffset.Y, savedOffset.X, PageOffsetSpace.Display);
                     }
                     finally
                     {

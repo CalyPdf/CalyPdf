@@ -253,7 +253,9 @@ internal sealed class TextSelectionInputHandler
                     if (dest.Coordinates.Top.HasValue)
                     {
                         double scaledTop = dest.Coordinates.Top.Value * annotation.PpiScale;
-                        owner.GoToPage(dest.PageNumber, scaledTop, true);
+                        // A null left keeps the current horizontal position.
+                        double? scaledLeft = dest.Coordinates.Left * annotation.PpiScale;
+                        owner.GoToPage(dest.PageNumber, scaledTop, scaledLeft, true);
                     }
                     else
                     {
