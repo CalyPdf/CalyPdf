@@ -21,6 +21,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using Caly.Core.Models;
 using Caly.Core.Utilities;
 
 namespace Caly.Core.Services.Rendering;
@@ -152,11 +153,14 @@ public sealed class TileCache : IDisposable
 
     private long _currentMemoryBytes;
 
+    internal long MaxMemoryBytes => _maxMemoryBytes;
+
     /// <summary>
     /// Creates a new tile cache with the specified memory budget.
     /// </summary>
-    /// <param name="maxMemoryBytes">Maximum memory budget in bytes. Default is 128 MB.</param>
-    public TileCache(long maxMemoryBytes = 128L * 1024 * 1024)
+    /// <param name="maxMemoryBytes">Maximum memory budget in bytes. Default is
+    /// <see cref="CalySettings.DefaultTileCacheSizeMB"/> MB; the app passes <see cref="CalySettings.TileCacheSizeMB"/>.</param>
+    public TileCache(long maxMemoryBytes = CalySettings.DefaultTileCacheSizeMB * 1024L * 1024)
     {
         _maxMemoryBytes = maxMemoryBytes;
     }

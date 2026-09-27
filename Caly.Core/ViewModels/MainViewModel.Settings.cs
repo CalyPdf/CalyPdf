@@ -45,6 +45,20 @@ public sealed partial class MainViewModel
         set => SetSetting(static (s, v) => s.UseCompactTileFormat = v, value);
     }
 
+    public int[] TileCacheSizeOptions => CalySettings.TileCacheSizeOptionsMB;
+
+    public int TileCacheSizeMB
+    {
+        get => GetSetting(static s => s.TileCacheSizeMB, CalySettings.DefaultTileCacheSizeMB);
+        set
+        {
+            if (CalySettings.IsValidTileCacheSize(value))
+            {
+                SetSetting(static (s, v) => s.TileCacheSizeMB = v, value);
+            }
+        }
+    }
+
     public CalyTheme[] ThemeOptions { get; } = Enum.GetValues<CalyTheme>();
 
     public CalyTheme Theme
