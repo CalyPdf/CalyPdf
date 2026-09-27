@@ -162,7 +162,7 @@ public sealed class DocumentControl : CalyTemplatedControl
             {
                 if (SelectedBookmark.OffsetY.HasValue)
                 {
-                    GoToPage(SelectedBookmark.PageNumber.Value, SelectedBookmark.OffsetY.Value, true);
+                    GoToPage(SelectedBookmark.PageNumber.Value, SelectedBookmark.OffsetY.Value, offsetPdfCoord: true);
                 }
                 else
                 {
@@ -228,11 +228,13 @@ public sealed class DocumentControl : CalyTemplatedControl
     /// </summary>
     /// <param name="pageNumber">The page number.<para>Starts at 1.</para></param>
     /// <param name="yOffset">Optional Y offset within the page.<para>Default is 0.</para></param>
+    /// <param name="xOffset">Optional X offset within the page, in Avalonia coordinates (left = 0, increasing rightward, unscaled pixels).
+    /// <para><c>null</c> keeps the current horizontal scroll position.</para></param>
     /// <param name="offsetPdfCoord"><c>true</c> if the offset is in PDF coordinates (bottom = 0, increasing upward).
     /// <para><c>false</c> if the offset is in Avalonia coordinates (top = 0, increasing downward, unscaled pixels).</para>
     /// Default is <c>false</c>.</param>
-    public void GoToPage(int pageNumber, double yOffset = 0, bool offsetPdfCoord = false)
+    public void GoToPage(int pageNumber, double yOffset = 0, double? xOffset = null, bool offsetPdfCoord = false)
     {
-        _pageItemsControl?.GoToPage(pageNumber, yOffset, offsetPdfCoord);
+        _pageItemsControl?.GoToPage(pageNumber, yOffset, xOffset, offsetPdfCoord);
     }
 }
