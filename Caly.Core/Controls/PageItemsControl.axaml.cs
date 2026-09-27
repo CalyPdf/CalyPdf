@@ -150,6 +150,13 @@ public sealed class PageItemsControl : ItemsControl
             defaultBindingMode: BindingMode.TwoWay);
 
     /// <summary>
+    /// Defines the <see cref="ReadingPoint"/> property.
+    /// </summary>
+    public static readonly StyledProperty<PageReadingPoint?> ReadingPointProperty =
+        AvaloniaProperty.Register<PageItemsControl, PageReadingPoint?>(nameof(ReadingPoint),
+            defaultBindingMode: BindingMode.OneWayToSource);
+
+    /// <summary>
     /// Defines the <see cref="TextSelection"/> property.
     /// </summary>
     public static readonly StyledProperty<TextSelection?> TextSelectionProperty =
@@ -336,6 +343,16 @@ public sealed class PageItemsControl : ItemsControl
     }
 
     /// <summary>
+    /// The point of the document under the viewport centre, or <c>null</c> when no page is visible.
+    /// Updated with the page visibility.
+    /// </summary>
+    public PageReadingPoint? ReadingPoint
+    {
+        get => GetValue(ReadingPointProperty);
+        set => SetValue(ReadingPointProperty, value);
+    }
+
+    /// <summary>
     /// Starts at 1.
     /// </summary>
     public Range? RealisedPages
@@ -370,7 +387,7 @@ public sealed class PageItemsControl : ItemsControl
     }
 
     /// <summary>
-    /// Scrolls to the page number, attempting to focus on the word.
+    /// Scrolls to the page number, attempting to centre the word in the viewport.
     /// </summary>
     /// <param name="pageNumber">The page number.<para>Starts at 1.</para></param>
     /// <param name="wordIndex">The word index to focus on, if possible.</param>
@@ -398,9 +415,9 @@ public sealed class PageItemsControl : ItemsControl
     /// <param name="xOffset">Optional X offset within the page (left = 0, increasing rightward, unscaled pixels).
     /// <para><c>null</c> keeps the current horizontal scroll position.</para></param>
     /// <param name="offsetPdfCoord"><c>true</c> if the offsets are in PDF coordinates (bottom-left = 0, y increasing upward),
-    /// relative to the unrotated page: they follow the page when it is rotated.
+    /// relative to the unrotated page: they follow the page when it is rotated. The target point is centred in the viewport.
     /// <para><c>false</c> if the offsets are in Avalonia coordinates (top-left = 0, y increasing downward, unscaled pixels),
-    /// relative to the page as displayed, i.e. after rotation.</para>
+    /// relative to the page as displayed, i.e. after rotation, and aligned with the viewport's top-left corner.</para>
     /// Default is <c>false</c>.
     /// </param>
     public bool GoToPage(int pageNumber, double? yOffset = null, double? xOffset = null, bool offsetPdfCoord = false)
@@ -527,9 +544,17 @@ public sealed class PageItemsControl : ItemsControl
         double? x = xOffset;
         double? y = yOffset;
 
+        // A Display offset is a scroll position, aligned with the viewport's top-left corner.
+        // Other offsets are targets on the page (a link destination, a search result), centred
+        // in the viewport: whatever the page rotation, the content around the target is visible.
+        bool centreX = false;
+        bool centreY = false;
+
         if (space != PageOffsetSpace.Display)
         {
             (x, y) = ToDisplayOffsets(pageItem.Rotation, bounds.Size, x, y, space == PageOffsetSpace.Pdf);
+            centreX = x.HasValue;
+            centreY = y.HasValue;
 
             // On a 90 / 270 rotation a lone X or Y offset lands on the other display axis; land at
             // the page top rather than wherever ScrollIntoView left it. The offset is on the page, never above it.
@@ -542,12 +567,17 @@ public sealed class PageItemsControl : ItemsControl
 
         double scale = LayoutTransform.LayoutTransform?.Value.M11 ?? 1.0;
 
+        // The ScrollViewer clamps the offsets to the scrollable range.
         double newOffsetY = Scroll.Offset.Y;
         if (y.HasValue)
         {
             // Max offset is page height. No lower bound: a restored Display offset can sit in the margin above the page.
             double clampedY = Math.Min(y.Value, bounds.Height);
             newOffsetY = (bounds.Top + clampedY) * scale;
+            if (centreY)
+            {
+                newOffsetY -= Scroll.Viewport.Height / 2;
+            }
         }
 
         double newOffsetX = Scroll.Offset.X;
@@ -556,7 +586,13 @@ public sealed class PageItemsControl : ItemsControl
             double absoluteX = xOffsetInPage
                 ? bounds.Left + Math.Clamp(x.Value, 0, bounds.Width)
                 : x.Value;
-            newOffsetX = Math.Max(0, absoluteX * scale);
+            newOffsetX = absoluteX * scale;
+            if (centreX)
+            {
+                newOffsetX -= Scroll.Viewport.Width / 2;
+            }
+
+            newOffsetX = Math.Max(0, newOffsetX);
         }
 
         Scroll.SetCurrentValue(ScrollViewer.OffsetProperty, new Vector(newOffsetX, newOffsetY));
@@ -1196,6 +1232,15 @@ public sealed class PageItemsControl : ItemsControl
         double maxOverlap = double.MinValue;
         int mostVisibleIndex = -1;
 
+        // The reading point is on the visible page vertically closest to the viewport centre
+        // (distance 0 when the page contains it). Content smaller than the viewport is centred in
+        // it, which the viewport rect above does not account for: its centre is then the content's.
+        Point viewportCentre = new Point(
+            Scroll.Extent.Width < Scroll.Viewport.Width ? Scroll.Extent.Width / 2 * invScale : viewport.Center.X,
+            Scroll.Extent.Height < Scroll.Viewport.Height ? Scroll.Extent.Height / 2 * invScale : viewport.Center.Y);
+        double readingPageDistance = double.MaxValue;
+        PageReadingPoint? readingPoint = null;
+
         bool CheckPage(int index, out bool visible)
         {
             visible = false;
@@ -1231,6 +1276,13 @@ public sealed class PageItemsControl : ItemsControl
             {
                 maxOverlap = overlapArea;
                 mostVisibleIndex = index;
+            }
+
+            double centreDistance = Math.Max(0, Math.Max(bounds.Top - viewportCentre.Y, viewportCentre.Y - bounds.Bottom));
+            if (centreDistance < readingPageDistance)
+            {
+                readingPageDistance = centreDistance;
+                readingPoint = new PageReadingPoint(index + 1, ToUnrotatedPagePoint(page.Rotation, bounds, viewportCentre));
             }
 
             visible = true;
@@ -1290,6 +1342,8 @@ public sealed class PageItemsControl : ItemsControl
             RefreshPages?.Execute(null);
         }
 
+        SetCurrentValue(ReadingPointProperty, readingPoint);
+
         // Auto-select the page with the largest overlap
         if (mostVisibleIndex >= 0 && SelectedPageNumber != mostVisibleIndex + 1)
         {
@@ -1339,6 +1393,29 @@ public sealed class PageItemsControl : ItemsControl
             180 => new Rect(page.Bounds.Width - visible.Right, page.Bounds.Height - visible.Bottom, visible.Width, visible.Height),
             270 => new Rect(page.Bounds.Height - visible.Bottom, visible.X, visible.Height, visible.Width),
             _ => visible
+        };
+    }
+
+    /// <summary>
+    /// Maps a point in document coordinates to the unrotated page, clamped to the page.
+    /// Point counterpart of <see cref="ComputeVisibleArea"/>, and inverse of <see cref="ToDisplayOffsets"/>.
+    /// </summary>
+    /// <param name="rotation">The page's clockwise rotation, in degrees (0, 90, 180 or 270).</param>
+    /// <param name="bounds">The page bounds as displayed, in document coordinates.</param>
+    /// <param name="point">The point, in document coordinates.</param>
+    internal static Point ToUnrotatedPagePoint(int rotation, Rect bounds, Point point)
+    {
+        double x = Math.Clamp(point.X - bounds.Left, 0, bounds.Width);
+        double y = Math.Clamp(point.Y - bounds.Top, 0, bounds.Height);
+        double w = bounds.Width;
+        double h = bounds.Height;
+
+        return rotation switch
+        {
+            90 => new Point(y, w - x),
+            180 => new Point(w - x, h - y),
+            270 => new Point(h - y, x),
+            _ => new Point(x, y)
         };
     }
 

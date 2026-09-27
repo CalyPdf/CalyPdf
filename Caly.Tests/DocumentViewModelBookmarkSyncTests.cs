@@ -15,10 +15,9 @@ namespace Caly.Tests;
 
 /// <summary>
 /// Tests that the active bookmark (the highlighted row in the bookmarks tree) tracks the
-/// viewport. The viewport position is the (<see cref="DocumentViewModel.SelectedPageNumber"/>,
-/// <c>ScrollOffset</c>) pair: page navigation (e.g. Page Up/Down) can bring another page into
-/// view while the offset within the selected page stays the same, so both halves must trigger
-/// the update.
+/// viewport, as given by <see cref="DocumentViewModel.ReadingPoint"/> (the viewport centre on the
+/// unrotated page, computed by PageItemsControl). Until the view reports one, the sync falls back
+/// to the top of <see cref="DocumentViewModel.SelectedPageNumber"/>.
 /// </summary>
 public class DocumentViewModelBookmarkSyncTests
 {
@@ -130,7 +129,7 @@ public class DocumentViewModelBookmarkSyncTests
     }
 
     [AvaloniaFact]
-    public async Task PageNavigation_WithUnchangedScrollOffset_UpdatesActiveBookmark()
+    public async Task PageNavigation_UpdatesActiveBookmark()
     {
         var doc = NewDocumentWithBookmarks(
         [
@@ -141,17 +140,17 @@ public class DocumentViewModelBookmarkSyncTests
         var source = await doc.BookmarksSource;
         Assert.NotNull(source);
         Dispatcher.UIThread.RunJobs();
+        // No reading point yet: the selected page's top.
         Assert.Equal("Chapter 1", source!.RowSelection!.SelectedItem?.Title);
 
-        // Page Down: the next page comes into view but the offset within the
-        // selected page stays 0, so ScrollOffset never changes.
-        doc.SelectedPageNumber = 2;
+        // Page Down: the reading point moves to the same spot on the next page.
+        doc.ReadingPoint = new PageReadingPoint(2, new Point(250, 0));
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal("Chapter 2", source.RowSelection.SelectedItem?.Title);
 
         // And back up.
-        doc.SelectedPageNumber = 1;
+        doc.ReadingPoint = new PageReadingPoint(1, new Point(250, 0));
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal("Chapter 1", source.RowSelection.SelectedItem?.Title);
@@ -184,14 +183,14 @@ public class DocumentViewModelBookmarkSyncTests
         source.RowSelection.Select(new IndexPath(2));
         Assert.Equal("C", doc.SelectedBookmark?.Title);
 
-        // The resulting navigation nudges the persisted scroll position, queuing a sync.
-        doc.ScrollOffset = new Vector(0, 1);
+        // The resulting navigation nudges the reading point, queuing a sync.
+        doc.ReadingPoint = new PageReadingPoint(1, new Point(250, 1));
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal("C", source.RowSelection.SelectedItem?.Title);
 
         // The tie must not trap the selection either: moving to another page still re-syncs.
-        doc.SelectedPageNumber = 2;
+        doc.ReadingPoint = new PageReadingPoint(2, new Point(250, 1));
         Dispatcher.UIThread.RunJobs();
         Assert.Equal("Next", source.RowSelection.SelectedItem?.Title);
     }
@@ -216,8 +215,8 @@ public class DocumentViewModelBookmarkSyncTests
         source.RowSelection.Select(new IndexPath(2));
         Assert.Equal("C", doc.SelectedBookmark?.Title);
 
-        // Viewport lands on the shared target: 1000 (page height) - 500 (PDF offset) = 500.
-        doc.ScrollOffset = new Vector(0, 500);
+        // The viewport centre lands on the shared target: 1000 (page height) - 500 (PDF offset) = 500.
+        doc.ReadingPoint = new PageReadingPoint(1, new Point(250, 500));
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal("C", source.RowSelection.SelectedItem?.Title);
@@ -240,7 +239,131 @@ public class DocumentViewModelBookmarkSyncTests
         Dispatcher.UIThread.RunJobs();
         Assert.Equal("Intro", source!.RowSelection!.SelectedItem?.Title);
 
-        doc.ScrollOffset = new Vector(0, 800);
+        doc.ReadingPoint = new PageReadingPoint(1, new Point(250, 800));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("Details", source.RowSelection.SelectedItem?.Title);
+    }
+
+    [AvaloniaFact]
+    public async Task ActiveBookmark_IsTheClosestToTheReadingPoint()
+    {
+        // Viewport targets on the 1000-high page: Intro 50, Middle 400, Details 900.
+        var doc = NewDocumentWithBookmarks(
+        [
+            new PdfBookmarkNode("Intro", 1, 950, null),
+            new PdfBookmarkNode("Middle", 1, 600, null),
+            new PdfBookmarkNode("Details", 1, 100, null)
+        ], pageCount: 1);
+
+        var source = await doc.BookmarksSource;
+        Assert.NotNull(source);
+        Dispatcher.UIThread.RunJobs();
+
+        // Viewport 0..800: its top is closest to Intro, its centre (400) is on Middle.
+        doc.ReadingPoint = new PageReadingPoint(1, new Point(250, 400));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("Middle", source!.RowSelection!.SelectedItem?.Title);
+    }
+
+    [AvaloniaFact]
+    public async Task ClickedBookmark_WhoseTargetCannotBeCentred_IsNotStolenByViewportSync()
+    {
+        // Intro sits at the very top of the document: navigating to it cannot centre it, the
+        // viewport stays at the top, and its centre is on Middle.
+        var doc = NewDocumentWithBookmarks(
+        [
+            new PdfBookmarkNode("Intro", 1, 950, null),
+            new PdfBookmarkNode("Middle", 1, 600, null),
+            new PdfBookmarkNode("Details", 1, 100, null)
+        ], pageCount: 1);
+        var page = doc.Pages[0];
+
+        var source = await doc.BookmarksSource;
+        Assert.NotNull(source);
+        Dispatcher.UIThread.RunJobs();
+
+        source!.RowSelection!.Select(new IndexPath(2));
+        source.RowSelection.Select(new IndexPath(0));
+        Assert.Equal("Intro", doc.SelectedBookmark?.Title);
+
+        page.VisibleArea = new Rect(0, 0, 500, 800);
+        doc.ReadingPoint = new PageReadingPoint(1, new Point(250, 400));
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("Intro", source.RowSelection.SelectedItem?.Title);
+
+        // Once the user scrolls the clicked target off screen, the sync resumes.
+        page.VisibleArea = new Rect(0, 500, 500, 500);
+        doc.ReadingPoint = new PageReadingPoint(1, new Point(250, 750));
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("Details", source.RowSelection.SelectedItem?.Title);
+    }
+
+    // Page 500 x 1000 unrotated, so 1000 x 500 on screen when sideways. VisibleArea is in unrotated
+    // page coordinates (top = 0, increasing downward): "Intro" targets v = 50, "Details" v = 900.
+    // At 90 the unrotated top edge is on the right (v = 1000 - screen x); at 270 on the left (v = screen x).
+    // The reading point is the centre of the visible part, as the viewport is no wider than the page.
+    private static void SetVisibleV(DocumentViewModel doc, double top, double bottom)
+    {
+        doc.Pages[0].VisibleArea = new Rect(0, top, 500, bottom - top);
+        doc.ReadingPoint = new PageReadingPoint(1, new Point(250, (top + bottom) / 2));
+    }
+
+    [AvaloniaTheory]
+    [InlineData(90, 700, 1000, "Details", 0, 300, "Intro")]  // screen x 0..300, then 700..1000
+    [InlineData(270, 850, 1000, "Details", 0, 300, "Intro")] // screen x 850..1000, then 0..300
+    public async Task ScrollAcrossSidewaysPage_UpdatesActiveBookmark(int rotation,
+        double firstTop, double firstBottom, string firstExpected,
+        double secondTop, double secondBottom, string secondExpected)
+    {
+        var doc = NewDocumentWithBookmarks(
+        [
+            new PdfBookmarkNode("Intro", 1, 950, null),
+            new PdfBookmarkNode("Details", 1, 100, null)
+        ], pageCount: 1);
+        var page = doc.Pages[0];
+        page.Rotation = rotation;
+
+        var source = await doc.BookmarksSource;
+        Assert.NotNull(source);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("Intro", source!.RowSelection!.SelectedItem?.Title);
+
+        SetVisibleV(doc, firstTop, firstBottom);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(firstExpected, source.RowSelection.SelectedItem?.Title);
+
+        SetVisibleV(doc, secondTop, secondBottom);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(secondExpected, source.RowSelection.SelectedItem?.Title);
+    }
+
+    [AvaloniaTheory]
+    [InlineData(90)]
+    [InlineData(270)]
+    public async Task ClickedBookmark_OnSidewaysPageFittingTheWidth_IsNotStolenByViewportSync(int rotation)
+    {
+        // The whole page width is on screen, so navigating to "Details" cannot scroll its target
+        // to the viewport edge: the sync must keep the clicked bookmark.
+        var doc = NewDocumentWithBookmarks(
+        [
+            new PdfBookmarkNode("Intro", 1, 950, null),
+            new PdfBookmarkNode("Details", 1, 100, null)
+        ], pageCount: 1);
+        var page = doc.Pages[0];
+        page.Rotation = rotation;
+        SetVisibleV(doc, 0, 1000);
+
+        var source = await doc.BookmarksSource;
+        Assert.NotNull(source);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("Intro", source!.RowSelection!.SelectedItem?.Title);
+
+        source.RowSelection.Select(new IndexPath(1));
+        Assert.Equal("Details", doc.SelectedBookmark?.Title);
+
+        doc.ReadingPoint = new PageReadingPoint(1, new Point(250, 501));
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal("Details", source.RowSelection.SelectedItem?.Title);

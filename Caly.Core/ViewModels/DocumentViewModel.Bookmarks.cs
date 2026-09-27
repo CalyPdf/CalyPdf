@@ -50,6 +50,11 @@ public partial class DocumentViewModel
 
     [ObservableProperty] public partial PdfBookmarkNode? SelectedBookmark { get; set; }
 
+    /// <summary>
+    /// The point of the document under the viewport centre, which the active bookmark follows.
+    /// </summary>
+    [ObservableProperty] public partial PageReadingPoint? ReadingPoint { get; set; }
+
     private async Task<HierarchicalTreeDataGridSource<PdfBookmarkNode>?> GetBookmarks()
     {
         try
@@ -110,7 +115,7 @@ public partial class DocumentViewModel
         SelectedBookmark = e.SelectedItems[0];
     }
 
-    partial void OnScrollOffsetChanged(Vector value)
+    partial void OnReadingPointChanged(PageReadingPoint? value)
     {
         QueueActiveBookmarkUpdate();
     }
@@ -131,6 +136,11 @@ public partial class DocumentViewModel
     }
 
     /// <summary>
+    /// Slack, in unscaled page units, when comparing bookmark targets with the viewport.
+    /// </summary>
+    private const double Tolerance = 1;
+
+    /// <summary>
     /// Highlights the bookmark matching the current viewport, without triggering navigation.
     /// No-op until bookmarks have been loaded.
     /// </summary>
@@ -148,7 +158,10 @@ public partial class DocumentViewModel
             return;
         }
 
-        int activePage = selectedPageNumber.Value;
+        // Without a reading point (bookmarks loaded before the pages were laid out), assume the
+        // selected page's top. Page navigation needs no trigger of its own: it moves the reading point.
+        int activePage = ReadingPoint?.PageNumber ?? selectedPageNumber.Value;
+        double readingPosition = ReadingPoint?.Position.Y ?? 0;
         if (activePage < 1 || activePage > pages.Count)
         {
             return;
@@ -156,19 +169,21 @@ public partial class DocumentViewModel
 
         var currentPath = source.RowSelection.SelectedIndex;
 
-        double offsetY = ScrollOffset.Y;
-
-        // A negative offset means the viewport top is above the selected page's top (sits inside the previous page)
-        if (offsetY < 0 && activePage > 1)
+        // GoToPage centres a bookmark's target in the viewport, but cannot when the target is
+        // near the document's start or end, or when the page fits the viewport's width on a 90 / 270
+        // rotation. Keep the bookmark the user clicked while its target is on screen, so the
+        // sync does not steal the selection straight back.
+        if (SelectedBookmark is { } clicked &&
+            ReferenceEquals(source.RowSelection.SelectedItem, clicked) &&
+            IsTargetOnScreen(clicked, pages))
         {
-            activePage--;
-            offsetY += pages[activePage - 1].DisplayHeight;
+            return;
         }
 
         PdfBookmarkLocation? active = null;
         if (locations.TryGetValue(activePage, out var pageLocations))
         {
-            active = SelectClosestOnPage(pages[activePage - 1], pageLocations, offsetY, currentPath);
+            active = SelectClosestOnPage(pages[activePage - 1], pageLocations, readingPosition, currentPath);
         }
         else
         {
@@ -213,17 +228,43 @@ public partial class DocumentViewModel
 
         return;
 
-        static PdfBookmarkLocation? SelectClosestOnPage(PageViewModel page, IReadOnlyList<PdfBookmarkLocation> pageLocations, double offsetY, IndexPath currentPath)
+        // Bookmark targets are compared in unrotated page coordinates (top = 0, increasing
+        // downward), like PageViewModel.VisibleArea. A bookmark without an offset targets the page top.
+        static double TargetOnUnrotatedPage(PageViewModel page, PdfBookmarkNode node)
+            => page.Size.Height - (node.OffsetY ?? page.Size.Height);
+
+        static bool IsTargetOnScreen(PdfBookmarkNode node, IList<PageViewModel> pages)
+        {
+            if (node.PageNumber is not { } pageNumber || pageNumber < 1 || pageNumber > pages.Count)
+            {
+                return false;
+            }
+
+            var page = pages[pageNumber - 1];
+            if (page.VisibleArea is not { } visible)
+            {
+                return false;
+            }
+
+            // The offset only locates the target along the unrotated page's vertical axis.
+            double target = TargetOnUnrotatedPage(page, node);
+            return target >= visible.Top - Tolerance && target <= visible.Bottom + Tolerance;
+        }
+
+        // readingPosition is the viewport centre's Y on the unrotated page, like the bookmark targets.
+        static PdfBookmarkLocation? SelectClosestOnPage(PageViewModel page, IReadOnlyList<PdfBookmarkLocation> pageLocations, double readingPosition, IndexPath currentPath)
         {
             if (pageLocations.Count == 1)
             {
                 return pageLocations[0];
             }
 
-            // A 90 or 270 rotation lays the bookmarks out along the horizontal axis, for which we
-            // have no X offset: every bookmark on the page is an equally good match, so keep the
-            // current selection when it is one of them, and fall back to the first one otherwise.
-            if (!page.IsPortrait)
+            // A 90 or 270 rotation lays the bookmarks out along the horizontal axis. When the page
+            // is not visible, or all of its width is, the viewport centre says nothing about which
+            // one is being read: keep the current selection when it is one of them.
+            if (!page.IsPortrait &&
+                (page.VisibleArea is not { } visible ||
+                 (visible.Top <= Tolerance && visible.Bottom >= page.Size.Height - Tolerance)))
             {
                 foreach (var loc in pageLocations)
                 {
@@ -236,15 +277,11 @@ public partial class DocumentViewModel
                 return pageLocations[0];
             }
 
-            double height = page.Size.Height;
-
             PdfBookmarkLocation? best = null;
             double minDist = double.MaxValue;
             foreach (var loc in pageLocations)
             {
-                double offset = loc.Node.OffsetY ?? 0;
-                double target = page.Rotation == 180 ? offset : height - offset;
-                double dist = Math.Abs(offsetY - target);
+                double dist = Math.Abs(readingPosition - TargetOnUnrotatedPage(page, loc.Node));
 
                 // Several bookmarks can share a location (or have none at all): on a distance tie,
                 // prefer the current selection so the viewport sync does not steal it from the
