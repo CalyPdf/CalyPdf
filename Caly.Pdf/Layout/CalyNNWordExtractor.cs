@@ -61,31 +61,58 @@ namespace Caly.Pdf.Layout
 
             if (options.GroupByOrientation)
             {
-                // axis aligned
-                var lo = letters.ToLookup(x => x.TextOrientation);
+                Span<int> counts = stackalloc int[OrientationBucketsCount];
+                for (int i = 0; i < letters.Count; i++)
+                {
+                    counts[GetOrientationBucket(letters[i].TextOrientation)]++;
+                }
 
-                var horizontal = GetWords(lo[TextOrientation.Horizontal].ToArray(),
-                     options.MaximumDistance, options.DistanceMeasureAA, options.FilterPivot,
-                     options.Filter, parallelOptions);
+                // Most pages have a single orientation: no need to copy the letters.
+                for (int i = 0; i < OrientationBucketsCount; i++)
+                {
+                    if (counts[i] == letters.Count)
+                    {
+                        return GetWords(letters, options.MaximumDistance, GetDistanceMeasure(i), options.FilterPivot,
+                            options.Filter, parallelOptions);
+                    }
+                }
 
-                var rotate270 = GetWords(lo[TextOrientation.Rotate270].ToArray(),
-                     options.MaximumDistance, options.DistanceMeasureAA, options.FilterPivot,
-                     options.Filter, parallelOptions);
+                var buckets = new PdfLetter[OrientationBucketsCount][];
+                for (int i = 0; i < OrientationBucketsCount; i++)
+                {
+                    if (counts[i] > 0)
+                    {
+                        buckets[i] = new PdfLetter[counts[i]];
+                    }
+                }
 
-                var rotate180 = GetWords(lo[TextOrientation.Rotate180].ToArray(),
-                    options.MaximumDistance, options.DistanceMeasureAA, options.FilterPivot,
-                    options.Filter, parallelOptions);
+                // Filled from the end, so that the letters keep their order within each bucket.
+                for (int i = letters.Count - 1; i >= 0; i--)
+                {
+                    var letter = letters[i];
+                    int bucket = GetOrientationBucket(letter.TextOrientation);
+                    buckets[bucket][--counts[bucket]] = letter;
+                }
 
-                var rotate90 = GetWords(lo[TextOrientation.Rotate90].ToArray(),
-                    options.MaximumDistance, options.DistanceMeasureAA, options.FilterPivot,
-                    options.Filter, parallelOptions);
+                // Buckets are processed in order, so that the words order is deterministic.
+                // Each bucket is already processed in parallel.
+                List<PdfWord>? results = null;
+                for (int i = 0; i < buckets.Length; i++)
+                {
+                    if (buckets[i] is null) continue;
+                    var words = GetWords(buckets[i], options.MaximumDistance, GetDistanceMeasure(i), options.FilterPivot,
+                        options.Filter, parallelOptions);
+                    if (results is null)
+                    {
+                        results = words;
+                    }
+                    else
+                    {
+                        results.AddRange(words);
+                    }
+                }
 
-                // not axis aligned
-                var other = GetWords(lo[TextOrientation.Other].ToArray(),
-                    options.MaximumDistance, options.DistanceMeasure, options.FilterPivot,
-                    options.Filter, parallelOptions);
-
-                return horizontal.Concat(rotate270).Concat(rotate180).Concat(rotate90).Concat(other);
+                return results ?? [];
             }
             else
             {
@@ -93,6 +120,26 @@ namespace Caly.Pdf.Layout
                     options.MaximumDistance, options.DistanceMeasure, options.FilterPivot,
                     options.Filter, parallelOptions);
             }
+        }
+
+        private const int OrientationBucketsCount = 5;
+        private const int OtherOrientationBucket = 4;
+
+        private static int GetOrientationBucket(TextOrientation orientation)
+        {
+            switch (orientation)
+            {
+                case TextOrientation.Horizontal: return 0;
+                case TextOrientation.Rotate270: return 1;
+                case TextOrientation.Rotate180: return 2;
+                case TextOrientation.Rotate90: return 3;
+                default: return OtherOrientationBucket;
+            }
+        }
+
+        private Func<PdfPoint, PdfPoint, float> GetDistanceMeasure(int bucket)
+        {
+            return bucket == OtherOrientationBucket ? options.DistanceMeasure : options.DistanceMeasureAA;
         }
 
         /// <summary>
@@ -110,27 +157,30 @@ namespace Caly.Pdf.Layout
         /// <param name="parallelOptions">Sets the maximum number of concurrent tasks enabled.
         /// <para>A positive property value limits the number of concurrent operations to the set value.
         /// If it is -1, there is no limit on the number of concurrently running operations.</para></param>
-        private static IEnumerable<PdfWord> GetWords(IReadOnlyList<PdfLetter> letters,
+        private static List<PdfWord> GetWords(IReadOnlyList<PdfLetter> letters,
             Func<PdfLetter, PdfLetter, float> maxDistanceFunction, Func<PdfPoint, PdfPoint, float> distMeasure,
             Func<PdfLetter, bool> filterPivotFunction,
             Func<PdfLetter, PdfLetter, bool> filterFunction, ParallelOptions parallelOptions)
         {
             if (letters is null || letters.Count == 0)
             {
-                yield break;
+                return [];
             }
 
-            var groupedLetters = CalyClustering.NearestNeighbours(letters,
+            var groupedLetters = CalyClustering.NearestNeighbourGroups(letters,
                 distMeasure, maxDistanceFunction,
                 l => l.EndBaseLine, l => l.StartBaseLine,
                 filterPivotFunction,
                 filterFunction,
                 parallelOptions);
 
+            var words = new List<PdfWord>(groupedLetters.Count);
             foreach (var g in groupedLetters)
             {
-                yield return new PdfWord(g);
+                words.Add(new PdfWord(g));
             }
+
+            return words;
         }
 
         /// <summary>
