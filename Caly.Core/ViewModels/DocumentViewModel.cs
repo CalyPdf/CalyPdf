@@ -195,6 +195,7 @@ public sealed partial class DocumentViewModel : ViewModelBase
         }
 
         _mainToken = _mainCts.Token;
+        _tabPreviewTimeout = TimeSpan.FromSeconds(5);
         _searchResultsDisposable = null!;
         _propertiesTask = null!;
         _bookmarksTask = null!;
@@ -212,7 +213,7 @@ public sealed partial class DocumentViewModel : ViewModelBase
 #endif
 
     public DocumentViewModel(IPdfDocumentService pdfService, PdfPageService pdfPageService,
-        ITextSearchService textSearchService)
+        ITextSearchService textSearchService, TimeSpan? tabPreviewTimeout = null)
     {
         ArgumentNullException.ThrowIfNull(pdfService, nameof(pdfService));
 
@@ -222,6 +223,7 @@ public sealed partial class DocumentViewModel : ViewModelBase
         _pdfService = pdfService;
         _pdfPageService = pdfPageService;
         _textSearchService = textSearchService;
+        _tabPreviewTimeout = tabPreviewTimeout ?? TimeSpan.FromSeconds(5);
 
         _pdfService.PasswordPrompt = RequestPasswordAsync;
 
@@ -759,6 +761,10 @@ public sealed partial class DocumentViewModel : ViewModelBase
         {
             item?.Dispose();
         }
+
+        // Before CancelAndClear empties the picture cache: the pages have dropped their own
+        // references above, but the cache still holds its own, so this is still a downscale.
+        await CaptureTabPreview().ConfigureAwait(false);
 
         await _pdfPageService.CancelAndClear().ConfigureAwait(false);
 

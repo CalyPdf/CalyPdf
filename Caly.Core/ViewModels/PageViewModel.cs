@@ -60,6 +60,7 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
     /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ThumbnailSize))]
+    [NotifyPropertyChangedFor(nameof(TabPreviewSize))]
     [NotifyPropertyChangedFor(nameof(DisplayWidth))]
     [NotifyPropertyChangedFor(nameof(DisplayHeight))]
     private Size _size;
@@ -123,7 +124,33 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
 
         return new PixelSize(ThumbnailMaxWidth, Math.Max(1, (int)(ThumbnailMaxWidth / aspectRatio)));
     }
-    
+
+    /*
+     * The tab hover preview is larger than a sidebar thumbnail: it has to be recognisable as a
+     * page at a glance, not just as a shape. 320px tall is crisp at 125% display scaling and
+     * costs ~145KB per document as Rgb565.
+     */
+
+    private const int TabPreviewHeight = 320;
+
+    private const int TabPreviewMaxWidth = 320;
+
+    /// <summary>
+    /// Pixel size of this page's tab hover preview.
+    /// </summary>
+    public PixelSize TabPreviewSize => GetTabPreviewSize(Size.AspectRatio);
+
+    private static PixelSize GetTabPreviewSize(double aspectRatio)
+    {
+        int width = Math.Max(1, (int)(aspectRatio * TabPreviewHeight));
+        if (width <= TabPreviewMaxWidth)
+        {
+            return new PixelSize(width, TabPreviewHeight);
+        }
+
+        return new PixelSize(TabPreviewMaxWidth, Math.Max(1, (int)(TabPreviewMaxWidth / aspectRatio)));
+    }
+
     public double DisplayWidth => IsPortrait ? Size.Width : Size.Height;
 
     public double DisplayHeight => IsPortrait ? Size.Height : Size.Width;

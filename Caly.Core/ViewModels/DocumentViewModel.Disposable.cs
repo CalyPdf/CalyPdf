@@ -43,7 +43,11 @@ public partial class DocumentViewModel : IAsyncDisposable
             });
 
         Pages.Clear();
-        
+
+        var tabPreview = TabPreview;
+        TabPreview = null;
+        tabPreview?.Dispose();
+
         _searchResultsDisposable.Dispose();
 
         if (SearchResultsSource?.RowSelection is not null)
@@ -76,5 +80,6 @@ public partial class DocumentViewModel : IAsyncDisposable
 
         _mainCts.Dispose();
         _pendingSearchTaskCts?.Dispose();
+        _tabPreviewCts?.Dispose();
     }
 }
