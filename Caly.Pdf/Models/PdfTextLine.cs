@@ -38,7 +38,7 @@ public sealed class PdfTextLine : IPdfTextElement
 
     public string? InteractiveLink { get; internal set; }
 
-    internal ushort WordStartIndex { get; set; }
+    internal int WordStartIndex { get; set; }
 
     public TextOrientation TextOrientation { get; }
 
@@ -50,12 +50,12 @@ public sealed class PdfTextLine : IPdfTextElement
     /// <summary>
     /// Text line index in the page.
     /// </summary>
-    public ushort IndexInPage { get; internal set; }
+    public int IndexInPage { get; internal set; }
 
     /// <summary>
     /// Text block index in the page the text line belongs to.
     /// </summary>
-    public ushort TextBlockIndex { get; internal set; }
+    public int TextBlockIndex { get; internal set; }
 
     /// <summary>
     /// The words contained in the line.

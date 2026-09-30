@@ -1,4 +1,5 @@
-﻿using Caly.Pdf.Models;
+﻿using System.Collections.Concurrent;
+using Caly.Pdf.Models;
 using UglyToad.PdfPig.Core;
 using UglyToad.PdfPig.DocumentLayoutAnalysis;
 
@@ -148,72 +149,102 @@ public sealed class CalyDocstrum
         ParallelOptions parallelOptions,
         out float withinLineDistance, out float betweenLineDistance)
     {
+        // 1. Estimate within line and between line spacing
+        CalyKdTree<PdfWord> kdTreeBottomLeft = new CalyKdTree<PdfWord>(words, w => w.BoundingBox.BottomLeft, parallelOptions);
+
+        void AddDistances(int i, List<float> wl, List<float> bl,
+            CalyKdTree<PdfWord>.KNearestNeighboursQueue queue, List<(PdfWord, int, float)> neighbours)
+        {
+            var word = words[i];
+
+            // Within-line distance
+            // 1.1.1 Find the 2 closest neighbours words to the candidate, using euclidean distance.
+            kdTreeBottomLeft.FindNearestNeighbours(word, 2, w => w.BoundingBox.BottomRight, CalyDistances.Euclidean, queue, neighbours);
+            foreach (var n in neighbours)
+            {
+                // 1.1.2 Check if the neighbour word is within the angle of the candidate
+                if (wlBounds.Contains(AngleWL(word, n.Item1)))
+                {
+                    wl.Add(CalyDistances.Euclidean(word.BoundingBox.BottomRight, n.Item1.BoundingBox.BottomLeft));
+                }
+            }
+
+            // Between-line distance
+            // 1.2.1 Find the 2 closest neighbours words to the candidate, using euclidean distance.
+            kdTreeBottomLeft.FindNearestNeighbours(word, 2, w => w.BoundingBox.TopLeft, CalyDistances.Euclidean, queue, neighbours);
+            foreach (var n in neighbours)
+            {
+                // 1.2.2 Check if the candidate words is within the angle
+                var angle = AngleBL(word, n.Item1);
+                if (blBounds.Contains(angle))
+                {
+                    // 1.2.3 Compute the vertical (between-line) distance between the candidate
+                    // and the neighbour and add it to the between-line distances list
+                    float hypotenuse = CalyDistances.Euclidean(word.BoundingBox.Centroid, n.Item1.BoundingBox.Centroid);
+
+                    // Angle is kept within [-90, 90]
+                    if (angle > 90)
+                    {
+                        angle -= 180;
+                    }
+
+                    var dist = MathF.Abs(hypotenuse * MathF.Cos((90 - angle) * MathF.PI / 180))
+                               - (float)word.BoundingBox.Height / 2.0f - (float)n.Item1.BoundingBox.Height / 2.0f;
+
+                    // The perpendicular distance can be negative because of the subtractions.
+                    // Could occur when words are overlapping, we ignore that.
+                    if (dist >= 0)
+                    {
+                        bl.Add(dist);
+                    }
+                }
+            }
+        }
+
+        // Each range of words has its own lists, concatenated in the words order: the distances are
+        // always in the same order, so is their average (floating point additions are not associative).
+        const int rangeSize = 64;
+        int rangeCount = (words.Count + rangeSize - 1) / rangeSize;
+        var withinLineDistRanges = new List<float>[rangeCount];
+        var betweenLineDistRanges = new List<float>[rangeCount];
+
+        void AddRangeDistances(int start, int end)
+        {
+            var wl = new List<float>();
+            var bl = new List<float>();
+            var queue = new CalyKdTree<PdfWord>.KNearestNeighboursQueue();
+            var neighbours = new List<(PdfWord, int, float)>();
+            for (int i = start; i < end; i++)
+            {
+                AddDistances(i, wl, bl, queue, neighbours);
+            }
+
+            withinLineDistRanges[start / rangeSize] = wl;
+            betweenLineDistRanges[start / rangeSize] = bl;
+        }
+
+        if (words.Count < CalyClustering.KNearestParallelThreshold || parallelOptions.MaxDegreeOfParallelism == 1)
+        {
+            // The cost of running in parallel outweighs the gain for small inputs
+            for (int start = 0; start < words.Count; start += rangeSize)
+            {
+                parallelOptions.CancellationToken.ThrowIfCancellationRequested();
+                AddRangeDistances(start, Math.Min(start + rangeSize, words.Count));
+            }
+        }
+        else
+        {
+            Parallel.ForEach(Partitioner.Create(0, words.Count, rangeSize), parallelOptions,
+                range => AddRangeDistances(range.Item1, range.Item2));
+        }
+
         var withinLineDistList = new List<float>();
         var betweenLineDistList = new List<float>();
-
-        // 1. Estimate within line and between line spacing
-        CalyKdTree<PdfWord> kdTreeBottomLeft = new CalyKdTree<PdfWord>(words, w => w.BoundingBox.BottomLeft);
-
-        Parallel.For(0, words.Count, parallelOptions,
-            () => (wl: new List<float>(), bl: new List<float>()),
-            (i, _, local) =>
-            {
-                var word = words[i];
-
-                // Within-line distance
-                // 1.1.1 Find the 2 closest neighbours words to the candidate, using euclidean distance.
-                foreach (var n in kdTreeBottomLeft.FindNearestNeighbours(word, 2, w => w.BoundingBox.BottomRight, CalyDistances.Euclidean))
-                {
-                    // 1.1.2 Check if the neighbour word is within the angle of the candidate
-                    if (wlBounds.Contains(AngleWL(word, n.Item1)))
-                    {
-                        local.wl.Add(CalyDistances.Euclidean(word.BoundingBox.BottomRight, n.Item1.BoundingBox.BottomLeft));
-                    }
-                }
-
-                // Between-line distance
-                // 1.2.1 Find the 2 closest neighbours words to the candidate, using euclidean distance.
-                foreach (var n in kdTreeBottomLeft.FindNearestNeighbours(word, 2, w => w.BoundingBox.TopLeft, CalyDistances.Euclidean))
-                {
-                    // 1.2.2 Check if the candidate words is within the angle
-                    var angle = AngleBL(word, n.Item1);
-                    if (blBounds.Contains(angle))
-                    {
-                        // 1.2.3 Compute the vertical (between-line) distance between the candidate
-                        // and the neighbour and add it to the between-line distances list
-                        float hypotenuse = CalyDistances.Euclidean(word.BoundingBox.Centroid, n.Item1.BoundingBox.Centroid);
-
-                        // Angle is kept within [-90, 90]
-                        if (angle > 90)
-                        {
-                            angle -= 180;
-                        }
-
-                        var dist = MathF.Abs(hypotenuse * MathF.Cos((90 - angle) * MathF.PI / 180))
-                                   - (float)word.BoundingBox.Height / 2.0f - (float)n.Item1.BoundingBox.Height / 2.0f;
-
-                        // The perpendicular distance can be negative because of the subtractions.
-                        // Could occur when words are overlapping, we ignore that.
-                        if (dist >= 0)
-                        {
-                            local.bl.Add(dist);
-                        }
-                    }
-                }
-
-                return local;
-            },
-            local =>
-            {
-                lock (withinLineDistList)
-                {
-                    withinLineDistList.AddRange(local.wl);
-                }
-                lock (betweenLineDistList)
-                {
-                    betweenLineDistList.AddRange(local.bl);
-                }
-            });
+        for (int r = 0; r < rangeCount; r++)
+        {
+            withinLineDistList.AddRange(withinLineDistRanges[r]);
+            betweenLineDistList.AddRange(betweenLineDistRanges[r]);
+        }
 
         // Compute average peak value of distribution
         float? withinLinePeak = GetPeakAverageDistance(withinLineDistList, wlBinSize);
@@ -268,11 +299,10 @@ public sealed class CalyDocstrum
         }
 
         int binCount = (int)Math.Ceiling(max / (double)binLength) + 1;
-        var bins = new List<float>[binCount];
-        for (int i = 0; i < binCount; i++)
-        {
-            bins[i] = new List<float>();
-        }
+
+        // The distances are summed in the same order as they are in the list
+        var counts = new int[binCount];
+        var sums = new float[binCount];
 
         for (int i = 0; i < distances.Count; i++)
         {
@@ -286,30 +316,26 @@ public sealed class CalyDocstrum
             {
                 bin = binCount - 1;
             }
-            bins[bin].Add(distance);
+            counts[bin]++;
+            sums[bin] += distance;
         }
 
-        List<float> best = null;
-        for (int i = 0; i < binCount; i++)
+        // The first bin with the most distances
+        int best = 0;
+        for (int i = 1; i < binCount; i++)
         {
-            var bin = bins[i];
-            if (best is null || bin.Count > best.Count)
+            if (counts[i] > counts[best])
             {
-                best = bin;
+                best = i;
             }
         }
 
-        if (best == null || best.Count == 0)
+        if (counts[best] == 0)
         {
             return null;
         }
 
-        float sum = 0;
-        for (int i = 0; i < best.Count; i++)
-        {
-            sum += best[i];
-        }
-        return sum / best.Count;
+        return sums[best] / counts[best];
     }
     #endregion
 
@@ -326,7 +352,7 @@ public sealed class CalyDocstrum
     /// <returns>The <see cref="PdfTextLine"/>s built.</returns>
     public static IEnumerable<PdfTextLine> GetLines(IReadOnlyList<PdfWord> words, float maxWLDistance, AngleBounds wlBounds, ParallelOptions parallelOptions)
     {
-        var groupedWords = CalyClustering.NearestNeighbours(words,
+        var groupedWords = CalyClustering.NearestNeighbourGroups(words,
             2,
             CalyDistances.Euclidean,
             (_, __) => maxWLDistance,
@@ -406,20 +432,136 @@ public sealed class CalyDocstrum
          *  then they are said to meet the criteria to belong to the same structural block.
          ******************************************************************************************************/
 
-        var groupedLines = CalyClustering.NearestNeighbours(
-            lines,
-            (l1, l2) => PerpendicularOverlappingDistance(in l1, in l2, ref angularDifferenceBounds, epsilon),
-            (_, __) => maxBLDistance,
-            pivot => new PdfLine(pivot.BoundingBox.BottomLeft, pivot.BoundingBox.BottomRight),
-            candidate => new PdfLine(candidate.BoundingBox.TopLeft, candidate.BoundingBox.TopRight),
-            _ => true,
-            (_, __) => true,
-            parallelOptions).ToArray();
+        var closestLines = GetClosestLineIndexes(lines, maxBLDistance, angularDifferenceBounds, epsilon, parallelOptions);
 
-        foreach (var g in groupedLines)
+        foreach (var g in CalyClustering.GroupIndexes(closestLines, lines))
         {
             yield return new PdfTextBlock(g.OrderByReadingOrder().ToArray());
         }
+    }
+
+    /// <summary>
+    /// For each line, the index of the line with the smallest <see cref="PerpendicularOverlappingDistance"/> from the
+    /// line's bottom to its top (the first one for equal distances), if below <paramref name="maxBLDistance"/>, otherwise -1.
+    /// <para>
+    /// Only the lines close enough to be linked are compared: the distance is from a point of the candidate line
+    /// that projects inside the pivot line, so it is at least the distance between the two segments, and so between
+    /// their bounding boxes.
+    /// </para>
+    /// </summary>
+    internal static int[] GetClosestLineIndexes(IReadOnlyList<PdfTextLine> lines, float maxBLDistance,
+        AngleBounds angularDifferenceBounds, float epsilon, ParallelOptions parallelOptions)
+    {
+        int n = lines.Count;
+        var indexes = new int[n];
+        var pivots = new PdfLine[n];
+        var candidates = new PdfLine[n];
+        var candidatesMinY = new double[n];
+        var candidatesOrder = new int[n];
+        double candidatesMaxHeight = 0;
+
+        for (int i = 0; i < n; i++)
+        {
+            indexes[i] = -1;
+            var box = lines[i].BoundingBox;
+            pivots[i] = new PdfLine(box.BottomLeft, box.BottomRight);
+            candidates[i] = new PdfLine(box.TopLeft, box.TopRight);
+            candidatesMinY[i] = Math.Min(candidates[i].Point1.Y, candidates[i].Point2.Y);
+            candidatesMaxHeight = Math.Max(candidatesMaxHeight, Math.Abs(candidates[i].Point1.Y - candidates[i].Point2.Y));
+            candidatesOrder[i] = i;
+        }
+
+        // The margin covers the approximations made when computing the distance (e.g. almost vertical lines),
+        // and the single precision used by the distance computations
+        double searchDistance = maxBLDistance + Math.Max(epsilon, 0) + 1e-2;
+        if (n < 2 || !(searchDistance >= 0))
+        {
+            return indexes;
+        }
+
+        // Candidates sorted by their bottom
+        Array.Sort(candidatesMinY, candidatesOrder);
+
+        void FindClosestLine(int i)
+        {
+            ref readonly var pivot = ref pivots[i];
+            double minX = Math.Min(pivot.Point1.X, pivot.Point2.X) - searchDistance;
+            double maxX = Math.Max(pivot.Point1.X, pivot.Point2.X) + searchDistance;
+            double minY = Math.Min(pivot.Point1.Y, pivot.Point2.Y) - searchDistance;
+            double maxY = Math.Max(pivot.Point1.Y, pivot.Point2.Y) + searchDistance;
+
+            float closestDistance = float.MaxValue;
+            int closestIndex = -1;
+
+            for (int s = LowerBound(candidatesMinY, minY - candidatesMaxHeight); s < n && candidatesMinY[s] <= maxY; s++)
+            {
+                int j = candidatesOrder[s];
+                ref readonly var candidate = ref candidates[j];
+                if (j == i ||
+                    Math.Max(candidate.Point1.Y, candidate.Point2.Y) < minY ||
+                    Math.Max(candidate.Point1.X, candidate.Point2.X) < minX ||
+                    Math.Min(candidate.Point1.X, candidate.Point2.X) > maxX)
+                {
+                    continue;
+                }
+
+                float distance = PerpendicularOverlappingDistance(in pivot, in candidate, in angularDifferenceBounds, epsilon);
+                if (distance < closestDistance || (distance == closestDistance && j < closestIndex))
+                {
+                    closestDistance = distance;
+                    closestIndex = j;
+                }
+            }
+
+            if (closestIndex != -1 && closestDistance < maxBLDistance)
+            {
+                indexes[i] = closestIndex;
+            }
+        }
+
+        if (n < CalyClustering.KNearestParallelThreshold || parallelOptions.MaxDegreeOfParallelism == 1)
+        {
+            parallelOptions.CancellationToken.ThrowIfCancellationRequested();
+            for (int i = 0; i < n; i++)
+            {
+                FindClosestLine(i);
+            }
+        }
+        else
+        {
+            Parallel.ForEach(Partitioner.Create(0, n), parallelOptions, range =>
+            {
+                for (int i = range.Item1; i < range.Item2; i++)
+                {
+                    FindClosestLine(i);
+                }
+            });
+        }
+
+        return indexes;
+    }
+
+    /// <summary>
+    /// The index of the first value greater than or equal to <paramref name="value"/> in the sorted <paramref name="values"/>.
+    /// </summary>
+    private static int LowerBound(double[] values, double value)
+    {
+        int low = 0;
+        int high = values.Length;
+        while (low < high)
+        {
+            int middle = low + (high - low) / 2;
+            if (values[middle] < value)
+            {
+                low = middle + 1;
+            }
+            else
+            {
+                high = middle;
+            }
+        }
+
+        return low;
     }
 
     /// <summary>
@@ -429,7 +571,7 @@ public sealed class CalyDocstrum
     /// <param name="line2"></param>
     /// <param name="angularDifferenceBounds"></param>
     /// <param name="epsilon"></param>
-    private static float PerpendicularOverlappingDistance(ref readonly PdfLine line1, ref readonly PdfLine line2, ref readonly AngleBounds angularDifferenceBounds, float epsilon)
+    internal static float PerpendicularOverlappingDistance(ref readonly PdfLine line1, ref readonly PdfLine line2, ref readonly AngleBounds angularDifferenceBounds, float epsilon)
     {
         if (GetStructuralBlockingParameters(in line1, in line2, epsilon, out float theta, out _, out float ed))
         {
@@ -488,6 +630,15 @@ public sealed class CalyDocstrum
         float dYj = (float)j2.Y - (float)j1.Y;
 
         angularDifference = CalyDistances.BoundAngle180((MathF.Atan2(dYj, dXj) - MathF.Atan2(dYi, dXi)) * 180 / MathF.PI);
+
+        if (dXi.AlmostEqualsToZero(epsilon) && dYi.AlmostEqualsToZero(epsilon))
+        {
+            // Line i has no direction, as a line of length zero: the perpendicular distance
+            // would only be measured along the X axis
+            normalisedOverlap = float.NaN;
+            perpendicularDistance = float.NaN;
+            return false;
+        }
 
         PdfPoint? Aj = GetTranslatedPoint((float)i.Point1.X, (float)i.Point1.Y, (float)j1.X, (float)j1.Y, dXi, dYi, dXj, dYj, epsilon);
         PdfPoint? Bj = GetTranslatedPoint((float)i.Point2.X, (float)i.Point2.Y, (float)j2.X, (float)j2.Y, dXi, dYi, dXj, dYj, epsilon);

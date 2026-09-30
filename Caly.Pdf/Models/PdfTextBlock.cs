@@ -27,8 +27,8 @@ namespace Caly.Pdf.Models;
 
 public sealed class PdfTextBlock : IPdfTextElement
 {
-    internal ushort WordStartIndex { get; set; }
-    internal ushort WordEndIndex { get; set; }
+    internal int WordStartIndex { get; set; }
+    internal int WordEndIndex { get; set; }
 
     public TextOrientation TextOrientation { get; }
 
@@ -37,7 +37,7 @@ public sealed class PdfTextBlock : IPdfTextElement
     /// </summary>
     public PdfRectangle BoundingBox { get; }
 
-    public ushort IndexInPage { get; internal set; }
+    public int IndexInPage { get; internal set; }
 
     /// <summary>
     /// The text lines contained in the block.

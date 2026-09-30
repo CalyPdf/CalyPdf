@@ -35,7 +35,7 @@ public sealed class PdfWord : IPdfTextElement
         }
 #endif
 
-    private readonly ushort[]? _toCharIndex;
+    private readonly int[]? _toCharIndex;
 
     private readonly float[]? _letterPositions;
 
@@ -51,21 +51,21 @@ public sealed class PdfWord : IPdfTextElement
     /// <summary>
     /// Word index in the page.
     /// </summary>
-    public ushort IndexInPage { get; internal set; }
+    public int IndexInPage { get; internal set; }
 
     /// <summary>
     /// Text line index in the page the word belongs to.
     /// </summary>
-    public ushort TextLineIndex { get; internal set; }
+    public int TextLineIndex { get; internal set; }
 
     /// <summary>
     /// Text block index in the page the word belongs to.
     /// </summary>
-    public ushort TextBlockIndex { get; internal set; }
+    public int TextBlockIndex { get; internal set; }
 
     public string Value { get; }
 
-    public ushort Count { get; }
+    public int Count { get; }
 
     public PdfWord(IReadOnlyList<PdfLetter> letters)
     {
@@ -78,7 +78,7 @@ public sealed class PdfWord : IPdfTextElement
 
         TextOrientation = PdfTextLayerHelper.GetTextOrientation(letters);
 
-        Count = (ushort)letters.Count;
+        Count = letters.Count;
 
         var firstLetter = letters[0];
         int charsCount = firstLetter.Value.Length;
@@ -153,9 +153,9 @@ public sealed class PdfWord : IPdfTextElement
         else
         {
             // Usually because of ligatures
-            _toCharIndex = new ushort[letters.Count];
+            _toCharIndex = new int[letters.Count];
 
-            ushort k = 0;
+            int k = 0;
             for (int l = 0; l < letters.Count; ++l)
             {
                 var letter = letters[l].Value.AsSpan();

@@ -219,17 +219,17 @@ namespace Caly.Pdf
         /// </summary>
         internal static void AssignIndices(IReadOnlyList<PdfTextBlock> pdfBlocks, CancellationToken token = default)
         {
-            ushort wordIndex = 0;
-            ushort lineIndex = 0;
-            ushort blockIndex = 0;
+            int wordIndex = 0;
+            int lineIndex = 0;
+            int blockIndex = 0;
 
             foreach (PdfTextBlock block in pdfBlocks)
             {
-                ushort blockStartIndex = wordIndex;
+                int blockStartIndex = wordIndex;
 
                 foreach (PdfTextLine line in block.TextLines)
                 {
-                    ushort lineStartIndex = wordIndex;
+                    int lineStartIndex = wordIndex;
 
                     foreach (PdfWord word in line.Words)
                     {
@@ -251,7 +251,7 @@ namespace Caly.Pdf
 
                 block.IndexInPage = blockIndex++;
                 block.WordStartIndex = blockStartIndex;
-                block.WordEndIndex = ushort.CreateChecked(wordIndex - 1);
+                block.WordEndIndex = wordIndex - 1;
             }
         }
 

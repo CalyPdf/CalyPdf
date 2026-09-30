@@ -25,6 +25,9 @@
 		<None Update="fseprd1102849.pdf">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</None>
+		<None Update="MOZILLA-7952-0.pdf">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
 	</ItemGroup>
 
 </Project>

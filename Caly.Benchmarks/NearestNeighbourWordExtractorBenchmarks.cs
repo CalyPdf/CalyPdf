@@ -21,8 +21,6 @@
 using BenchmarkDotNet.Attributes;
 using Caly.Pdf.Layout;
 using Caly.Pdf.Models;
-using Caly.Pdf.PageFactories;
-using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
 using UglyToad.PdfPig.DocumentLayoutAnalysis.WordExtractor;
 
@@ -31,24 +29,18 @@ namespace Caly.Benchmarks
     [MemoryDiagnoser]
     public class NearestNeighbourWordExtractorBenchmarks
     {
-        //private const string _path = "fseprd1102849.pdf";
-        private const string _path = "2559 words.pdf";
+        [ParamsSource(nameof(Pages))]
+        public string Page { get; set; } = null!;
 
-        private readonly Letter[] _letters;
-        private readonly PdfLetter[] _calyLetters;
+        public static IEnumerable<string> Pages => BenchmarkDocuments.Pages;
 
-        public NearestNeighbourWordExtractorBenchmarks()
+        private Letter[] _letters = null!;
+        private PdfLetter[] _calyLetters = null!;
+
+        [GlobalSetup]
+        public void Setup()
         {
-            using (var doc = PdfDocument.Open(_path))
-            {
-                doc.AddPageFactory<PageTextLayerContent, TextLayerFactory>();
-
-                var page = doc.GetPage(1);
-                _letters = page.Letters.ToArray();
-
-                var layer = doc.GetPage<PageTextLayerContent>(1);
-                _calyLetters = layer.Letters.ToArray();
-            }
+            (_letters, _calyLetters) = BenchmarkDocuments.GetLetters(Page);
         }
 
         [Benchmark(Baseline = true)]

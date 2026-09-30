@@ -73,6 +73,17 @@
         /// <param name="elements">The elements used to build the tree.</param>
         /// <param name="elementsPointFunc">The function that converts the candidate elements into a <see cref="PdfPoint"/>.</param>
         public CalyKdTree(IReadOnlyList<T> elements, Func<T, PdfPoint> elementsPointFunc)
+            : this(elements, elementsPointFunc, null)
+        { }
+
+        /// <summary>
+        /// K-D tree data structure, with the large subtrees built in parallel if <paramref name="parallelOptions"/> is not null.
+        /// The tree is the same as when built sequentially.
+        /// </summary>
+        /// <param name="elements">The elements used to build the tree.</param>
+        /// <param name="elementsPointFunc">The function that converts the candidate elements into a <see cref="PdfPoint"/>.</param>
+        /// <param name="parallelOptions">The options for building in parallel, or null to build sequentially.</param>
+        internal CalyKdTree(IReadOnlyList<T> elements, Func<T, PdfPoint> elementsPointFunc, ParallelOptions? parallelOptions)
         {
             if (elements == null || elements.Count == 0)
             {
@@ -89,15 +100,28 @@
                 array[i] = new KdTreeElement<T>(i, elementsPointFunc(el), el);
             }
 
-            Root = BuildTree(array, 0, Count, 0)!;
+            if (parallelOptions?.MaxDegreeOfParallelism == 1)
+            {
+                parallelOptions = null;
+            }
+
+            Root = BuildTree(array, 0, Count, 0, parallelOptions)!;
         }
+
+        /// <summary>
+        /// Minimum number of elements in a subtree for its two children to be built in parallel.
+        /// </summary>
+        private const int ParallelBuildThreshold = 8192;
 
         /// <summary>
         /// Build the tree from <c>elements[start..end)</c>, split on the median along X (even depth) or Y (odd depth).
         /// <para>Only the median needs to be in place, not the whole range sorted, so the elements are partitioned
         /// with a quickselect. Ties are broken by index, so the tree is the same as if the range was sorted.</para>
+        /// <para>Once the median is in place, the two children only use their own side of the range, so large
+        /// ones are built in parallel when <paramref name="parallelOptions"/> is not null.</para>
         /// </summary>
-        private static CalyKdTreeNode<T>? BuildTree(KdTreeElement<T>[] elements, int start, int end, int depth)
+        private static CalyKdTreeNode<T>? BuildTree(KdTreeElement<T>[] elements, int start, int end, int depth,
+            ParallelOptions? parallelOptions)
         {
             int count = end - start;
             if (count == 0)
@@ -125,8 +149,29 @@
             int median = start + count / 2;
             Select(elements, start, end - 1, median, byX);
 
-            CalyKdTreeNode<T>? vLeft = BuildTree(elements, start, median, depth + 1);
-            CalyKdTreeNode<T>? vRight = BuildTree(elements, median + 1, end, depth + 1);
+            if (parallelOptions is not null && count >= ParallelBuildThreshold)
+            {
+                return BuildChildrenInParallel(elements, start, end, median, depth, parallelOptions);
+            }
+
+            CalyKdTreeNode<T>? vLeft = BuildTree(elements, start, median, depth + 1, parallelOptions);
+            CalyKdTreeNode<T>? vRight = BuildTree(elements, median + 1, end, depth + 1, parallelOptions);
+
+            return new CalyKdTreeNode<T>(vLeft, vRight, elements[median], depth);
+        }
+
+        /// <summary>
+        /// In its own method so that only the parallel builds allocate the lambdas' closure, not every node.
+        /// </summary>
+        private static CalyKdTreeNode<T> BuildChildrenInParallel(KdTreeElement<T>[] elements, int start, int end, int median,
+            int depth, ParallelOptions parallelOptions)
+        {
+            CalyKdTreeNode<T>? vLeft = null;
+            CalyKdTreeNode<T>? vRight = null;
+
+            Parallel.Invoke(parallelOptions,
+                () => vLeft = BuildTree(elements, start, median, depth + 1, parallelOptions),
+                () => vRight = BuildTree(elements, median + 1, end, depth + 1, parallelOptions));
 
             return new CalyKdTreeNode<T>(vLeft, vRight, elements[median], depth);
         }
@@ -322,7 +367,7 @@
         /// <summary>
         /// Get the k nearest neighbours to the pivot element.
         /// Might return more than k neighbours if points are equidistant.
-        /// <para>Use <see cref="FindNearestNeighbour(CalyKdTreeNode{Q}, T, Func{T, PdfPoint}, Func{PdfPoint, PdfPoint, float})"/> if only looking for the (single) closest point.</para>
+        /// <para>Use <see cref="FindNearestNeighbour(T, Func{T, PdfPoint}, Func{PdfPoint, PdfPoint, float}, out int, out float)"/> if only looking for the (single) closest point.</para>
         /// </summary>
         /// <param name="pivot">The element for which to find the k nearest neighbours.</param>
         /// <param name="k">The number of neighbours to return. Might return more than k neighbours if points are equidistant.</param>
@@ -331,153 +376,149 @@
         /// <returns>Returns a list of tuples of the k nearest neighbours. Tuples are (element, index, distance).</returns>
         public IReadOnlyList<(T, int, float)> FindNearestNeighbours(T pivot, int k, Func<T, PdfPoint> pivotPointFunc, Func<PdfPoint, PdfPoint, float> distanceMeasure)
         {
-            var pivotPoint = pivotPointFunc(pivot);
-            var kdTreeNodes = new KNearestNeighboursQueue(k);
-            FindNearestNeighbours(Root, pivot, k, pivotPoint, distanceMeasure, kdTreeNodes);
-
             var results = new List<(T, int, float)>();
-            for (int i = 0; i < kdTreeNodes.Count; i++)
-            {
-                float dist = kdTreeNodes.Keys[i];
-                foreach (var e in kdTreeNodes.Values[i])
-                {
-                    results.Add((e.Element, e.Index, dist));
-                }
-            }
+            FindNearestNeighbours(pivot, k, pivotPointFunc, distanceMeasure, new KNearestNeighboursQueue(), results);
             return results;
         }
 
-        private static (CalyKdTreeNode<T>, float) FindNearestNeighbours(CalyKdTreeNode<T> node, T pivot, int k,
-            PdfPoint pivotPoint, Func<PdfPoint, PdfPoint, float> distance, KNearestNeighboursQueue queue)
+        /// <summary>
+        /// Same as <see cref="FindNearestNeighbours(T, int, Func{T, PdfPoint}, Func{PdfPoint, PdfPoint, float})"/>,
+        /// reusing the queue and the results list.
+        /// </summary>
+        internal void FindNearestNeighbours(T pivot, int k, Func<T, PdfPoint> pivotPointFunc, Func<PdfPoint, PdfPoint, float> distanceMeasure,
+            KNearestNeighboursQueue queue, List<(T, int, float)> results)
         {
-            if (node == null)
+            queue.Reset(k);
+            FindNearestNeighbours(Root, pivot, pivotPointFunc(pivot), distanceMeasure, queue);
+
+            results.Clear();
+            for (int i = 0; i < queue.Count; i++)
             {
-                return (null, float.NaN);
-            }
-            
-            if (node.IsLeaf)
-            {
-                if (node.Element.Equals(pivot))
-                {
-                    return (null, float.NaN);
-                }
-
-                var currentDistance = distance(node.Value, pivotPoint);
-                var currentNearestNode = node;
-
-                if (!queue.IsFull || currentDistance <= queue.LastDistance)
-                {
-                    queue.Add(currentDistance, currentNearestNode);
-                    currentDistance = queue.LastDistance;
-                    currentNearestNode = queue.LastElement;
-                }
-
-                return (currentNearestNode, currentDistance);
-            }
-            else
-            {
-                var currentNearestNode = node;
-                var currentDistance = distance(node.Value, pivotPoint);
-                if ((!queue.IsFull || currentDistance <= queue.LastDistance) && !node.Element.Equals(pivot))
-                {
-                    queue.Add(currentDistance, currentNearestNode);
-                    currentDistance = queue.LastDistance;
-                    currentNearestNode = queue.LastElement;
-                }
-
-                CalyKdTreeNode<T> newNode = null;
-                float newDist = float.NaN;
-
-                var pointValue = node.IsAxisCutX ? pivotPoint.X : pivotPoint.Y;
-
-                if (pointValue < node.L)
-                {
-                    // start left
-                    (newNode, newDist) = FindNearestNeighbours(node.LeftChild, pivot, k, pivotPoint, distance, queue);
-
-                    if (!double.IsNaN(newDist) && newDist <= currentDistance && !newNode.Element.Equals(pivot))
-                    {
-                        queue.Add(newDist, newNode);
-                        currentDistance = queue.LastDistance;
-                        currentNearestNode = queue.LastElement;
-                    }
-
-                    if (node.RightChild != null && pointValue + currentDistance >= node.L)
-                    {
-                        (newNode, newDist) = FindNearestNeighbours(node.RightChild, pivot, k, pivotPoint, distance, queue);
-                    }
-                }
-                else
-                {
-                    // start right
-                    (newNode, newDist) = FindNearestNeighbours(node.RightChild, pivot, k, pivotPoint, distance, queue);
-
-                    if (!double.IsNaN(newDist) && newDist <= currentDistance && !newNode.Element.Equals(pivot))
-                    {
-                        queue.Add(newDist, newNode);
-                        currentDistance = queue.LastDistance;
-                        currentNearestNode = queue.LastElement;
-                    }
-
-                    if (node.LeftChild != null && pointValue - currentDistance <= node.L)
-                    {
-                        (newNode, newDist) = FindNearestNeighbours(node.LeftChild, pivot, k, pivotPoint, distance, queue);
-                    }
-                }
-
-                if (!double.IsNaN(newDist) && newDist <= currentDistance && !newNode.Element.Equals(pivot))
-                {
-                    queue.Add(newDist, newNode);
-                    currentDistance = queue.LastDistance;
-                    currentNearestNode = queue.LastElement;
-                }
-
-                return (currentNearestNode, currentDistance);
+                var (distance, node) = queue[i];
+                results.Add((node.Element, node.Index, distance));
             }
         }
 
-        private sealed class KNearestNeighboursQueue : SortedList<float, HashSet<CalyKdTreeNode<T>>>
+        /// <summary>
+        /// Depth-first search visiting the node, then the child on the pivot's side, then the other child if it can
+        /// contain a point as near as the k-th nearest found so far.
+        /// </summary>
+        private static void FindNearestNeighbours(CalyKdTreeNode<T> node, T pivot,
+            PdfPoint pivotPoint, Func<PdfPoint, PdfPoint, float> distance, KNearestNeighboursQueue queue)
         {
-            private readonly int K;
-
-            public CalyKdTreeNode<T>? LastElement { get; private set; }
-
-            public float LastDistance { get; private set; }
-
-            public bool IsFull => Count >= K;
-
-            public KNearestNeighboursQueue(int k) : base(k)
+            // The pivot is not a candidate, otherwise it could be returned as its own neighbour
+            if (!EqualityComparer<T>.Default.Equals(node.Element, pivot))
             {
-                K = k;
-                LastDistance = float.PositiveInfinity;
+                queue.Add(distance(node.Value, pivotPoint), node);
             }
 
-            public void Add(float key, CalyKdTreeNode<T> value)
+            var pointValue = node.IsAxisCutX ? pivotPoint.X : pivotPoint.Y;
+            var split = node.L;
+
+            if (pointValue < split)
             {
-                if (key > LastDistance && IsFull)
+                // start left
+                if (node.LeftChild != null)
+                {
+                    FindNearestNeighbours(node.LeftChild, pivot, pivotPoint, distance, queue);
+                }
+
+                if (node.RightChild != null && pointValue + queue.Radius >= split)
+                {
+                    FindNearestNeighbours(node.RightChild, pivot, pivotPoint, distance, queue);
+                }
+            }
+            else
+            {
+                // start right
+                if (node.RightChild != null)
+                {
+                    FindNearestNeighbours(node.RightChild, pivot, pivotPoint, distance, queue);
+                }
+
+                if (node.LeftChild != null && pointValue - queue.Radius <= split)
+                {
+                    FindNearestNeighbours(node.LeftChild, pivot, pivotPoint, distance, queue);
+                }
+            }
+        }
+
+        /// <summary>
+        /// The nodes at the k smallest distinct distances found so far, by increasing distance, and in the
+        /// order they were added for equal distances.
+        /// </summary>
+        internal sealed class KNearestNeighboursQueue
+        {
+            private (float Distance, CalyKdTreeNode<T> Node)[] entries = new (float, CalyKdTreeNode<T>)[4];
+            private int k;
+            private int distinctDistances;
+
+            public int Count { get; private set; }
+
+            public (float Distance, CalyKdTreeNode<T> Node) this[int index] => entries[index];
+
+            private bool IsFull => distinctDistances >= k;
+
+            private float LastDistance => Count == 0 ? float.PositiveInfinity : entries[Count - 1].Distance;
+
+            /// <summary>
+            /// The distance within which the k nearest neighbours can still be found:
+            /// infinite until k distances are found, then the k-th distance.
+            /// </summary>
+            public float Radius => IsFull ? LastDistance : float.PositiveInfinity;
+
+            public void Reset(int k)
+            {
+                this.k = k;
+                distinctDistances = 0;
+                Count = 0;
+            }
+
+            public void Add(float distance, CalyKdTreeNode<T> node)
+            {
+                if (distance > LastDistance && IsFull)
                 {
                     return;
                 }
 
-                if (!ContainsKey(key))
+                // After the entries at the same distance
+                int position = Count;
+                while (position > 0 && entries[position - 1].Distance.CompareTo(distance) > 0)
                 {
-                    base.Add(key, new HashSet<CalyKdTreeNode<T>>());
-                    if (Count > K)
+                    position--;
+                }
+
+                bool isNewDistance = position == 0 || entries[position - 1].Distance.CompareTo(distance) != 0;
+                if (!isNewDistance)
+                {
+                    for (int i = position - 1; i >= 0 && entries[i].Distance.CompareTo(distance) == 0; i--)
                     {
-                        RemoveAt(Count - 1);
+                        if (ReferenceEquals(entries[i].Node, node))
+                        {
+                            return;
+                        }
                     }
                 }
 
-                if (this[key].Add(value))
+                if (Count == entries.Length)
                 {
-                    LastDistance = Keys[Count - 1];
-                    var lastSet = Values[Count - 1];
-                    CalyKdTreeNode<T> lastElement = null;
-                    foreach (var e in lastSet)
+                    Array.Resize(ref entries, entries.Length * 2);
+                }
+
+                Array.Copy(entries, position, entries, position + 1, Count - position);
+                entries[position] = (distance, node);
+                Count++;
+
+                if (isNewDistance && ++distinctDistances > k)
+                {
+                    // Remove the entries at the largest distance
+                    float largest = entries[Count - 1].Distance;
+                    while (Count > 0 && entries[Count - 1].Distance.CompareTo(largest) == 0)
                     {
-                        lastElement = e;
+                        entries[--Count] = default;
                     }
-                    LastElement = lastElement;
+
+                    distinctDistances--;
                 }
             }
         }
