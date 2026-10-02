@@ -76,14 +76,10 @@ public sealed class TextSearchResult : IEquatable<TextSearchResult>
         if (!text.IsEmpty)
         {
             string str = $"...{text}...";
-            if (str.Contains(SearchValuesTextSearchService.SpaceInText))
-            {
-                str = str.Replace(SearchValuesTextSearchService.SpaceInText, " ");
-            }
-
             if (str.Contains(SearchValuesTextSearchService.WordSeparator))
             {
-                str = str.Replace(SearchValuesTextSearchService.WordSeparator, ' ');
+                str = str.Replace(SearchValuesTextSearchService.WordSeparator,
+                                  SearchValuesTextSearchService.WhiteSpace);
             }
 
             return str;
