@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using System;
+using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Media;
 using Caly.Pdf.Models;
@@ -114,6 +115,131 @@ internal static class PdfWordHelpers
     public static StreamGeometry GetGeometry(ReadOnlySpan<PdfRectangle> rects, TextOrientation orientation)
     {
         return GetGeometry(GetRectangle(rects, orientation), true);
+    }
+
+    /// <summary>
+    /// Splits rectangles, given in reading order, into one group per text line.
+    /// A new group starts each time the line index changes.
+    /// </summary>
+    public static void GroupByLine(IEnumerable<(ushort LineIndex, PdfRectangle Rect)> rects, List<PdfRectangle[]> lines)
+    {
+        var current = new List<PdfRectangle>();
+        int currentLineIndex = -1;
+
+        foreach (var (lineIndex, rect) in rects)
+        {
+            if (lineIndex != currentLineIndex && current.Count > 0)
+            {
+                lines.Add(current.ToArray());
+                current.Clear();
+            }
+
+            currentLineIndex = lineIndex;
+            current.Add(rect);
+        }
+
+        if (current.Count > 0)
+        {
+            lines.Add(current.ToArray());
+        }
+    }
+
+    /// <summary>
+    /// Builds a single filled geometry for the rectangles of one text line, given in reading order.
+    /// <para>
+    /// Consecutive rectangles are joined by a quad going from the end edge of one to the start edge
+    /// of the next, so the highlight follows the baseline even when the line is rotated or curved.
+    /// All figures are wound the same way and filled with <see cref="FillRule.NonZero"/>, so overlaps
+    /// are painted once (no darker spots with a translucent brush).
+    /// </para>
+    /// </summary>
+    public static StreamGeometry GetLineGeometry(IReadOnlyList<PdfRectangle> rects)
+    {
+        var quads = new List<Quad>(rects.Count * 2);
+        GetLineQuads(rects, quads);
+
+        var sg = new StreamGeometry();
+        using (var ctx = sg.Open())
+        {
+            ctx.SetFillRule(FillRule.NonZero);
+
+            foreach (var q in quads)
+            {
+                ctx.BeginFigure(new Point(q.A.X, q.A.Y), true);
+                ctx.LineTo(new Point(q.B.X, q.B.Y));
+                ctx.LineTo(new Point(q.C.X, q.C.Y));
+                ctx.LineTo(new Point(q.D.X, q.D.Y));
+                ctx.EndFigure(true);
+            }
+        }
+
+        return sg;
+    }
+
+    internal readonly record struct Quad(PdfPoint A, PdfPoint B, PdfPoint C, PdfPoint D);
+
+    /// <summary>
+    /// The figures of <see cref="GetLineGeometry"/>: one quad per rectangle, plus one joining quad
+    /// per gap between consecutive rectangles. All quads have a non-negative signed area.
+    /// </summary>
+    internal static void GetLineQuads(IReadOnlyList<PdfRectangle> rects, List<Quad> quads)
+    {
+        for (int i = 0; i < rects.Count; ++i)
+        {
+            var rect = rects[i];
+
+            if (i > 0)
+            {
+                var previous = rects[i - 1];
+                if (HasGap(previous, rect))
+                {
+                    quads.Add(NormaliseWinding(previous.BottomRight, previous.TopRight, rect.TopLeft, rect.BottomLeft));
+                }
+            }
+
+            quads.Add(NormaliseWinding(rect.BottomLeft, rect.TopLeft, rect.TopRight, rect.BottomRight));
+        }
+    }
+
+    /// <summary>
+    /// <c>true</c> if <paramref name="next"/> starts after <paramref name="previous"/> ends, along the
+    /// reading direction of <paramref name="previous"/>, on both the bottom and top edges. Otherwise, the
+    /// joining quad would be self-intersecting (the rectangles overlap and need no joining anyway).
+    /// </summary>
+    private static bool HasGap(PdfRectangle previous, PdfRectangle next)
+    {
+        double dirX = previous.BottomRight.X - previous.BottomLeft.X;
+        double dirY = previous.BottomRight.Y - previous.BottomLeft.Y;
+
+        double bottomGap = (next.BottomLeft.X - previous.BottomRight.X) * dirX +
+                           (next.BottomLeft.Y - previous.BottomRight.Y) * dirY;
+
+        double topGap = (next.TopLeft.X - previous.TopRight.X) * dirX +
+                        (next.TopLeft.Y - previous.TopRight.Y) * dirY;
+
+        return bottomGap > 0 && topGap > 0;
+    }
+
+    /// <summary>
+    /// Twice the signed area of the quad (shoelace formula).
+    /// </summary>
+    internal static double SignedArea(Quad q)
+    {
+        return q.A.X * q.B.Y - q.B.X * q.A.Y +
+               q.B.X * q.C.Y - q.C.X * q.B.Y +
+               q.C.X * q.D.Y - q.D.X * q.C.Y +
+               q.D.X * q.A.Y - q.A.X * q.D.Y;
+    }
+
+    /// <summary>
+    /// Word rectangles do not all have the same handedness (e.g. mirrored text, with a negative scale in
+    /// its text matrix), so the winding is normalised for <see cref="FillRule.NonZero"/> to union the figures, rather than
+    /// cancel them out where they overlap.
+    /// </summary>
+    private static Quad NormaliseWinding(PdfPoint a, PdfPoint b, PdfPoint c, PdfPoint d)
+    {
+        var quad = new Quad(a, b, c, d);
+        return SignedArea(quad) < 0 ? new Quad(a, d, c, b) : quad;
     }
 
     #region Bounding box - Same as PdfWord
