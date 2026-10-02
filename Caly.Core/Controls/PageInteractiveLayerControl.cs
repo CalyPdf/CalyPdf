@@ -69,14 +69,14 @@ public sealed class PageInteractiveLayerControl : Control
     /// <summary>
     /// Defines the <see cref="SelectedWords"/> property.
     /// </summary>
-    public static readonly StyledProperty<IReadOnlyList<PdfRectangle>?> SelectedWordsProperty =
-        AvaloniaProperty.Register<PageInteractiveLayerControl, IReadOnlyList<PdfRectangle>?>(nameof(SelectedWords));
+    public static readonly StyledProperty<IReadOnlyList<PdfRectangle[]>?> SelectedWordsProperty =
+        AvaloniaProperty.Register<PageInteractiveLayerControl, IReadOnlyList<PdfRectangle[]>?>(nameof(SelectedWords));
 
     /// <summary>
     /// Defines the <see cref="SearchResults"/> property.
     /// </summary>
-    public static readonly StyledProperty<IReadOnlyList<PdfRectangle>?> SearchResultsProperty =
-        AvaloniaProperty.Register<PageInteractiveLayerControl, IReadOnlyList<PdfRectangle>?>(nameof(SearchResults));
+    public static readonly StyledProperty<IReadOnlyList<PdfRectangle[]>?> SearchResultsProperty =
+        AvaloniaProperty.Register<PageInteractiveLayerControl, IReadOnlyList<PdfRectangle[]>?>(nameof(SearchResults));
 
     private StreamGeometry[]? _selectedWordsGeometry;
     private StreamGeometry[]? _searchResultsGeometry;
@@ -98,13 +98,13 @@ public sealed class PageInteractiveLayerControl : Control
         });
     }
 
-    public IReadOnlyList<PdfRectangle>? SelectedWords
+    public IReadOnlyList<PdfRectangle[]>? SelectedWords
     {
         get => GetValue(SelectedWordsProperty);
         set => SetValue(SelectedWordsProperty, value);
     }
 
-    public IReadOnlyList<PdfRectangle>? SearchResults
+    public IReadOnlyList<PdfRectangle[]>? SearchResults
     {
         get => GetValue(SearchResultsProperty);
         set => SetValue(SearchResultsProperty, value);
@@ -244,9 +244,9 @@ public sealed class PageInteractiveLayerControl : Control
         if (change.Property == SelectedWordsProperty)
         {
             _selectedWordsGeometry = null;
-            if (change.NewValue is IReadOnlyCollection<PdfRectangle> rects && rects.Count > 0)
+            if (change.NewValue is IReadOnlyList<PdfRectangle[]> lines && lines.Count > 0)
             {
-                _selectedWordsGeometry = rects.Select(r => PdfWordHelpers.GetGeometry(r, true)).ToArray();
+                _selectedWordsGeometry = lines.Select(PdfWordHelpers.GetLineGeometry).ToArray();
             }
             else
             {
@@ -256,9 +256,9 @@ public sealed class PageInteractiveLayerControl : Control
         else if (change.Property == SearchResultsProperty)
         {
             _searchResultsGeometry = null;
-            if (change.NewValue is IReadOnlyCollection<PdfRectangle> rects && rects.Count > 0)
+            if (change.NewValue is IReadOnlyList<PdfRectangle[]> lines && lines.Count > 0)
             {
-                _searchResultsGeometry = rects.Select(r => PdfWordHelpers.GetGeometry(r, true)).ToArray();
+                _searchResultsGeometry = lines.Select(PdfWordHelpers.GetLineGeometry).ToArray();
             }
             else
             {

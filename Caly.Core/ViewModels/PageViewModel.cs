@@ -82,10 +82,10 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
     [NotifyPropertyChangedFor(nameof(DisplayHeight))]
     private int _rotation;
     
-    [ObservableProperty] private IReadOnlyList<PdfRectangle>? _selectedWords;
+    [ObservableProperty] private IReadOnlyList<PdfRectangle[]>? _selectedWords;
 
     private IReadOnlyList<Range>? _searchResultsRanges; // Needed as the text layer might not be available when we set search results
-    [ObservableProperty] private IReadOnlyList<PdfRectangle>? _searchResults;
+    [ObservableProperty] private IReadOnlyList<PdfRectangle[]>? _searchResults;
 
     public TextSelection TextSelection { get; }
 
@@ -225,7 +225,7 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
     /// caller. Always posted (never inline) so UI-thread and background callers are
     /// serialized in FIFO order; the generated setter ignores no-op assignments.
     /// </summary>
-    private void SetSelectedWords(IReadOnlyList<PdfRectangle>? value)
+    private void SetSelectedWords(IReadOnlyList<PdfRectangle[]>? value)
     {
         Dispatcher.UIThread.Post(() => SelectedWords = value);
     }
@@ -233,7 +233,7 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
     /// <summary>
     /// Same dispatch strategy as <see cref="SetSelectedWords"/>, for <see cref="SearchResults"/>.
     /// </summary>
-    private void SetSearchResults(IReadOnlyList<PdfRectangle>? value)
+    private void SetSearchResults(IReadOnlyList<PdfRectangle[]>? value)
     {
         Dispatcher.UIThread.Post(() => SearchResults = value);
     }
@@ -291,13 +291,14 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
 
         System.Diagnostics.Debug.Assert(PdfTextLayer is not null);
 
-        var results = new List<PdfRectangle>(_searchResultsRanges.Count);
+        // One group per line and per search result, so that distinct results are never joined
+        var results = new List<PdfRectangle[]>(_searchResultsRanges.Count);
         foreach (var range in _searchResultsRanges)
         {
             var start = PdfTextLayer[range.Start];
             var end = PdfTextLayer[range.End];
-            results.AddRange(PdfTextLayer.GetWords(start, end)
-                .Select(x => x.BoundingBox));
+            PdfWordHelpers.GroupByLine(PdfTextLayer.GetWords(start, end)
+                .Select(x => (x.TextLineIndex, x.BoundingBox)), results);
         }
 
         SetSearchResults(results.Count > 0 ? results : null);
@@ -321,11 +322,13 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
         }
         else
         {
-            var selectedWordRects = TextSelection.GetPageSelectionAs(
+            var selectedLines = new List<PdfRectangle[]>();
+            PdfWordHelpers.GroupByLine(TextSelection.GetPageSelectionAs(
                     selectedWords, PageNumber,
-                    PdfWordHelpers.GetRectangle, PdfWordHelpers.GetRectangle)
-                .ToArray();
-            SetSelectedWords(selectedWordRects);
+                    w => (w.TextLineIndex, PdfWordHelpers.GetRectangle(w)),
+                    (w, s, e) => (w.TextLineIndex, PdfWordHelpers.GetRectangle(w, s, e))),
+                selectedLines);
+            SetSelectedWords(selectedLines);
         }
     }
 
