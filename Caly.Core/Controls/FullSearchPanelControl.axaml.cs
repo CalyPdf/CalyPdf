@@ -24,7 +24,7 @@ using Avalonia.Controls.Metadata;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.LogicalTree;
+using Avalonia.Threading;
 using Caly.Core.Utilities;
 
 namespace Caly.Core.Controls;
@@ -38,6 +38,7 @@ public sealed class FullSearchPanelControl : TemplatedControl
 {
     private TextBox? _textBoxSearch;
     private TreeDataGrid? _resultsDataGrid;
+    private TopLevel? _topLevel;
 
     public FullSearchPanelControl()
     {
@@ -53,6 +54,12 @@ public sealed class FullSearchPanelControl : TemplatedControl
     {
         base.OnApplyTemplate(e);
 
+        if (_textBoxSearch is not null)
+        {
+            _textBoxSearch.KeyDown -= TextBoxSearch_OnKeyDown;
+            _textBoxSearch.Loaded -= TextBox_Loaded;
+        }
+
         _resultsDataGrid = e.NameScope.FindFromNameScope<TreeDataGrid>("PART_TreeDataGrid");
         _textBoxSearch = e.NameScope.FindFromNameScope<TextBox>("PART_TextBoxSearch");
         _textBoxSearch.KeyDown += TextBoxSearch_OnKeyDown;
@@ -62,20 +69,28 @@ public sealed class FullSearchPanelControl : TemplatedControl
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
-        if (_textBoxSearch is not null)
-        {
-            _textBoxSearch.Loaded += TextBox_Loaded;
-        }
+        _topLevel = TopLevel.GetTopLevel(this);
+        _topLevel?.AddHandler(KeyDownEvent, TopLevel_KeyDown, RoutingStrategies.Bubble, handledEventsToo: true);
     }
 
-    protected override void OnDetachedFromLogicalTree(LogicalTreeAttachmentEventArgs e)
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
-        base.OnDetachedFromLogicalTree(e);
-        if (_textBoxSearch is not null)
+        base.OnDetachedFromVisualTree(e);
+        _topLevel?.RemoveHandler(KeyDownEvent, TopLevel_KeyDown);
+        _topLevel = null;
+    }
+
+    private void TopLevel_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (_textBoxSearch is null || !CalyHotkeyConfiguration.DocumentSearchGesture.Matches(e))
         {
-            _textBoxSearch.KeyDown -= TextBoxSearch_OnKeyDown;
-            _textBoxSearch.Loaded -= TextBox_Loaded;
+            return;
         }
+
+        // The same gesture may also be opening the side pane: let layout make the search box
+        // visible before focusing it.
+        TextBox textBox = _textBoxSearch;
+        Dispatcher.UIThread.Post(() => FocusSearchBox(textBox), DispatcherPriority.Loaded);
     }
 
     private static void TextBox_Loaded(object? sender, RoutedEventArgs e)
@@ -85,12 +100,21 @@ public sealed class FullSearchPanelControl : TemplatedControl
             return;
         }
 
-        textBox.Loaded -= TextBox_Loaded;
+        FocusSearchBox(textBox);
+    }
 
+    /// <summary>
+    /// Focuses the search box and selects its text, so typing replaces the previous query.
+    /// </summary>
+    private static void FocusSearchBox(TextBox textBox)
+    {
         if (!textBox.Focus())
         {
             System.Diagnostics.Debug.WriteLine("Something wrong happened while setting focus on search box.");
+            return;
         }
+
+        textBox.SelectAll();
     }
 
     private void TextBoxSearch_OnKeyDown(object? sender, KeyEventArgs e)
