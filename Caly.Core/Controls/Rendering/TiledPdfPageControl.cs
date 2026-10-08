@@ -299,6 +299,10 @@ public sealed partial class TiledPdfPageControl : Control
             return;
         }
 
+        // Read on the UI thread with the picture: a cache clear between here and the render (the
+        // document's content was released, e.g. a layer toggled) then drops this picture's tiles.
+        long cacheGeneration = service.Cache.Generation;
+
         IRef<SKPicture> pictureClone;
         try
         {
@@ -316,7 +320,8 @@ public sealed partial class TiledPdfPageControl : Control
             VisibleArea.Value,
             pageDisplaySize,
             PpiScale,
-            pictureClone);
+            pictureClone,
+            cacheGeneration);
 
         ThreadPool.UnsafeQueueUserWorkItem(workItem, preferLocal: false);
     }
@@ -335,10 +340,12 @@ public sealed partial class TiledPdfPageControl : Control
         private readonly Size _pageDisplaySize;
         private readonly double _ppiScale;
         private readonly IRef<SKPicture> _picture;
+        private readonly long _cacheGeneration;
 
         public PrefetchWorkItem(TileRenderService service, int pageNumber, int tileLevel,
-            Rect visibleArea, Size pageDisplaySize, double ppiScale, IRef<SKPicture> picture)
+            Rect visibleArea, Size pageDisplaySize, double ppiScale, IRef<SKPicture> picture, long cacheGeneration)
         {
+            _cacheGeneration = cacheGeneration;
             _service = service;
             _pageNumber = pageNumber;
             _tileLevel = tileLevel;
@@ -364,7 +371,7 @@ public sealed partial class TiledPdfPageControl : Control
                 if (missing.Count > 0)
                 {
                     _service.RequestTiles(_pageNumber, _picture, _tileLevel,
-                        CollectionsMarshal.AsSpan(missing), _ppiScale, _pageDisplaySize, _visibleArea);
+                        CollectionsMarshal.AsSpan(missing), _ppiScale, _pageDisplaySize, _visibleArea, _cacheGeneration);
                 }
             }
             catch (Exception e)

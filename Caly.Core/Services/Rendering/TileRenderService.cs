@@ -71,9 +71,16 @@ public sealed class TileRenderService : IAsyncDisposable
         /// </summary>
         public double AngleCw { get; }
 
+        /// <summary>
+        /// <see cref="TileCache.Generation"/> when <see cref="Picture"/> was captured; the tile is dropped
+        /// if the cache has been cleared since.
+        /// </summary>
+        public long CacheGeneration { get; }
+
         public TileRequest(in TileKey key, IRef<SKPicture> picture, double ppiScale, in Size pageDisplaySize,
-            CancellationToken token, long requestId, double distSq, double angleCw)
+            CancellationToken token, long requestId, double distSq, double angleCw, long cacheGeneration)
         {
+            CacheGeneration = cacheGeneration;
             Key = key;
             Picture = picture;
             PpiScale = ppiScale;
@@ -329,11 +336,11 @@ public sealed class TileRenderService : IAsyncDisposable
 
                 if (image is not null)
                 {
-                    Cache.Add(request.Key, image);
+                    Cache.Add(request.Key, image, request.CacheGeneration);
                 }
                 else
                 {
-                    Cache.AddBlank(request.Key);
+                    Cache.AddBlank(request.Key, request.CacheGeneration);
                 }
 
                 if (shouldRender)
@@ -352,7 +359,7 @@ public sealed class TileRenderService : IAsyncDisposable
 
             // There is nothing to render. The SKPicture's CullRect is a narrow rect of the area
             // that contains elements to render (SKPicture is recorded with the RTree optimisation).
-            Cache.AddBlank(request.Key);
+            Cache.AddBlank(request.Key, request.CacheGeneration);
         }
     }
 
@@ -405,13 +412,18 @@ public sealed class TileRenderService : IAsyncDisposable
     /// <param name="pageDisplaySize">The page display size (in display coordinates).</param>
     /// <param name="visibleArea">Visible area in page display coordinates. Used to compute the
     /// centre from which the render priority radiates outward.</param>
+    /// <param name="cacheGeneration"><see cref="TileCache.Generation"/> read when <paramref name="picture"/>
+    /// was taken from the page; tiles are dropped if the cache has been cleared since. Defaults to the
+    /// current generation.</param>
     public void RequestTiles(int pageNumber, IRef<SKPicture> picture, int tileLevel, ReadOnlySpan<TileCoord> tiles,
-        double ppiScale, in Size pageDisplaySize, in Rect visibleArea)
+        double ppiScale, in Size pageDisplaySize, in Rect visibleArea, long? cacheGeneration = null)
     {
         if (_mainToken.IsCancellationRequested)
         {
             return;
         }
+
+        long generation = cacheGeneration ?? Cache.Generation;
 
         // Get or create per-page cancellation token
         var pageToken = GetPageCancellationToken(pageNumber);
@@ -481,7 +493,7 @@ public sealed class TileRenderService : IAsyncDisposable
                 var pictureClone = batchPicture.Clone();
 
                 var request = new TileRequest(in key, pictureClone, ppiScale, in pageDisplaySize, pageToken,
-                    requestId, distSq, angleCw);
+                    requestId, distSq, angleCw, generation);
                 if (!_requestWriter.TryWrite(request))
                 {
                     pictureClone.Dispose();

@@ -561,4 +561,52 @@ public class TileCacheTests
     }
 
     #endregion
+
+    #region Generations: tiles rendered before a Clear
+
+    [Fact]
+    public void Add_WithGenerationFromBeforeClear_IsNotCachedAndIsDisposed()
+    {
+        // A worker rendering from the old picture can finish after Clear(); keys carry no picture
+        // identity, so caching its tile would serve the old content for the new picture.
+        using var cache = new TileCache();
+        long generation = cache.Generation;
+        cache.Clear();
+        var stale = CreateTile();
+
+        cache.Add(Key(), stale, generation);
+
+        Assert.Equal(TileCacheState.Missing, cache.Lookup(Key()).State);
+        Assert.Equal(IntPtr.Zero, stale.Image.Handle);
+    }
+
+    [Fact]
+    public void AddBlank_WithGenerationFromBeforeClear_IsNotRecorded()
+    {
+        using var cache = new TileCache();
+        long generation = cache.Generation;
+        cache.Clear();
+
+        cache.AddBlank(Key(), generation);
+
+        Assert.Equal(TileCacheState.Missing, cache.Lookup(Key()).State);
+    }
+
+    [Fact]
+    public void Add_WithCurrentGeneration_IsCached()
+    {
+        using var cache = new TileCache();
+        cache.Clear();
+        var tile = CreateTile();
+
+        cache.Add(Key(), tile, cache.Generation);
+        cache.AddBlank(Key(col: 1), cache.Generation);
+
+        var result = cache.Lookup(Key());
+        Assert.Same(tile, result.Image!.Item);
+        Assert.Equal(TileCacheState.Blank, cache.Lookup(Key(col: 1)).State);
+        result.Image.Dispose();
+    }
+
+    #endregion
 }

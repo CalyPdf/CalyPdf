@@ -153,7 +153,26 @@ public sealed class TileCache : IDisposable
 
     private long _currentMemoryBytes;
 
+    private long _generation;
+
     internal long MaxMemoryBytes => _maxMemoryBytes;
+
+    /// <summary>
+    /// Incremented by <see cref="Clear"/>. Tile keys carry no picture identity, so a tile rendered
+    /// from a picture captured before a clear (the page's content may have changed since, e.g. a layer
+    /// was toggled) must not land in the cache afterwards: capture this when the picture is captured and
+    /// pass it to <see cref="Add(in TileKey, TileImage, long)"/> / <see cref="AddBlank(in TileKey, long)"/>.
+    /// </summary>
+    public long Generation
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _generation;
+            }
+        }
+    }
 
     /// <summary>
     /// Creates a new tile cache with the specified memory budget.
@@ -196,10 +215,23 @@ public sealed class TileCache : IDisposable
     /// nothing to draw. Blank tiles are exempt from the memory budget: they cost a key each, and
     /// evicting them under memory pressure would free nothing while discarding useful knowledge.
     /// </summary>
-    public void AddBlank(in TileKey key)
+    public void AddBlank(in TileKey key) => AddBlankCore(key, null);
+
+    /// <summary>
+    /// <see cref="AddBlank(in TileKey)"/>, dropped if the cache has been cleared since
+    /// <paramref name="generation"/> was read from <see cref="Generation"/>.
+    /// </summary>
+    public void AddBlank(in TileKey key, long generation) => AddBlankCore(key, generation);
+
+    private void AddBlankCore(in TileKey key, long? generation)
     {
         lock (_lock)
         {
+            if (generation.HasValue && generation.Value != _generation)
+            {
+                return;
+            }
+
             if (_entries.ContainsKey(key))
             {
                 // A real image won the race for this key; it supersedes the blank result.
@@ -232,7 +264,15 @@ public sealed class TileCache : IDisposable
     /// </summary>
     /// <param name="key">The tile key.</param>
     /// <param name="image">The TileImage to cache. The cache takes ownership.</param>
-    public void Add(in TileKey key, TileImage image)
+    public void Add(in TileKey key, TileImage image) => AddCore(key, image, null);
+
+    /// <summary>
+    /// <see cref="Add(in TileKey, TileImage)"/>, except that the tile is disposed instead of cached if
+    /// the cache has been cleared since <paramref name="generation"/> was read from <see cref="Generation"/>.
+    /// </summary>
+    public void Add(in TileKey key, TileImage image, long generation) => AddCore(key, image, generation);
+
+    private void AddCore(in TileKey key, TileImage image, long? generation)
     {
         long memorySize = image.BytesSize;
         IRef<TileImage> imageRef = RefCountable.Create(image);
@@ -240,6 +280,13 @@ public sealed class TileCache : IDisposable
 
         lock (_lock)
         {
+            if (generation.HasValue && generation.Value != _generation)
+            {
+                // Rendered from a picture captured before the last Clear.
+                imageRef.Dispose();
+                return;
+            }
+
             // A tile with pixel data supersedes any blank result previously recorded for this key.
             if (_blankKeys.TryGetValue(key.PageNumber, out var blanks) && blanks.Remove(key) && blanks.Count == 0)
             {
@@ -348,7 +395,8 @@ public sealed class TileCache : IDisposable
     }
 
     /// <summary>
-    /// Removes every tile, image and blank, for every page. The cache stays usable afterwards.
+    /// Removes every tile, image and blank, for every page, and starts a new <see cref="Generation"/>.
+    /// The cache stays usable afterwards.
     /// </summary>
     public void Clear()
     {
@@ -358,6 +406,7 @@ public sealed class TileCache : IDisposable
         {
             toDispose = new List<CacheEntry>(_entries.Values);
 
+            _generation++;
             _entries.Clear();
             _lruList.Clear();
             _pageKeys.Clear();
