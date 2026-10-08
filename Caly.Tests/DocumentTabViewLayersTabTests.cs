@@ -1,9 +1,12 @@
 ﻿using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Markup.Xaml;
+using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Caly.Core.Controls;
 using Caly.Core.Models;
 using Caly.Core.Services;
@@ -55,6 +58,70 @@ public class DocumentTabViewLayersTabTests
         }
         finally
         {
+            Application.Current.Styles.Remove(icons);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task LayersTree_RealizesACheckBoxThatTogglesTheLayer()
+    {
+        var icons = (Styles)AvaloniaXamlLoader.Load(new Uri("avares://Caly.Core/Assets/Icons.axaml"));
+        Application.Current!.Styles.Add(icons);
+        var treeTheme = new StyleInclude(new Uri("avares://Caly.Tests"))
+        {
+            Source = new Uri("avares://Avalonia.Controls.TreeDataGrid/Themes/Fluent.axaml")
+        };
+        Application.Current.Styles.Add(treeTheme);
+        try
+        {
+            var node = new PdfLayerNode("Layer", 0, null);
+            node.ApplyState(true, true);
+            var pdfService = new RenderingPdfDocumentService
+            {
+                Layers = [node],
+                LayerStates = [true]
+            };
+            await using var pageService = new PdfPageService(pdfService);
+            var document = NewLoadedDocument(pdfService, pageService);
+            var view = new DocumentTabView { DataContext = document };
+            var window = new Window { Content = view };
+            window.Show();
+
+            // The pane state and size come from the host tab strip, which this view does not have here.
+            view.PaneSize = 300;
+            view.IsPaneOpen = true;
+            await document.LayersSource;
+            Dispatcher.UIThread.RunJobs();
+
+            var tabControl = view.FindControl<TabControl>("PART_TabControlNavigation")!;
+            tabControl.SelectedIndex = (int)LeftNavBarTabIndex.Layers;
+            Dispatcher.UIThread.RunJobs();
+
+            // A TabItem's content is hosted by the TabControl's presenter, not inside the TabItem.
+            CheckBox? Find() => tabControl.GetVisualDescendants().OfType<CheckBox>()
+                .FirstOrDefault(c => AutomationProperties.GetName(c) == "Layer");
+
+            var found = await WaitUntil(() =>
+            {
+                Dispatcher.UIThread.RunJobs();
+                window.UpdateLayout();
+                return Find() is not null;
+            });
+            Assert.True(found);
+
+            var checkBox = Find()!;
+            Assert.True(checkBox.IsChecked);
+
+            checkBox.IsChecked = false;
+            Assert.True(await WaitUntil(() =>
+            {
+                Dispatcher.UIThread.RunJobs();
+                return pdfService.SetLayerVisibilityCount == 1;
+            }));
+        }
+        finally
+        {
+            Application.Current.Styles.Remove(treeTheme);
             Application.Current.Styles.Remove(icons);
         }
     }
