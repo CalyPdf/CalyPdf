@@ -50,32 +50,6 @@ namespace Caly.Pdf.TextLayer
         private readonly double _ppiScale;
 
         private readonly AnnotationProvider _annotationProvider;
-        
-        /// <summary>
-        /// The replacement text (/ActualText) the next glyph receives, or <see langword="null"/> when
-        /// no replacement is in effect. It stands for the content of its whole marked-content
-        /// sequence, nested sequences included, so the first glyph takes it and it becomes empty for
-        /// the rest. See the PDF specification, 14.9.4 "Replacement text".
-        /// </summary>
-        private string? _activeActualText;
-
-        /// <summary>
-        /// The number of marked-content sequences currently open.
-        /// </summary>
-        private int _markedContentDepth;
-
-        /// <summary>
-        /// The depth of the sequence that brought <see cref="_activeActualText"/>, so that the
-        /// matching end can clear it, or 0 when no replacement is in effect.
-        /// </summary>
-        private int _actualTextDepth;
-
-        /// <summary>
-        /// The number of sequences open when the content stream being processed began. The stream
-        /// can only end sequences it opened itself, so this is the floor it cannot end past.
-        /// </summary>
-        private int _streamMarkedContentDepth;
-
 
         public TextLayerStreamProcessor(int pageNumber,
             IResourceStore resourceStore,
@@ -121,7 +95,7 @@ namespace Caly.Pdf.TextLayer
             PageNumber = pageNumberCurrent;
             CloneAllStates();
 
-            ProcessOperations(operations);
+            ProcessContentStream(operations);
 
             DrawAnnotations();
 
@@ -134,42 +108,20 @@ namespace Caly.Pdf.TextLayer
 
         protected override void ProcessOperations(IReadOnlyList<IGraphicsStateOperation> operations)
         {
-            var enclosingDepth = _markedContentDepth;
-            var enclosingActualTextDepth = _actualTextDepth;
-            var enclosingStreamDepth = _streamMarkedContentDepth;
-
-            _streamMarkedContentDepth = enclosingDepth;
-
-            try
+            if (!_token.CanBeCanceled)
             {
-                if (!_token.CanBeCanceled)
-                {
-                    base.ProcessOperations(operations);
-                    return;
-                }
-
-                for (var i = 0; i < operations.Count; ++i)
-                {
-                    if (i % 100 == 0)
-                    {
-                        _token.ThrowIfCancellationRequested();
-                    }
-
-                    operations[i].Run(this);
-                }
+                base.ProcessOperations(operations);
+                return;
             }
-            finally
-            {
-                _streamMarkedContentDepth = enclosingStreamDepth;
 
-                if (_actualTextDepth > enclosingDepth)
+            for (var i = 0; i < operations.Count; ++i)
+            {
+                if (i % 100 == 0)
                 {
-                    // The replacement text came from a sequence this stream opened, which it never
-                    // closed. Nothing outside the stream is part of that sequence.
-                    _activeActualText = null;
+                    _token.ThrowIfCancellationRequested();
                 }
 
-                _actualTextDepth = _activeActualText is null ? 0 : enclosingActualTextDepth;
+                operations[i].Run(this);
             }
         }
 
@@ -194,14 +146,13 @@ namespace Caly.Pdf.TextLayer
             in TransformationMatrix transformationMatrix,
             CharacterBoundingBox characterBoundingBox)
         {
-            if (_activeActualText is not null)
+            if (IsOptionalContentHidden)
             {
-                // The active marked-content sequence specifies replacement text (/ActualText) for
-                // extraction. It applies to the whole sequence, so assign it to the first glyph and
-                // give the remaining glyphs an empty value to avoid duplicating the replaced text.
-                unicode = _activeActualText;
-                _activeActualText = string.Empty;
+                // Hidden optional content (layer) is not drawn, so its text cannot be selected or found.
+                return;
             }
+
+            unicode = ApplyActualText(unicode);
 
             if (currentOffset > 0 && _letters.Count > 0 && Diacritics.IsInCombiningDiacriticRange(unicode))
             {
@@ -406,55 +357,6 @@ namespace Caly.Pdf.TextLayer
         public override void ClosePath()
         {
             // No op
-        }
-
-        public override void BeginMarkedContent(NameToken name, NameToken? propertyDictionaryName,
-            DictionaryToken? properties)
-        {
-            _markedContentDepth++;
-
-            if (propertyDictionaryName is not null)
-            {
-                // The properties were given by name rather than inline, so they live in the /Properties
-                // entry of the resource dictionary in scope.
-                var actual = ResourceStore.GetMarkedContentPropertiesDictionary(propertyDictionaryName);
-
-                properties = actual ?? properties;
-            }
-
-            // A marked-content sequence may provide replacement text for extraction via /ActualText
-            // (PDF spec, 14.9.4 "Replacement text"). When opted in via ParsingOptions.UseActualText,
-            // honour it so that content with no usable mapping in the font.
-            if (_actualTextDepth == 0 && ParsingOptions.UseActualText
-                && properties is not null
-                && properties.TryGet(NameToken.ActualText, PdfScanner, out IDataToken<string>? actualTextToken))
-            {
-                // Strip soft hyphens (U+00AD): in replacement text these are conditional hyphens
-                // marking potential line-break points and are meant to be invisible when not broken.
-                // Keeping them would inject invisible characters mid-word and corrupt extracted text.
-                _activeActualText = actualTextToken.Data.Replace("\u00ad", string.Empty);
-                _actualTextDepth = _markedContentDepth;
-            }
-        }
-
-        public override void EndMarkedContent()
-        {
-            if (_markedContentDepth <= _streamMarkedContentDepth)
-            {
-                // An end with no beginning in this content stream. Sequences are balanced within a
-                // stream (14.6), so this cannot be ending one an enclosing stream opened, and taking
-                // it for that would drop the enclosing sequence's replacement text for everything
-                // drawn after this stream returns.
-                return;
-            }
-
-            if (_markedContentDepth == _actualTextDepth)
-            {
-                _activeActualText = null;
-                _actualTextDepth = 0;
-            }
-
-            _markedContentDepth--;
         }
 
         public override void ModifyClippingIntersect(FillingRule clippingRule)

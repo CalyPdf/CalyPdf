@@ -58,6 +58,11 @@ namespace Caly.Pdf.TextLayer
         {
             foreach (Annotation annotation in _annotations.Value)
             {
+                if (!IsOptionalContentVisible(annotation.AnnotationDictionary))
+                {
+                    continue;
+                }
+
                 PdfRectangle rect = annotation.Rectangle;
 
                 if (rect.Width > 0 && rect.Height > 0)

@@ -161,7 +161,8 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
                         SkipMissingFonts = true,
                         UseActualText = true,
                         FilterProvider = SkiaRenderingFilterProvider.Instance,
-                        IccProfileService = UnicolourIccProfileService.Instance
+                        IccProfileService = UnicolourIccProfileService.Instance,
+                        SkipHiddenOptionalContent = true
                     };
 
                     if (_settingsService.GetSettings().ShowPdfLogs)

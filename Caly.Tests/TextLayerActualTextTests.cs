@@ -169,14 +169,14 @@ public class TextLayerActualTextTests
     }
 
     /// <summary>
-    /// The form leaves its sequence open, so without a boundary its replacement text would stay in
-    /// effect afterwards and the rest of the page would be extracted as the empty value the
+    /// The form leaves its sequence open. Form XObjects are not balanced separately (as in PDFBox), so
+    /// its replacement text stays in effect and the rest of the page is extracted as the empty value the
     /// sequence gives every glyph after its first.
     /// </summary>
     [Fact]
-    public void AnUnclosedSequenceInAFormDoesNotCoverTheRestOfThePage()
+    public void AnUnclosedSequenceInAFormCoversTheRestOfThePage()
     {
-        Assert.Equal("XYB", ExtractWithForm(
+        Assert.Equal("XY", ExtractWithForm(
             pageContent: "q\n/Fm1 Do\nQ\nBT\n/F1 12 Tf\n10 20 Td\n(B) Tj\nET\n",
             formContent: "BT\n/F1 12 Tf\n10 50 Td\n/Span <</ActualText (XY)>> BDC\n(A) Tj\nET\n"));
     }
@@ -196,14 +196,13 @@ public class TextLayerActualTextTests
     }
 
     /// <summary>
-    /// The form ends a sequence it never began. That cannot be the page's sequence ending, since
-    /// the page's own end is still to come, so the form's stray end is ignored and the page's
-    /// replacement text goes on covering what follows.
+    /// The form ends a sequence it never began: it ends the page's sequence, so what follows in the
+    /// page is extracted as its own text, and the page's own end is then ignored.
     /// </summary>
     [Fact]
-    public void AStrayEndInAFormDoesNotEndTheEnclosingSequence()
+    public void AStrayEndInAFormEndsTheEnclosingSequence()
     {
-        Assert.Equal("XY", ExtractWithForm(
+        Assert.Equal("XYB", ExtractWithForm(
             pageContent: "/Span <</ActualText (XY)>> BDC\nq\n/Fm1 Do\nQ\n"
                          + "BT\n/F1 12 Tf\n10 20 Td\n(B) Tj\nET\nEMC\n",
             formContent: "BT\n/F1 12 Tf\n10 50 Td\n(A) Tj\nET\nEMC\n"));
