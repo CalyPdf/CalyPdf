@@ -166,6 +166,43 @@ internal sealed class CountingTextSearchService : ITextSearchService
     }
 }
 
+/// <summary>
+/// A search service whose index builds block on <see cref="Gate"/>, honouring their token - the stand-in
+/// for a slow index build.
+/// </summary>
+internal sealed class GatedTextSearchService : ITextSearchService
+{
+    private int _builds;
+    private int _cancelledBuilds;
+
+    public TaskCompletionSource Gate { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public int Builds => Volatile.Read(ref _builds);
+
+    /// <summary>How many builds ended by observing their token's cancellation.</summary>
+    public int CancelledBuilds => Volatile.Read(ref _cancelledBuilds);
+
+    public async Task BuildPdfDocumentIndex(IProgress<int> progress, CancellationToken token)
+    {
+        Interlocked.Increment(ref _builds);
+        try
+        {
+            await Gate.Task.WaitAsync(token);
+        }
+        catch (OperationCanceledException)
+        {
+            Interlocked.Increment(ref _cancelledBuilds);
+            throw;
+        }
+    }
+
+    public IEnumerable<TextSearchResult> Search(string text, IReadOnlyCollection<int> pagesToSkip, CancellationToken token) => [];
+
+    public void Dispose()
+    {
+    }
+}
+
 internal static class DocumentTestHarness
 {
     /// <summary>

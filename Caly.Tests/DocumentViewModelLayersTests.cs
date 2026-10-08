@@ -178,4 +178,34 @@ public class DocumentViewModelLayersTests
 
         Assert.True(await WaitUntil(() => search.Builds == 2), "the index to be rebuilt after the toggle");
     }
+
+    private static async Task<bool> CompletesWithin(Task task, int milliseconds = 4000)
+        => await Task.WhenAny(task, Task.Delay(milliseconds)) == task;
+
+    [AvaloniaFact]
+    public async Task SecondToggle_DoesNotWaitForTheFirstTogglesIndexRebuild()
+    {
+        var pdfService = new RenderingPdfDocumentService();
+        await using var pageService = new PdfPageService(pdfService);
+        var search = new GatedTextSearchService();
+        var document = NewLoadedDocument(pdfService, pageService, textSearchService: search);
+        var node = OneLayer(pdfService);
+        await document.LayersSource;
+
+        document.TextSearch = "layer";
+        Assert.True(await WaitUntil(() => search.Builds == 1), "the index to be built for the search");
+
+        Assert.True(await CompletesWithin(document.SetLayerVisibilityAsync(node, true)),
+            "the first toggle to complete while its index rebuild is still running");
+        Assert.True(await WaitUntil(() => search.Builds == 2), "the index to be rebuilt after the first toggle");
+
+        Assert.True(await CompletesWithin(document.SetLayerVisibilityAsync(node, false)),
+            "the second toggle to complete without the first toggle's rebuild finishing");
+        Assert.True(await WaitUntil(() => search.CancelledBuilds == 2),
+            "the first toggle's rebuild to be cancelled (as was the original build)");
+        Assert.True(await WaitUntil(() => search.Builds == 3), "the index to be rebuilt after the second toggle");
+        Assert.False(node.IsOn);
+
+        search.Gate.SetResult();
+    }
 }

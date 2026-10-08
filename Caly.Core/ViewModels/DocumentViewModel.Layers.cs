@@ -108,8 +108,11 @@ public partial class DocumentViewModel
             {
                 await previousIndex.ConfigureAwait(false);
             }
-            catch (OperationCanceledException)
-            { /* Cancelled on purpose */ }
+            catch
+            {
+                /* Cancelled on purpose; a failure is reported by the search awaiting the build, and
+                   must not stop the layer change */
+            }
 
             if (node.GroupIndex is not int groupIndex)
             {
@@ -134,6 +137,11 @@ public partial class DocumentViewModel
                 // The selection refers to words that may no longer exist.
                 TextSelection?.ResetSelection();
 
+                // Again, now that the state has changed: a search started since the click began a
+                // build that may have indexed text layers of the old state. Not awaited: cancelled,
+                // it can only drop its results (text-layer caching is guarded by the content version).
+                _ = ResetSearchIndex();
+
                 // Sequenced with tab (de)activation, which also releases and restores content.
                 reload = _activityTransition = QueueActivityTransition(ReloadContent);
             });
@@ -155,9 +163,15 @@ public partial class DocumentViewModel
         // No-op for an inactive document: it is restored when activated.
         await RestoreContent().ConfigureAwait(false);
 
-        if (!string.IsNullOrEmpty(TextSearch))
+        // Started, not awaited: the search only ends once the whole index is rebuilt, and the next layer
+        // change or tab (de)activation must not wait for that. The next change's ResetSearchIndex, and
+        // the search it starts, cancel this one.
+        Dispatcher.UIThread.Post(() =>
         {
-            await Dispatcher.UIThread.InvokeAsync(() => SearchTextCommand.ExecuteAsync(null));
-        }
+            if (!string.IsNullOrEmpty(TextSearch))
+            {
+                SearchTextCommand.Execute(null);
+            }
+        });
     }
 }
