@@ -508,7 +508,7 @@ public sealed partial class DocumentViewModel : ViewModelBase
                 break;
         }
 
-        // The Bookmarks and Embedded Files tabs are hidden when empty, so only switch to them once
+        // The Bookmarks, Embedded Files and Layers tabs are hidden when empty, so only switch to them once
         // their content is known to exist. Many PDFs set /UseOutlines without any outline.
         SelectedTabIndex = (int)LeftNavBarTabIndex.Thumbnails;
         switch (preferences.PageMode)
@@ -521,6 +521,10 @@ public sealed partial class DocumentViewModel : ViewModelBase
             case PdfPageMode.UseAttachments:
                 _ = SelectTabIfNotEmpty(LeftNavBarTabIndex.EmbeddedFiles,
                     async () => (await EmbeddedFiles).Count > 0);
+                break;
+            case PdfPageMode.UseOC:
+                _ = SelectTabIfNotEmpty(LeftNavBarTabIndex.Layers,
+                    async () => await LayersSource is not null);
                 break;
         }
     }

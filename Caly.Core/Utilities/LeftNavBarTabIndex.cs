@@ -13,6 +13,7 @@
         Bookmarks = 1,
         Search = 2,
         DocumentProperties = 3,
-        EmbeddedFiles = 4
+        EmbeddedFiles = 4,
+        Layers = 5
     }
 }

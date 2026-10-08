@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:Caly.Core.ViewModels"
              xmlns:controls="clr-namespace:Caly.Core.Controls"
+             xmlns:models="clr-namespace:Caly.Core.Models"
              xmlns:tabalonia="clr-namespace:Tabalonia.Controls;assembly=Tabalonia"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="Caly.Core.Controls.DocumentTabView"
@@ -431,6 +432,51 @@
                                         </DataTemplate>
                                     </ListBox.ItemTemplate>
                                 </ListBox>
+                            </TabItem>
+
+                            <!-- Layers tab -->
+                            <TabItem MinHeight="40"
+                                     Focusable="False"
+                                     IsVisible="{Binding LayersSource^, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                     IsEnabled="{Binding LayersSource^, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                <TabItem.Header>
+                                    <PathIcon Width="17"
+                                              Height="17"
+                                              Data="{StaticResource layer_regular}">
+                                        <ToolTip.Tip>Layers</ToolTip.Tip>
+                                    </PathIcon>
+                                </TabItem.Header>
+
+                                <TreeDataGrid Source="{Binding LayersSource^}"
+                                              ShowColumnHeaders="False"
+                                              CanUserSortColumns="False"
+                                              HorizontalAlignment="Stretch"
+                                              AutoScrollHorizontally="False">
+                                    <TreeDataGrid.Resources>
+                                        <DataTemplate x:Key="PdfLayerCellTemplate" x:DataType="models:PdfLayerNode">
+                                            <StackPanel Orientation="Horizontal"
+                                                        Spacing="6"
+                                                        Classes.dimmed="{Binding !IsParentOn}">
+                                                <CheckBox IsVisible="{Binding IsGroup}"
+                                                          IsChecked="{Binding IsOn}"
+                                                          AutomationProperties.Name="{Binding Name}"
+                                                          MinWidth="0"
+                                                          Padding="0"
+                                                          VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding Name}"
+                                                           VerticalAlignment="Center"
+                                                           TextWrapping="WrapWithOverflow"
+                                                           MaxWidth="400"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </TreeDataGrid.Resources>
+                                    <TreeDataGrid.Styles>
+                                        <!-- A layer under an OFF layer cannot show: dim its name. -->
+                                        <Style Selector="StackPanel.dimmed > TextBlock">
+                                            <Setter Property="Opacity" Value="0.5"/>
+                                        </Style>
+                                    </TreeDataGrid.Styles>
+                                </TreeDataGrid>
                             </TabItem>
 
 						</TabControl>
