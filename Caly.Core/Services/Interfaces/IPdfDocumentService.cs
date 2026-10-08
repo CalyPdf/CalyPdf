@@ -99,6 +99,20 @@ public interface IPdfDocumentService : IAsyncDisposable
 
     Task<IReadOnlyList<PdfBookmarkNode>?> GetPdfBookmark(CancellationToken token);
 
+    /// <summary>
+    /// The document's layer tree in its current state, or <see langword="null"/> when it has no layers.
+    /// </summary>
+    Task<IReadOnlyList<PdfLayerNode>?> GetLayersAsync(CancellationToken token)
+        => Task.FromResult<IReadOnlyList<PdfLayerNode>?>(null);
+
+    /// <summary>
+    /// Turns a layer on or off for the pages processed afterwards. Returns every layer's state after the
+    /// change, indexed like <see cref="PdfLayerNode.GroupIndex"/> (turning on a layer of a radio-button
+    /// group turns its siblings off), or <see langword="null"/> when nothing could be changed.
+    /// </summary>
+    Task<IReadOnlyList<bool>?> SetLayerVisibilityAsync(int groupIndex, bool isOn, CancellationToken token)
+        => Task.FromResult<IReadOnlyList<bool>?>(null);
+
     Task<IReadOnlyList<PdfEmbeddedFileViewModel>?> GetEmbeddedFileAsync(CancellationToken token);
 
     Task<PdfPageSize?> GetPageSizeAsync(int pageNumber, CancellationToken token);
