@@ -69,7 +69,8 @@ public partial class DocumentViewModel
     {
         lock (_searchIndexLock)
         {
-            if (_searchIndexTask is null)
+            // A failed or cancelled build is not reused: it would leave the index partly filled.
+            if (_searchIndexTask is null || _searchIndexTask.IsFaulted || _searchIndexTask.IsCanceled)
             {
                 _searchIndexCts = CancellationTokenSource.CreateLinkedTokenSource(_mainToken);
                 _searchIndexTask = BuildSearchIndex(_searchIndexCts.Token);
@@ -108,6 +109,13 @@ public partial class DocumentViewModel
         token.ThrowIfCancellationRequested();
         var progress = new Progress<int>(done =>
         {
+            // Reports are posted, so one can land after ResetSearchIndex (which cancels the token on
+            // this same thread) has set the progress back to 0.
+            if (token.IsCancellationRequested)
+            {
+                return;
+            }
+
             BuildIndexProgress = (int)Math.Ceiling((done / (double)PageCount) * 100);
         });
 

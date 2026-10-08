@@ -2,6 +2,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using Caly.Core.Models;
 using Caly.Core.Services;
+using Caly.Core.ViewModels;
 using Caly.Tests.Fakes;
 using static Caly.Tests.Fakes.DocumentTestHarness;
 
@@ -207,5 +208,103 @@ public class DocumentViewModelLayersTests
         Assert.False(node.IsOn);
 
         search.Gate.SetResult();
+    }
+
+    private static bool SearchEnded(DocumentViewModel document)
+        => document.Exception is not null || document.SearchStatus == "No Result Found";
+
+    [AvaloniaFact]
+    public async Task SetInactive_WhileTheIndexIsBuilding_DoesNotBreakTheSearch()
+    {
+        // Deactivation does not stop the index build, so text layers it requested are still in
+        // flight across the deactivation's release of the page content.
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pdfService = new RenderingPdfDocumentService { TextLayerGate = gate };
+        await using var pageService = new PdfPageService(pdfService);
+        using var search = new RecordingTextSearchService(new SearchValuesTextSearchService(pageService));
+        var document = NewLoadedDocument(pdfService, pageService, textSearchService: search);
+
+        document.TextSearch = "layer";
+        Assert.True(await WaitUntil(() => pdfService.TextLayerRequests == 2),
+            "both pages' text layers to be requested for the index");
+
+        document.SetInactive();
+        await Settle();
+
+        gate.SetResult();
+        Assert.True(await WaitUntil(() => SearchEnded(document)), "the search to end");
+        Assert.Null(document.Exception);
+
+        // The next search runs over a complete index: the first build's, or a new one if that one
+        // did not complete - never a build that stopped part-way.
+        document.TextSearch = "other";
+        Assert.True(await WaitUntil(() => search.SuccessfulBuilds == 1), "an index build to complete");
+        Assert.True(await WaitUntil(() => SearchEnded(document)), "the next search to end");
+        Assert.Null(document.Exception);
+    }
+
+    [AvaloniaFact]
+    public async Task Search_AfterAFailedIndexBuild_StartsANewBuild()
+    {
+        var pdfService = new RenderingPdfDocumentService();
+        await using var pageService = new PdfPageService(pdfService);
+        var search = new FailingOnceTextSearchService();
+        var document = NewLoadedDocument(pdfService, pageService, textSearchService: search);
+
+        document.TextSearch = "layer";
+        Assert.True(await WaitUntil(() => document.Exception is not null), "the failed build to be reported");
+        document.Exception = null;
+
+        document.TextSearch = "other";
+        Assert.True(await WaitUntil(() => search.Builds == 2), "a new build, not the failed one reused");
+        Assert.True(await WaitUntil(() => SearchEnded(document)), "the search to end");
+        Assert.Null(document.Exception);
+    }
+
+    [AvaloniaFact]
+    public async Task Toggle_CancellingAnIndexBuild_LeavesNoStaleProgress()
+    {
+        var pdfService = new RenderingPdfDocumentService();
+        await using var pageService = new PdfPageService(pdfService);
+        var search = new GatedTextSearchService();
+        var document = NewLoadedDocument(pdfService, pageService, textSearchService: search);
+        var node = OneLayer(pdfService);
+        await document.LayersSource;
+
+        Task toggle = document.SetLayerVisibilityAsync(node, true);
+
+        // A build started after the click, before the reload: the reload cancels it, and it reports
+        // progress after that. An empty query still starts the build, and nothing re-runs it.
+        document.SearchTextCommand.Execute(null);
+        Assert.True(search.Reported.Task.Wait(4000), "the build to start");
+
+        await toggle;
+        Assert.True(await WaitUntil(() => search.CancelledBuilds == 1), "the build to be cancelled");
+        await Settle();
+
+        Assert.Equal(0, document.BuildIndexProgress);
+        Assert.False(document.BuildingIndex);
+
+        search.Gate.SetResult();
+    }
+
+    [AvaloniaFact]
+    public async Task Toggle_ClearsTheSearchResultsImmediately()
+    {
+        var pdfService = new RenderingPdfDocumentService();
+        await using var pageService = new PdfPageService(pdfService);
+        var document = NewLoadedDocument(pdfService, pageService);
+        var node = OneLayer(pdfService);
+        await document.LayersSource;
+
+        var result = new TextSearchResult { ItemType = SearchResultItemType.Word, PageNumber = 1 };
+        document.SearchResults.AddSorted(result);
+        document.SelectedTextSearchResult = result;
+
+        Task toggle = document.SetLayerVisibilityAsync(node, true);
+
+        Assert.Empty(document.SearchResults);
+        Assert.Null(document.SelectedTextSearchResult);
+        await toggle;
     }
 }

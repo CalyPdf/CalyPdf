@@ -341,8 +341,10 @@ namespace Caly.Core.Services
 
                         if (!TryCacheCurrent(_cachePictures, pageNumber, picture, version))
                         {
-                            picture.Dispose();
-                            throw new OperationCanceledException("The page was rendered from an out-of-date state.");
+                            // Rendered from a state invalidated since: not cached, but still handed to
+                            // the caller, which owns it and checks the version before showing it.
+                            // Throwing instead would fault a caller that is not watching the version.
+                            return picture;
                         }
                     }
                 }
@@ -374,10 +376,11 @@ namespace Caly.Core.Services
 
                 if (textLayer is not null)
                 {
-                    if (!TryCacheCurrent(_cacheTextLayers, pageNumber, textLayer, version))
-                    {
-                        throw new OperationCanceledException("The text layer was built from an out-of-date state.");
-                    }
+                    // Built from a state invalidated since: not cached, but still returned. Page
+                    // assignment checks the version itself; throwing instead would fault a search index
+                    // build that is still running across the change (Parallel.ForAsync treats an
+                    // exception it did not cancel as a failure).
+                    TryCacheCurrent(_cacheTextLayers, pageNumber, textLayer, version);
                 }
             }
 

@@ -89,6 +89,11 @@ public partial class DocumentViewModel
 
         // Stop the index build first, so it does not keep caching text layers of the old state.
         Task previousIndex = ResetSearchIndex();
+
+        // Results found before the change may point at text that no longer shows; the search is run
+        // again once the content is reloaded.
+        SelectedTextSearchResult = null;
+        SearchResults.Clear();
         _layerChange = ChangeLayer(_layerChange, previousIndex, node, isOn);
         return _layerChange;
     }
@@ -137,11 +142,7 @@ public partial class DocumentViewModel
                 // The selection refers to words that may no longer exist.
                 TextSelection?.ResetSelection();
 
-                // Again, now that the state has changed: a search started since the click began a
-                // build that may have indexed text layers of the old state. Not awaited: cancelled,
-                // it can only drop its results (text-layer caching is guarded by the content version).
-                _ = ResetSearchIndex();
-
+                // The search index is reset again by the reload, right after it invalidates the content.
                 // Sequenced with tab (de)activation, which also releases and restores content.
                 reload = _activityTransition = QueueActivityTransition(ReloadContent);
             });
@@ -158,7 +159,8 @@ public partial class DocumentViewModel
 
     private async Task ReloadContent()
     {
-        await ReleaseContent().ConfigureAwait(false);
+        // Also resets the search index, once the old state's content can no longer be cached.
+        await ReleaseContent(invalidate: true).ConfigureAwait(false);
 
         // No-op for an inactive document: it is restored when activated.
         await RestoreContent().ConfigureAwait(false);

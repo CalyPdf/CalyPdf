@@ -89,8 +89,28 @@ internal sealed class RenderingPdfDocumentService : IPdfDocumentService
     public Task<UglyToad.PdfPig.Rendering.Skia.PdfPageSize?> GetPageSizeAsync(int pageNumber, CancellationToken token)
         => throw new NotImplementedException();
 
-    public Task<PdfTextLayer?> GetPageTextLayerAsync(int pageNumber, CancellationToken token)
-        => Task.FromResult<PdfTextLayer?>(null);
+    /// <summary>
+    /// When set, every text layer request (counted as started) waits for it before completing,
+    /// honouring the request's token. Without it, there is no text layer.
+    /// </summary>
+    public TaskCompletionSource? TextLayerGate { get; set; }
+
+    private int _textLayerRequests;
+
+    /// <summary>How many text layer requests have started.</summary>
+    public int TextLayerRequests => Volatile.Read(ref _textLayerRequests);
+
+    public async Task<PdfTextLayer?> GetPageTextLayerAsync(int pageNumber, CancellationToken token)
+    {
+        if (TextLayerGate is not { } gate)
+        {
+            return null;
+        }
+
+        Interlocked.Increment(ref _textLayerRequests);
+        await gate.Task.WaitAsync(token);
+        return new PdfTextLayer([], []);
+    }
 
     public long? FileSize => throw new NotImplementedException();
     public string? LocalPath => throw new NotImplementedException();
@@ -167,6 +187,54 @@ internal sealed class CountingTextSearchService : ITextSearchService
 }
 
 /// <summary>
+/// Wraps a search service and counts how its index builds ended.
+/// </summary>
+internal sealed class RecordingTextSearchService(ITextSearchService inner) : ITextSearchService
+{
+    private int _builds;
+    private int _successfulBuilds;
+
+    public int Builds => Volatile.Read(ref _builds);
+
+    /// <summary>How many builds ran to completion (neither faulted nor cancelled).</summary>
+    public int SuccessfulBuilds => Volatile.Read(ref _successfulBuilds);
+
+    public async Task BuildPdfDocumentIndex(IProgress<int> progress, CancellationToken token)
+    {
+        Interlocked.Increment(ref _builds);
+        await inner.BuildPdfDocumentIndex(progress, token);
+        Interlocked.Increment(ref _successfulBuilds);
+    }
+
+    public IEnumerable<TextSearchResult> Search(string text, IReadOnlyCollection<int> pagesToSkip, CancellationToken token)
+        => inner.Search(text, pagesToSkip, token);
+
+    public void Dispose() => inner.Dispose();
+}
+
+/// <summary>
+/// A search service whose first index build fails, and whose later builds succeed.
+/// </summary>
+internal sealed class FailingOnceTextSearchService : ITextSearchService
+{
+    private int _builds;
+    public int Builds => Volatile.Read(ref _builds);
+
+    public Task BuildPdfDocumentIndex(IProgress<int> progress, CancellationToken token)
+    {
+        return Interlocked.Increment(ref _builds) == 1
+            ? Task.FromException(new InvalidOperationException("The first build fails."))
+            : Task.CompletedTask;
+    }
+
+    public IEnumerable<TextSearchResult> Search(string text, IReadOnlyCollection<int> pagesToSkip, CancellationToken token) => [];
+
+    public void Dispose()
+    {
+    }
+}
+
+/// <summary>
 /// A search service whose index builds block on <see cref="Gate"/>, honouring their token - the stand-in
 /// for a slow index build.
 /// </summary>
@@ -177,6 +245,9 @@ internal sealed class GatedTextSearchService : ITextSearchService
 
     public TaskCompletionSource Gate { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    /// <summary>Set once a build has reported progress (one page done), just before it waits.</summary>
+    public TaskCompletionSource Reported { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
     public int Builds => Volatile.Read(ref _builds);
 
     /// <summary>How many builds ended by observing their token's cancellation.</summary>
@@ -185,12 +256,16 @@ internal sealed class GatedTextSearchService : ITextSearchService
     public async Task BuildPdfDocumentIndex(IProgress<int> progress, CancellationToken token)
     {
         Interlocked.Increment(ref _builds);
+        progress.Report(1);
+        Reported.TrySetResult();
         try
         {
             await Gate.Task.WaitAsync(token);
         }
         catch (OperationCanceledException)
         {
+            // Like a page that finished as the cancellation came in: its report is posted after it.
+            progress.Report(1);
             Interlocked.Increment(ref _cancelledBuilds);
             throw;
         }

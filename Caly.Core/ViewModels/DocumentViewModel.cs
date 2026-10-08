@@ -742,7 +742,9 @@ public sealed partial class DocumentViewModel : ViewModelBase
             return;
         }
 
-        await ReleaseContent().ConfigureAwait(false);
+        // Not invalidated: the content has not changed, so a render or text layer still in flight
+        // (e.g. for the search index build, which deactivation does not stop) stays valid.
+        await ReleaseContent(invalidate: false).ConfigureAwait(false);
 
         GC.Collect(GC.MaxGeneration, GCCollectionMode.Optimized, false);
     }
@@ -751,7 +753,11 @@ public sealed partial class DocumentViewModel : ViewModelBase
     /// Releases everything rendered for the document: page pictures, thumbnails and text layers, and the
     /// page service's caches and in-flight requests. <see cref="RestoreContent"/> requests them again.
     /// </summary>
-    private async Task ReleaseContent()
+    /// <param name="invalidate">
+    /// Whether the content itself has changed (a layer was toggled): in-flight work is then retired as
+    /// out-of-date (<see cref="PdfPageService.InvalidateContent"/>) and the search index is reset.
+    /// </param>
+    private async Task ReleaseContent(bool invalidate)
     {
         // Capture pictures/thumbnails and clear all UI-bound page properties on the UI thread
         // in one batch, then dispose the captured resources off the UI thread.
@@ -759,9 +765,17 @@ public sealed partial class DocumentViewModel : ViewModelBase
 
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
-            // In the same job as the clear below, so a render still in flight either lands before it
-            // (and is cleared) or is dropped: after a layer change it shows the old state.
-            _pdfPageService.InvalidateContent();
+            if (invalidate)
+            {
+                // In the same job as the clear below, so a render still in flight either lands before it
+                // (and is cleared) or is dropped: after a layer change it shows the old state.
+                _pdfPageService.InvalidateContent();
+
+                // Right after the invalidation: a build started before it (e.g. by a search typed
+                // while this transition waited its turn) may have indexed text layers of the old
+                // state. Not awaited: cancelled, it can only drop its results.
+                _ = ResetSearchIndex();
+            }
 
             foreach (var page in Pages)
             {
