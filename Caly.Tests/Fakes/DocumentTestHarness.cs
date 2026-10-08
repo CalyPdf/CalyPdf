@@ -95,12 +95,51 @@ internal sealed class RenderingPdfDocumentService : IPdfDocumentService
     public Task<IReadOnlyList<PdfEmbeddedFileViewModel>?> GetEmbeddedFileAsync(CancellationToken token)
         => throw new NotImplementedException();
 
+    /// <summary>The layer tree <see cref="GetLayersAsync"/> returns.</summary>
+    public IReadOnlyList<PdfLayerNode>? Layers { get; set; }
+
+    /// <summary>Every layer's state, changed by <see cref="SetLayerVisibilityAsync"/>.</summary>
+    public bool[] LayerStates { get; set; } = [];
+
+    private int _setLayerVisibilityCount;
+    public int SetLayerVisibilityCount => Volatile.Read(ref _setLayerVisibilityCount);
+
+    public Task<IReadOnlyList<PdfLayerNode>?> GetLayersAsync(CancellationToken token) => Task.FromResult(Layers);
+
+    public Task<IReadOnlyList<bool>?> SetLayerVisibilityAsync(int groupIndex, bool isOn, CancellationToken token)
+    {
+        Interlocked.Increment(ref _setLayerVisibilityCount);
+        lock (LayerStates)
+        {
+            LayerStates[groupIndex] = isOn;
+            return Task.FromResult<IReadOnlyList<bool>?>(LayerStates.ToArray());
+        }
+    }
+
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
 
 internal sealed class NoopTextSearchService : ITextSearchService
 {
     public Task BuildPdfDocumentIndex(IProgress<int> progress, CancellationToken token) => Task.CompletedTask;
+
+    public IEnumerable<TextSearchResult> Search(string text, IReadOnlyCollection<int> pagesToSkip, CancellationToken token) => [];
+
+    public void Dispose()
+    {
+    }
+}
+
+internal sealed class CountingTextSearchService : ITextSearchService
+{
+    private int _builds;
+    public int Builds => Volatile.Read(ref _builds);
+
+    public Task BuildPdfDocumentIndex(IProgress<int> progress, CancellationToken token)
+    {
+        Interlocked.Increment(ref _builds);
+        return Task.CompletedTask;
+    }
 
     public IEnumerable<TextSearchResult> Search(string text, IReadOnlyCollection<int> pagesToSkip, CancellationToken token) => [];
 
@@ -117,9 +156,9 @@ internal static class DocumentTestHarness
     /// reading it.
     /// </summary>
     public static DocumentViewModel NewLoadedDocument(RenderingPdfDocumentService pdfService,
-        PdfPageService pageService, int pageCount = 2)
+        PdfPageService pageService, int pageCount = 2, ITextSearchService? textSearchService = null)
     {
-        var document = new DocumentViewModel(pdfService, pageService, new NoopTextSearchService());
+        var document = new DocumentViewModel(pdfService, pageService, textSearchService ?? new NoopTextSearchService());
 
         pdfService.Publish(pageCount);
         pageService.Initialise();

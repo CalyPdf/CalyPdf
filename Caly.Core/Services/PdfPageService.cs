@@ -67,6 +67,27 @@ namespace Caly.Core.Services
         /// </summary>
         private long _pictureKeepWindow;
 
+        /// <summary>
+        /// Incremented by <see cref="InvalidateContent"/>. A picture, text layer or thumbnail produced
+        /// from work started under an older value may show a document state that no longer applies (a
+        /// layer was toggled since), so it is neither cached nor handed to its page.
+        /// <para>
+        /// Cancellation alone cannot tell this apart: scrolling cancels generations too, and a render
+        /// that finishes after scrolling is still worth caching.
+        /// </para>
+        /// </summary>
+        private int _contentVersion;
+
+        /// <summary>
+        /// Retires everything rendered or being rendered: in-flight work will not cache or show its
+        /// result. Call on the UI thread in the same dispatcher job that clears the pages' content, so a
+        /// result is either handed to its page before that clear (and cleared with it) or dropped.
+        /// <see cref="CancelAndClear"/> must follow, to empty the caches.
+        /// </summary>
+        public void InvalidateContent() => Interlocked.Increment(ref _contentVersion);
+
+        private int ContentVersion => Volatile.Read(ref _contentVersion);
+
         private async Task ProcessingLoop()
         {
             Debug.ThrowOnUiThread();
@@ -252,6 +273,8 @@ namespace Caly.Core.Services
 
             token.ThrowIfCancellationRequested();
 
+            int version = ContentVersion;
+
             if (!_cachePictures.TryGetValue(pageNumber, out var picture))
             {
                 bool hasLock = false;
@@ -279,6 +302,19 @@ namespace Caly.Core.Services
                     {
                         System.Diagnostics.Debug.Assert(picture.IsAlive);
                         _cachePictures[pageNumber] = picture;
+
+                        // Checked after caching, not before: CancelAndClear evicts after the version
+                        // changes, so a picture cached before this check is either evicted by it or
+                        // taken back out here.
+                        if (ContentVersion != version)
+                        {
+                            if (_cachePictures.TryRemove(KeyValuePair.Create(pageNumber, picture)))
+                            {
+                                picture.Dispose();
+                            }
+
+                            throw new OperationCanceledException("The page was rendered from an out-of-date state.");
+                        }
                     }
                 }
                 finally
@@ -297,6 +333,8 @@ namespace Caly.Core.Services
         {
             token.ThrowIfCancellationRequested();
 
+            int version = ContentVersion;
+
             if (!_cacheTextLayers.TryGetValue(pageNumber, out var textLayer))
             {
                 var sw = ValueStopwatch.StartNew();
@@ -308,6 +346,13 @@ namespace Caly.Core.Services
                 if (textLayer is not null)
                 {
                     _cacheTextLayers[pageNumber] = textLayer;
+
+                    // As in GetPicture: checked after caching, so CancelAndClear's eviction cannot be missed.
+                    if (ContentVersion != version)
+                    {
+                        _cacheTextLayers.TryRemove(KeyValuePair.Create(pageNumber, textLayer));
+                        throw new OperationCanceledException("The text layer was built from an out-of-date state.");
+                    }
                 }
             }
 
@@ -321,6 +366,7 @@ namespace Caly.Core.Services
                 return;
             }
 
+            int version = ContentVersion;
             IRef<SKPicture>? picture = null;
             try
             {
@@ -337,16 +383,25 @@ namespace Caly.Core.Services
                 if (picture is not null)
                 {
                     var pictureToAssign = picture;
+                    bool assigned = false;
                     Dispatcher.UIThread.Invoke(() =>
                     {
-                        renderRequest.Page.PdfPicture = pictureToAssign;
+                        if (ContentVersion == version)
+                        {
+                            renderRequest.Page.PdfPicture = pictureToAssign;
+                            assigned = true;
+                        }
 
                         if (pageSize.HasValue)
                         {
                             renderRequest.Page.SetSize(pageSize.Value);
                         }
                     });
-                    picture = null;
+
+                    if (assigned)
+                    {
+                        picture = null;
+                    }
                 }
             }
             finally
@@ -361,6 +416,8 @@ namespace Caly.Core.Services
             {
                 return;
             }
+
+            int version = ContentVersion;
 
             using var picture = await GetPicture(renderRequest.Page.PageNumber, renderRequest.Token)
                 .ConfigureAwait(false);
@@ -382,12 +439,12 @@ namespace Caly.Core.Services
 
             if (picture is not null)
             {
-                await SetThumbnail(renderRequest.Page, picture.Item, renderRequest.Token)
+                await SetThumbnail(renderRequest.Page, picture.Item, version, renderRequest.Token)
                     .ConfigureAwait(false);
             }
         }
 
-        private async Task SetThumbnail(PageViewModel vm, SKPicture picture, CancellationToken token)
+        private async Task SetThumbnail(PageViewModel vm, SKPicture picture, int version, CancellationToken token)
         {
             Debug.ThrowOnUiThread();
 
@@ -430,7 +487,17 @@ namespace Caly.Core.Services
                     surface.ReadPixels(skImageInfo, fb.Address, fb.RowBytes, 0, 0);
                 }
 
-                await Dispatcher.UIThread.InvokeAsync(() => vm.Thumbnail = thumbnail, DispatcherPriority.Background);
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (ContentVersion == version)
+                    {
+                        vm.Thumbnail = thumbnail;
+                    }
+                    else
+                    {
+                        thumbnail.Dispose();
+                    }
+                }, DispatcherPriority.Background);
             }
         }
 
@@ -443,12 +510,19 @@ namespace Caly.Core.Services
                 return;
             }
 
+            int version = ContentVersion;
             var textLayer = await GetTextLayer(renderRequest.Page.PageNumber, renderRequest.Token)
                 .ConfigureAwait(false);
 
             if (textLayer is not null)
             {
-                await Dispatcher.UIThread.InvokeAsync(() => renderRequest.Page.PdfTextLayer = textLayer);
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (ContentVersion == version)
+                    {
+                        renderRequest.Page.PdfTextLayer = textLayer;
+                    }
+                });
             }
         }
 
@@ -686,6 +760,8 @@ namespace Caly.Core.Services
                     return;
                 }
 
+                int version = ContentVersion;
+
                 if (!m.VisiblePages.HasValue || !m.RealisedPages.HasValue)
                 {
                     // clear all pages
@@ -799,8 +875,20 @@ namespace Caly.Core.Services
                                 var cloneToAssign = clone;
                                 try
                                 {
-                                    await Dispatcher.UIThread.InvokeAsync(() => page.PdfPicture = cloneToAssign);
-                                    clone = null;
+                                    bool assigned = false;
+                                    await Dispatcher.UIThread.InvokeAsync(() =>
+                                    {
+                                        if (ContentVersion == version)
+                                        {
+                                            page.PdfPicture = cloneToAssign;
+                                            assigned = true;
+                                        }
+                                    });
+
+                                    if (assigned)
+                                    {
+                                        clone = null;
+                                    }
                                 }
                                 finally
                                 {
@@ -823,7 +911,13 @@ namespace Caly.Core.Services
                     {
                         if (_cacheTextLayers.TryGetValue(page.PageNumber, out var textLayer))
                         {
-                            await Dispatcher.UIThread.InvokeAsync(() => page.PdfTextLayer = textLayer);
+                            await Dispatcher.UIThread.InvokeAsync(() =>
+                            {
+                                if (ContentVersion == version)
+                                {
+                                    page.PdfTextLayer = textLayer;
+                                }
+                            });
                         }
                         else
                         {

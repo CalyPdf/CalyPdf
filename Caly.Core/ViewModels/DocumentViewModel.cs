@@ -198,7 +198,7 @@ public sealed partial class DocumentViewModel : ViewModelBase
         _searchResultsDisposable = null!;
         _propertiesTask = null!;
         _bookmarksTask = null!;
-        _buildSearchIndex = null!;
+        _layersTask = null!;
         _searchResultsSource = null!;
 
         _pdfService = new PdfPigDocumentService(new JsonSettingsService(null!));
@@ -225,9 +225,8 @@ public sealed partial class DocumentViewModel : ViewModelBase
 
         _pdfService.PasswordPrompt = RequestPasswordAsync;
 
-        _buildSearchIndex = new Lazy<Task>(BuildSearchIndex);
-
         _bookmarksTask = new Lazy<Task<HierarchicalTreeDataGridSource<PdfBookmarkNode>?>>(GetBookmarks);
+        _layersTask = new Lazy<Task<HierarchicalTreeDataGridSource<PdfLayerNode>?>>(GetLayers);
         _propertiesTask = new Lazy<Task<DocumentPropertiesViewModel?>>(GetProperties);
         _embeddedFilesTask = new Lazy<Task<IReadOnlyList<PdfEmbeddedFileViewModel>>>(GetEmbeddedFiles);
 
@@ -739,12 +738,27 @@ public sealed partial class DocumentViewModel : ViewModelBase
             return;
         }
 
+        await ReleaseContent().ConfigureAwait(false);
+
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Optimized, false);
+    }
+
+    /// <summary>
+    /// Releases everything rendered for the document: page pictures, thumbnails and text layers, and the
+    /// page service's caches and in-flight requests. <see cref="RestoreContent"/> requests them again.
+    /// </summary>
+    private async Task ReleaseContent()
+    {
         // Capture pictures/thumbnails and clear all UI-bound page properties on the UI thread
         // in one batch, then dispose the captured resources off the UI thread.
         var toDispose = new List<IDisposable?>();
 
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
+            // In the same job as the clear below, so a render still in flight either lands before it
+            // (and is cleared) or is dropped: after a layer change it shows the old state.
+            _pdfPageService.InvalidateContent();
+
             foreach (var page in Pages)
             {
                 toDispose.Add(page.PdfPicture);
@@ -761,7 +775,5 @@ public sealed partial class DocumentViewModel : ViewModelBase
         }
 
         await _pdfPageService.CancelAndClear().ConfigureAwait(false);
-
-        GC.Collect(GC.MaxGeneration, GCCollectionMode.Optimized, false);
     }
 }

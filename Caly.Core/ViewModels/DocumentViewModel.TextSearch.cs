@@ -34,7 +34,9 @@ namespace Caly.Core.ViewModels;
 
 public partial class DocumentViewModel
 {
-    private readonly Lazy<Task> _buildSearchIndex;
+    private readonly object _searchIndexLock = new();
+    private Task? _searchIndexTask;
+    private CancellationTokenSource? _searchIndexCts;
     private Task? _pendingSearchTask;
     private CancellationTokenSource? _pendingSearchTaskCts;
 
@@ -60,15 +62,56 @@ public partial class DocumentViewModel
     {
         SearchTextCommand.Execute(null);
     }
-    private async Task BuildSearchIndex()
+    /// <summary>
+    /// The current search index build, started on first use.
+    /// </summary>
+    private Task GetOrStartSearchIndex()
     {
-        _mainToken.ThrowIfCancellationRequested();
+        lock (_searchIndexLock)
+        {
+            if (_searchIndexTask is null)
+            {
+                _searchIndexCts = CancellationTokenSource.CreateLinkedTokenSource(_mainToken);
+                _searchIndexTask = BuildSearchIndex(_searchIndexCts.Token);
+            }
+
+            return _searchIndexTask;
+        }
+    }
+
+    /// <summary>
+    /// Cancels the search index build and forgets the index, so the next search builds it again from the
+    /// current text layers. Returns the cancelled build, to await before relying on it having stopped.
+    /// </summary>
+    private Task ResetSearchIndex()
+    {
+        Debug.ThrowNotOnUiThread();
+
+        Task previous;
+        lock (_searchIndexLock)
+        {
+            previous = _searchIndexTask ?? Task.CompletedTask;
+
+            // Not disposed: the build may still be reading its token. Released with _mainCts, like the
+            // search sources (see SearchText).
+            _searchIndexCts?.Cancel();
+            _searchIndexCts = null;
+            _searchIndexTask = null;
+        }
+
+        BuildIndexProgress = 0;
+        return previous;
+    }
+
+    private async Task BuildSearchIndex(CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
         var progress = new Progress<int>(done =>
         {
             BuildIndexProgress = (int)Math.Ceiling((done / (double)PageCount) * 100);
         });
 
-        await Task.Run(() => _textSearchService.BuildPdfDocumentIndex(progress, _mainToken), _mainToken)
+        await Task.Run(() => _textSearchService.BuildPdfDocumentIndex(progress, token), token)
             .ConfigureAwait(false);
 
         SetSearchStatusFinal();
@@ -158,7 +201,7 @@ public partial class DocumentViewModel
             SelectedTextSearchResult = null;
             SearchResults.Clear();
 
-            Task indexBuildTask = _buildSearchIndex.Value;
+            Task indexBuildTask = GetOrStartSearchIndex();
 
             if (string.IsNullOrEmpty(TextSearch))
             {
