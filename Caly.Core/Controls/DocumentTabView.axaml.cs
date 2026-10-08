@@ -22,6 +22,7 @@ using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.VisualTree;
+using Caly.Core.Models;
 using Caly.Core.Utilities;
 using Caly.Core.ViewModels;
 using CommunityToolkit.Mvvm.Input;
@@ -210,6 +211,26 @@ public sealed partial class DocumentTabView : UserControl
 
         // Try send back focus to the PageItemsControl
         this.FindDescendantOfType<PageItemsControl>()?.Focus();
+    }
+
+    /// <summary>
+    /// Space toggles the layer of the focused row. Keyboard navigation in the tree focuses its cells, not
+    /// the layer's check box; a focused check box handles Space itself (and marks it handled).
+    /// </summary>
+    private void LayersTreeDataGrid_OnKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Handled || e.Key != Key.Space || e.KeyModifiers != KeyModifiers.None)
+        {
+            return;
+        }
+
+        if (e.Source is CheckBox || e.Source is not StyledElement { DataContext: PdfLayerNode { IsGroup: true } node })
+        {
+            return;
+        }
+
+        node.IsOn = !node.IsOn;
+        e.Handled = true;
     }
 
     private void OnSizeChanged(object? sender, SizeChangedEventArgs e)

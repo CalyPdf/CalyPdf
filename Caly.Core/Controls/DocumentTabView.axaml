@@ -448,6 +448,7 @@
                                 </TabItem.Header>
 
                                 <TreeDataGrid Source="{Binding LayersSource^}"
+                                              KeyDown="LayersTreeDataGrid_OnKeyDown"
                                               ShowColumnHeaders="False"
                                               CanUserSortColumns="False"
                                               HorizontalAlignment="Stretch"
