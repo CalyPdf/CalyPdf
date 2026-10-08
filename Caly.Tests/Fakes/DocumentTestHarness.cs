@@ -46,11 +46,27 @@ internal sealed class RenderingPdfDocumentService : IPdfDocumentService
     /// </summary>
     public TaskCompletionSource? RenderGate { get; set; }
 
+    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<SKPicture, bool[]> _renderedUnder = new();
+
+    /// <summary>
+    /// The <see cref="LayerStates"/> <paramref name="picture"/> was rendered under (snapshot taken when
+    /// its render started), or <c>null</c> for no picture.
+    /// </summary>
+    public bool[]? RenderedUnder(IRef<SKPicture>? picture)
+        => picture is not null && _renderedUnder.TryGetValue(picture.Item, out var states) ? states : null;
+
     public async Task<IRef<SKPicture>?> GetRenderPageAsync(int pageNumber, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         Interlocked.Increment(ref _renderCount);
         _renderCounts.AddOrUpdate(pageNumber, 1, static (_, count) => count + 1);
+
+        bool[] layerStates = LayerStates;
+        bool[] renderedUnder;
+        lock (layerStates)
+        {
+            renderedUnder = layerStates.ToArray();
+        }
 
         if (RenderGate is { } gate)
         {
@@ -64,7 +80,9 @@ internal sealed class RenderingPdfDocumentService : IPdfDocumentService
             canvas.DrawRect(new SKRect(0, 0, 100, 100), paint);
         }
 
-        return RefCountable.Create(recorder.EndRecording());
+        var picture = recorder.EndRecording();
+        _renderedUnder.AddOrUpdate(picture, renderedUnder);
+        return RefCountable.Create(picture);
     }
 
     // Page sizes are set up front by the tests, so the render path never asks for one.

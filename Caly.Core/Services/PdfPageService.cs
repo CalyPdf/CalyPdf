@@ -79,12 +79,49 @@ namespace Caly.Core.Services
         private int _contentVersion;
 
         /// <summary>
-        /// Retires everything rendered or being rendered: in-flight work will not cache or show its
-        /// result. Call on the UI thread in the same dispatcher job that clears the pages' content, so a
-        /// result is either handed to its page before that clear (and cleared with it) or dropped.
-        /// <see cref="CancelAndClear"/> must follow, to empty the caches.
+        /// Makes <see cref="InvalidateContent"/>'s evict-then-bump atomic with respect to the version
+        /// check and write of <see cref="_cachePictures"/> and <see cref="_cacheTextLayers"/>, so that an
+        /// out-of-date entry is never visible in them, even briefly, once the version has changed.
+        /// Readers need not take it: having read the new version, they read caches already emptied.
         /// </summary>
-        public void InvalidateContent() => Interlocked.Increment(ref _contentVersion);
+        private readonly Lock _contentLock = new();
+
+        /// <summary>
+        /// Retires everything rendered or being rendered: the picture and text-layer caches and the tiles
+        /// are emptied now, and in-flight work will not cache or show its result. Call on the UI thread in
+        /// the same dispatcher job that clears the pages' content, so a result is either handed to its page
+        /// before that clear (and cleared with it) or dropped.
+        /// </summary>
+        public void InvalidateContent()
+        {
+            lock (_contentLock)
+            {
+                // Evict before bumping: work that reads the new version must find the caches empty.
+                EvictPicturesOutside(0, 0);
+                EvictTextLayersOutside(0, 0);
+                Interlocked.Increment(ref _contentVersion);
+            }
+
+            TileRenderService.Clear();
+        }
+
+        /// <summary>
+        /// Caches <paramref name="value"/> unless the content has been invalidated since
+        /// <paramref name="version"/> was read.
+        /// </summary>
+        private bool TryCacheCurrent<T>(ConcurrentDictionary<int, T> cache, int pageNumber, T value, int version)
+        {
+            lock (_contentLock)
+            {
+                if (ContentVersion != version)
+                {
+                    return false;
+                }
+
+                cache[pageNumber] = value;
+                return true;
+            }
+        }
 
         private int ContentVersion => Volatile.Read(ref _contentVersion);
 
@@ -301,18 +338,10 @@ namespace Caly.Core.Services
                     if (picture is not null)
                     {
                         System.Diagnostics.Debug.Assert(picture.IsAlive);
-                        _cachePictures[pageNumber] = picture;
 
-                        // Checked after caching, not before: CancelAndClear evicts after the version
-                        // changes, so a picture cached before this check is either evicted by it or
-                        // taken back out here.
-                        if (ContentVersion != version)
+                        if (!TryCacheCurrent(_cachePictures, pageNumber, picture, version))
                         {
-                            if (_cachePictures.TryRemove(KeyValuePair.Create(pageNumber, picture)))
-                            {
-                                picture.Dispose();
-                            }
-
+                            picture.Dispose();
                             throw new OperationCanceledException("The page was rendered from an out-of-date state.");
                         }
                     }
@@ -345,12 +374,8 @@ namespace Caly.Core.Services
 
                 if (textLayer is not null)
                 {
-                    _cacheTextLayers[pageNumber] = textLayer;
-
-                    // As in GetPicture: checked after caching, so CancelAndClear's eviction cannot be missed.
-                    if (ContentVersion != version)
+                    if (!TryCacheCurrent(_cacheTextLayers, pageNumber, textLayer, version))
                     {
-                        _cacheTextLayers.TryRemove(KeyValuePair.Create(pageNumber, textLayer));
                         throw new OperationCanceledException("The text layer was built from an out-of-date state.");
                     }
                 }
