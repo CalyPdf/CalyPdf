@@ -58,7 +58,8 @@ namespace Caly.Pdf.TextLayer
         {
             foreach (Annotation annotation in _annotations.Value)
             {
-                if (!IsOptionalContentVisible(annotation.AnnotationDictionary))
+                using var optionalContentScope = EnterOptionalContent(annotation.AnnotationDictionary);
+                if (IsOptionalContentHidden)
                 {
                     continue;
                 }
