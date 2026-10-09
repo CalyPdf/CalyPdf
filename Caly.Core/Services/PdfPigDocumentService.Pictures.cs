@@ -88,58 +88,75 @@ internal sealed partial class PdfPigDocumentService
 
     private async Task<SKPicture?> GetLayeredPictureAsync(PdfDocument document, OptionalContentState state, int pageNumber, CancellationToken guardCt)
     {
-        var layered = _layeredPages.Get(pageNumber);
-        if (layered is null)
+        // A page evicted while it is composed is processed again, once.
+        for (int attempt = 0; attempt < 2; attempt++)
         {
-            var (produced, fallback) = await ExecuteWithLockAsync(lockCt =>
+            var layered = _layeredPages.Get(pageNumber);
+            if (layered is null)
             {
-                try
+                var (produced, fallback) = await ExecuteWithLockAsync(lockCt =>
                 {
-                    using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(lockCt);
-                    linkedCts.CancelAfter(PageTimeOut);
-                    var page = document.GetPageAsSkiaLayeredPage(pageNumber, linkedCts.Token);
-                    Interlocked.Increment(ref LayeredPagesProcessed);
-                    return ((SkiaLayeredPage?)page, (SKPicture?)null);
-                }
-                catch (OperationCanceledException)
-                {
-                    if (!lockCt.IsCancellationRequested)
+                    // Another caller may have processed the page while this one waited for the lock.
+                    var cached = _layeredPages.Get(pageNumber);
+                    if (cached is not null)
                     {
-                        App.Messenger.Send(new ShowNotificationMessage(NotificationType.Error,
-                            $"Error in page {pageNumber}",
-                            $"Could not display page after {PageTimeOut.TotalSeconds} seconds."));
-                        return ((SkiaLayeredPage?)null, GetTimeOutPicture(document, pageNumber, lockCt));
+                        return (cached, (SKPicture?)null);
                     }
 
-                    return ((SkiaLayeredPage?)null, (SKPicture?)null);
-                }
-                catch (Exception e)
-                {
-                    Debug.WriteExceptionToFile(e);
-                    return ((SkiaLayeredPage?)null, GetErrorPicture(document, pageNumber, e, lockCt));
-                }
-            }, guardCt).ConfigureAwait(false);
+                    try
+                    {
+                        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(lockCt);
+                        linkedCts.CancelAfter(PageTimeOut);
+                        var page = document.GetPageAsSkiaLayeredPage(pageNumber, linkedCts.Token);
+                        Interlocked.Increment(ref LayeredPagesProcessed);
+                        _layeredPages.Add(pageNumber, page);
+                        return ((SkiaLayeredPage?)page, (SKPicture?)null);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        if (!lockCt.IsCancellationRequested)
+                        {
+                            App.Messenger.Send(new ShowNotificationMessage(NotificationType.Error,
+                                $"Error in page {pageNumber}",
+                                $"Could not display page after {PageTimeOut.TotalSeconds} seconds."));
+                            return ((SkiaLayeredPage?)null, GetTimeOutPicture(document, pageNumber, lockCt));
+                        }
 
-            if (produced is null)
-            {
-                return fallback;
+                        return ((SkiaLayeredPage?)null, (SKPicture?)null);
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.WriteExceptionToFile(e);
+                        return ((SkiaLayeredPage?)null, GetErrorPicture(document, pageNumber, e, lockCt));
+                    }
+                }, guardCt).ConfigureAwait(false);
+
+                if (produced is null)
+                {
+                    return fallback;
+                }
+
+                layered = produced;
             }
 
-            layered = produced;
-            _layeredPages.Add(pageNumber, layered);
+            try
+            {
+                // Compose with the state read on entry: a toggle meanwhile bumps PdfPageService's content
+                // version, which discards this result.
+                return layered.Compose(state);
+            }
+            catch (ObjectDisposedException)
+            {
+                // Evicted while composing: loop and process it again.
+            }
+            catch (Exception e)
+            {
+                Debug.WriteExceptionToFile(e);
+                return GetErrorPicture(document, pageNumber, e, guardCt);
+            }
         }
 
-        try
-        {
-            // Compose with the state read on entry: a toggle meanwhile bumps PdfPageService's content
-            // version, which discards this result.
-            return layered.Compose(state);
-        }
-        catch (ObjectDisposedException)
-        {
-            // Evicted while composing: process it again next time.
-            return null;
-        }
+        return null;
     }
 
     private static SKPicture? GetTimeOutPicture(PdfDocument document, int pageNumber, CancellationToken token)

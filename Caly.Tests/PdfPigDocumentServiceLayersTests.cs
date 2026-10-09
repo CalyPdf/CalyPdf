@@ -144,4 +144,29 @@ public class PdfPigDocumentServiceLayersTests
             Assert.NotEqual(Pixels(before!.Item), Pixels(after!.Item));
         });
     }
+
+    [AvaloniaFact]
+    public async Task ClearLayeredPages_ForcesReprocessingButAToggleDoesNot()
+    {
+        await Task.Run(async () =>
+        {
+            await using var service = new PdfPigDocumentService(new FakeSettingsService());
+            Assert.Equal(DocumentOpeningState.Success,
+                await service.OpenDocument(File("GWG151_OptionalContent-RBGroup_X4.pdf"), null, CancellationToken.None));
+
+            var layers = (await service.GetLayersAsync(CancellationToken.None))!;
+            int viewOne = layers.Single(l => l.Name == "GWG View 1").GroupIndex!.Value;
+
+            using (await service.GetRenderPageAsync(1, CancellationToken.None)) { }
+            int processed = service.LayeredPagesProcessed;
+
+            await service.SetLayerVisibilityAsync(viewOne, true, CancellationToken.None);
+            using (await service.GetRenderPageAsync(1, CancellationToken.None)) { }
+            Assert.Equal(processed, service.LayeredPagesProcessed);
+
+            service.ClearLayeredPages();
+            using (await service.GetRenderPageAsync(1, CancellationToken.None)) { }
+            Assert.Equal(processed + 1, service.LayeredPagesProcessed);
+        });
+    }
 }

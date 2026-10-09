@@ -36,6 +36,7 @@ internal sealed class LayeredPageCache : IDisposable
 
     public void Add(int pageNumber, SkiaLayeredPage page)
     {
+        SkiaLayeredPage? replaced = null;
         SkiaLayeredPage? evicted = null;
         lock (_lock)
         {
@@ -43,7 +44,7 @@ internal sealed class LayeredPageCache : IDisposable
             {
                 _order.Remove(existing);
                 _nodes.Remove(pageNumber);
-                existing.Value.Layered.Dispose();
+                replaced = existing.Value.Layered;
             }
 
             _nodes[pageNumber] = _order.AddFirst((pageNumber, page));
@@ -57,7 +58,33 @@ internal sealed class LayeredPageCache : IDisposable
             }
         }
 
+        if (!ReferenceEquals(replaced, page))
+        {
+            replaced?.Dispose();
+        }
+
         evicted?.Dispose();
+    }
+
+    public void Clear()
+    {
+        List<SkiaLayeredPage> pages;
+        lock (_lock)
+        {
+            pages = new List<SkiaLayeredPage>(_order.Count);
+            foreach (var (_, layered) in _order)
+            {
+                pages.Add(layered);
+            }
+
+            _order.Clear();
+            _nodes.Clear();
+        }
+
+        foreach (var page in pages)
+        {
+            page.Dispose();
+        }
     }
 
     public void Dispose()

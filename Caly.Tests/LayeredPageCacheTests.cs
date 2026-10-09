@@ -43,4 +43,20 @@ public class LayeredPageCacheTests
 
         Assert.Throws<ObjectDisposedException>(() => pages[0].Compose(null));
     }
+
+    [Fact]
+    public void Clear_DisposesAndEmptiesTheCache()
+    {
+        var pages = OpenPages(2);
+        using var cache = new LayeredPageCache(2);
+        cache.Add(1, pages[0]);
+        cache.Add(2, pages[1]);
+
+        cache.Clear();
+
+        Assert.Null(cache.Get(1));
+        Assert.Null(cache.Get(2));
+        Assert.Throws<ObjectDisposedException>(() => pages[0].Compose(null));
+        Assert.Throws<ObjectDisposedException>(() => pages[1].Compose(null));
+    }
 }

@@ -69,6 +69,8 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
     /// <summary>Number of layered pages produced by PdfPig (not served from the cache).</summary>
     internal int LayeredPagesProcessed;
 
+    public void ClearLayeredPages() => _layeredPages.Clear();
+
     private Uri? _filePath;
 
     public string? LocalPath => _filePath?.LocalPath;

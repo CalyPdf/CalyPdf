@@ -113,6 +113,14 @@ public interface IPdfDocumentService : IAsyncDisposable
     Task<IReadOnlyList<bool>?> SetLayerVisibilityAsync(int groupIndex, bool isOn, CancellationToken token)
         => Task.FromResult<IReadOnlyList<bool>?>(null);
 
+    /// <summary>
+    /// Releases the memory held for layered pages. Called when the document is deactivated; the pages
+    /// are processed again on demand.
+    /// </summary>
+    void ClearLayeredPages()
+    {
+    }
+
     Task<IReadOnlyList<PdfEmbeddedFileViewModel>?> GetEmbeddedFileAsync(CancellationToken token);
 
     Task<PdfPageSize?> GetPageSizeAsync(int pageNumber, CancellationToken token);

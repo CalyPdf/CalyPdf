@@ -11,7 +11,7 @@ public class PdfLayersTests
     [Fact]
     public void BuildTree_MapsTheOrderTreeWithTheCurrentStates()
     {
-        using var document = PdfDocument.Open(Gwg151, new ParsingOptions { SkipHiddenOptionalContent = true });
+        using var document = PdfDocument.Open(Gwg151);
 
         var roots = PdfLayers.BuildTree(document.OptionalContent!);
 
