@@ -40,8 +40,8 @@ internal sealed partial class PdfPigDocumentService
                 return null;
             }
 
-            return await ExecuteWithLockAsync<IReadOnlyList<PdfLayerNode>?>(_ =>
-                document.OptionalContent is { } state ? PdfLayers.BuildTree(state) : null, guardCt);
+            // The state is immutable: no lock needed.
+            return _layerState is { } state ? PdfLayers.BuildTree(state) : null;
         }, token);
     }
 
@@ -57,19 +57,17 @@ internal sealed partial class PdfPigDocumentService
                 return null;
             }
 
-            // Under the lock: no page is being processed while the state is swapped, and every page
-            // processed afterwards captures the new one.
-            return await ExecuteWithLockAsync<IReadOnlyList<bool>?>(_ =>
+            lock (_layerStateLock)
             {
-                if (document.OptionalContent is not { } state || groupIndex < 0 || groupIndex >= state.Groups.Count)
+                if (_layerState is not { } state || groupIndex < 0 || groupIndex >= state.Groups.Count)
                 {
                     return null;
                 }
 
                 var updated = state.WithGroupState(state.Groups[groupIndex], isOn);
-                document.SetOptionalContent(updated);
+                _layerState = updated;
                 return PdfLayers.GetStates(updated);
-            }, guardCt);
+            }
         }, token);
     }
 }

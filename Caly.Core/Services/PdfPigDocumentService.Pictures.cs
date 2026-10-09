@@ -27,6 +27,7 @@ using CommunityToolkit.Mvvm.Messaging;
 using SkiaSharp;
 using SkiaSharp.HarfBuzz;
 using UglyToad.PdfPig;
+using UglyToad.PdfPig.Content;
 using UglyToad.PdfPig.Rendering.Skia;
 
 namespace Caly.Core.Services;
@@ -46,6 +47,11 @@ internal sealed partial class PdfPigDocumentService
             if (document is null)
             {
                 return null;
+            }
+
+            if (_layerState is { } state)
+            {
+                return await GetLayeredPictureAsync(document, state, pageNumber, guardCt).ConfigureAwait(false);
             }
 
             return await ExecuteWithLockAsync(lockCt =>
@@ -78,6 +84,62 @@ internal sealed partial class PdfPigDocumentService
         }, token);
 
         return pic is null ? null : RefCountable.Create(pic);
+    }
+
+    private async Task<SKPicture?> GetLayeredPictureAsync(PdfDocument document, OptionalContentState state, int pageNumber, CancellationToken guardCt)
+    {
+        var layered = _layeredPages.Get(pageNumber);
+        if (layered is null)
+        {
+            var (produced, fallback) = await ExecuteWithLockAsync(lockCt =>
+            {
+                try
+                {
+                    using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(lockCt);
+                    linkedCts.CancelAfter(PageTimeOut);
+                    var page = document.GetPageAsSkiaLayeredPage(pageNumber, linkedCts.Token);
+                    Interlocked.Increment(ref LayeredPagesProcessed);
+                    return ((SkiaLayeredPage?)page, (SKPicture?)null);
+                }
+                catch (OperationCanceledException)
+                {
+                    if (!lockCt.IsCancellationRequested)
+                    {
+                        App.Messenger.Send(new ShowNotificationMessage(NotificationType.Error,
+                            $"Error in page {pageNumber}",
+                            $"Could not display page after {PageTimeOut.TotalSeconds} seconds."));
+                        return ((SkiaLayeredPage?)null, GetTimeOutPicture(document, pageNumber, lockCt));
+                    }
+
+                    return ((SkiaLayeredPage?)null, (SKPicture?)null);
+                }
+                catch (Exception e)
+                {
+                    Debug.WriteExceptionToFile(e);
+                    return ((SkiaLayeredPage?)null, GetErrorPicture(document, pageNumber, e, lockCt));
+                }
+            }, guardCt).ConfigureAwait(false);
+
+            if (produced is null)
+            {
+                return fallback;
+            }
+
+            layered = produced;
+            _layeredPages.Add(pageNumber, layered);
+        }
+
+        try
+        {
+            // Compose with the state read on entry: a toggle meanwhile bumps PdfPageService's content
+            // version, which discards this result.
+            return layered.Compose(state);
+        }
+        catch (ObjectDisposedException)
+        {
+            // Evicted while composing: process it again next time.
+            return null;
+        }
     }
 
     private static SKPicture? GetTimeOutPicture(PdfDocument document, int pageNumber, CancellationToken token)

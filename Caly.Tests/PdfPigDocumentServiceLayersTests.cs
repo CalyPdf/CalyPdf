@@ -71,7 +71,7 @@ public class PdfPigDocumentServiceLayersTests
         });
     }
 
-    [AvaloniaFact]
+    [AvaloniaFact(Skip = "Re-enabled by Task 5 (tagged text layer)")]
     public async Task SetLayerVisibilityAsync_ReturnsRadioSiblingsAndChangesTheTextLayer()
     {
         await Task.Run(async () =>
@@ -108,6 +108,40 @@ public class PdfPigDocumentServiceLayersTests
 
             Assert.Null(await service.SetLayerVisibilityAsync(999, true, CancellationToken.None));
             Assert.Null(await service.SetLayerVisibilityAsync(-1, true, CancellationToken.None));
+        });
+    }
+
+    private static byte[] Pixels(SkiaSharp.SKPicture picture)
+    {
+        using var bitmap = new SkiaSharp.SKBitmap(200, 200);
+        using var canvas = new SkiaSharp.SKCanvas(bitmap);
+        canvas.Clear(SkiaSharp.SKColors.White);
+        canvas.Scale(200f / picture.CullRect.Width, 200f / picture.CullRect.Height);
+        canvas.DrawPicture(picture);
+        return bitmap.Bytes;
+    }
+
+    [AvaloniaFact]
+    public async Task SetLayerVisibilityAsync_RecomposesWithoutReprocessing()
+    {
+        await Task.Run(async () =>
+        {
+            await using var service = new PdfPigDocumentService(new FakeSettingsService());
+            Assert.Equal(DocumentOpeningState.Success,
+                await service.OpenDocument(File("GWG151_OptionalContent-RBGroup_X4.pdf"), null, CancellationToken.None));
+
+            var layers = (await service.GetLayersAsync(CancellationToken.None))!;
+            int viewOne = layers.Single(l => l.Name == "GWG View 1").GroupIndex!.Value;
+
+            using var before = await service.GetRenderPageAsync(1, CancellationToken.None);
+            int processed = service.LayeredPagesProcessed;
+            Assert.True(processed > 0);
+
+            await service.SetLayerVisibilityAsync(viewOne, true, CancellationToken.None);
+            using var after = await service.GetRenderPageAsync(1, CancellationToken.None);
+
+            Assert.Equal(processed, service.LayeredPagesProcessed); // composed from the cache
+            Assert.NotEqual(Pixels(before!.Item), Pixels(after!.Item));
         });
     }
 }

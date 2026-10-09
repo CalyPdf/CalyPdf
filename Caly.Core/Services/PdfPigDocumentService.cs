@@ -39,6 +39,7 @@ using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Linq;
 using UglyToad.PdfPig;
+using UglyToad.PdfPig.Content;
 using UglyToad.PdfPig.Exceptions;
 using UglyToad.PdfPig.Outline;
 using UglyToad.PdfPig.Rendering.Skia;
@@ -60,6 +61,13 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
     private IStorageFile? _storageFile;
     private Stream? _fileStream;
     private PdfDocument? _document;
+
+    private volatile OptionalContentState? _layerState;
+    private readonly object _layerStateLock = new();
+    private readonly LayeredPageCache _layeredPages = new(16);
+
+    /// <summary>Number of layered pages produced by PdfPig (not served from the cache).</summary>
+    internal int LayeredPagesProcessed;
 
     private Uri? _filePath;
 
@@ -161,8 +169,7 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
                         SkipMissingFonts = true,
                         UseActualText = true,
                         FilterProvider = SkiaRenderingFilterProvider.Instance,
-                        IccProfileService = UnicolourIccProfileService.Instance,
-                        SkipHiddenOptionalContent = true
+                        IccProfileService = UnicolourIccProfileService.Instance
                     };
 
                     if (_settingsService.GetSettings().ShowPdfLogs)
@@ -176,6 +183,7 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
                     }
 
                     _document = PdfDocument.Open(_fileStream, pdfParsingOptions);
+                    _layerState = _document.OptionalContent;
 
                     token.ThrowIfCancellationRequested();
 
@@ -190,6 +198,7 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
 
                     _document.AddPageFactory<PdfPageSize, PageSizeFactory>();
                     _document.AddPageFactory<SKPicture, SkiaPageFactory>();
+                    _document.AddPageFactory<SkiaLayeredPage, SkiaLayeredPageFactory>();
                     _document.AddPageFactory<PageTextLayerContent, TextLayerFactory>();
 
                     NumberOfPages = _document.NumberOfPages;

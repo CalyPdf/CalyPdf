@@ -169,6 +169,8 @@ internal partial class PdfPigDocumentService
 
         _semaphore.Dispose();
 
+        _layeredPages.Dispose();
+
         // Document before stream: the document reads through the stream, so closing the stream
         // first is exactly the ordering that caused the bug this guards against.
         if (_document is not null)
