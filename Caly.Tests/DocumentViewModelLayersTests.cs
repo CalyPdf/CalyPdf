@@ -147,6 +147,31 @@ public class DocumentViewModelLayersTests
     }
 
     [AvaloniaFact]
+    public async Task Toggle_KeepsTheLayerCaches_DeactivationReleasesThem()
+    {
+        // The layered pages and raw text layers hold every layer's content, so a toggle reuses
+        // them: only deactivation may release them.
+        var pdfService = new RenderingPdfDocumentService();
+        await using var pageService = new PdfPageService(pdfService);
+        var document = NewLoadedDocument(pdfService, pageService);
+        var node = OneLayer(pdfService);
+        await document.LayersSource;
+
+        document.SetActive();
+        Assert.True(await WaitForPicture(document));
+
+        await document.SetLayerVisibilityAsync(node, true);
+        await document.SetLayerVisibilityAsync(node, false);
+        Assert.True(await WaitForPicture(document));
+        await Settle();
+        Assert.Equal(0, pdfService.ClearLayerCachesCount);
+
+        document.SetInactive();
+        Assert.True(await WaitUntil(() => pdfService.ClearLayerCachesCount == 1),
+            "the layer caches to be released on deactivation");
+    }
+
+    [AvaloniaFact]
     public async Task Toggle_WhileInactive_RendersOnlyOnceActive()
     {
         var pdfService = new RenderingPdfDocumentService();

@@ -1053,8 +1053,8 @@ namespace Caly.Core.Services
             // Tiles too
             TileRenderService.Clear();
 
-            // And the document service's layered pages
-            _pdfDocumentService.ClearLayerCaches();
+            // Not the document service's layer caches: this also runs on every layer toggle, which
+            // they exist to survive. Deactivation releases them (DocumentViewModel.Clear).
         }
 
         public async ValueTask DisposeAsync()

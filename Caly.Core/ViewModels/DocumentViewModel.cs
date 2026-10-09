@@ -746,6 +746,10 @@ public sealed partial class DocumentViewModel : ViewModelBase
         // (e.g. for the search index build, which deactivation does not stop) stays valid.
         await ReleaseContent(invalidate: false).ConfigureAwait(false);
 
+        // Only on deactivation: the layered pages and tagged text layers hold every layer's content,
+        // so a layer toggle (which also releases the content) reuses them.
+        _pdfService.ClearLayerCaches();
+
         GC.Collect(GC.MaxGeneration, GCCollectionMode.Optimized, false);
     }
 

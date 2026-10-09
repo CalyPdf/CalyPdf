@@ -154,6 +154,13 @@ internal sealed class RenderingPdfDocumentService : IPdfDocumentService
         }
     }
 
+    private int _clearLayerCachesCount;
+
+    /// <summary>How many times <see cref="ClearLayerCaches"/> has been called.</summary>
+    public int ClearLayerCachesCount => Volatile.Read(ref _clearLayerCachesCount);
+
+    public void ClearLayerCaches() => Interlocked.Increment(ref _clearLayerCachesCount);
+
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
 

@@ -106,16 +106,19 @@ public interface IPdfDocumentService : IAsyncDisposable
         => Task.FromResult<IReadOnlyList<PdfLayerNode>?>(null);
 
     /// <summary>
-    /// Turns a layer on or off for the pages processed afterwards. Returns every layer's state after the
-    /// change, indexed like <see cref="PdfLayerNode.GroupIndex"/> (turning on a layer of a radio-button
-    /// group turns its siblings off), or <see langword="null"/> when nothing could be changed.
+    /// Turns a layer on or off for every picture and text layer requested afterwards, including pages
+    /// already processed: those are composed again from their cached layered page and tagged text layer,
+    /// without reparsing. Pictures and text layers handed out before the change are not updated - the
+    /// caller releases and requests them again. Returns every layer's state after the change, indexed like
+    /// <see cref="PdfLayerNode.GroupIndex"/> (turning on a layer of a radio-button group turns its siblings
+    /// off), or <see langword="null"/> when nothing could be changed.
     /// </summary>
     Task<IReadOnlyList<bool>?> SetLayerVisibilityAsync(int groupIndex, bool isOn, CancellationToken token)
         => Task.FromResult<IReadOnlyList<bool>?>(null);
 
     /// <summary>
-    /// Releases the memory held for layered pages and tagged text layers. Called when the document is deactivated; the pages
-    /// are processed again on demand.
+    /// Releases the memory held for layered pages and tagged text layers. Called when the document is deactivated
+    /// (never on a layer toggle, which reuses them); the pages are processed again on demand.
     /// </summary>
     void ClearLayerCaches()
     {
