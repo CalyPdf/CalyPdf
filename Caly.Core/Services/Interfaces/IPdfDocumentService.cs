@@ -114,10 +114,10 @@ public interface IPdfDocumentService : IAsyncDisposable
         => Task.FromResult<IReadOnlyList<bool>?>(null);
 
     /// <summary>
-    /// Releases the memory held for layered pages. Called when the document is deactivated; the pages
+    /// Releases the memory held for layered pages and tagged text layers. Called when the document is deactivated; the pages
     /// are processed again on demand.
     /// </summary>
-    void ClearLayeredPages()
+    void ClearLayerCaches()
     {
     }
 

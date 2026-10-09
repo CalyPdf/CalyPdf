@@ -152,7 +152,8 @@ internal sealed partial class PdfPigDocumentService
             catch (Exception e)
             {
                 Debug.WriteExceptionToFile(e);
-                return GetErrorPicture(document, pageNumber, e, guardCt);
+                return await ExecuteWithLockAsync(lockCt => GetErrorPicture(document, pageNumber, e, lockCt), guardCt)
+                    .ConfigureAwait(false);
             }
         }
 

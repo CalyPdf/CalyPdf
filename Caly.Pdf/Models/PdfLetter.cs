@@ -55,8 +55,15 @@ public sealed class PdfLetter : IPdfTextElement
     /// </summary>
     public int TextSequence { get; }
 
-    public PdfLetter(string value, PdfRectangle boundingBox, float pointSize, int textSequence)
+    /// <summary>
+    /// The optional content (layer) condition the letter belongs to, or <see langword="null"/> when it is always visible.
+    /// </summary>
+    public OptionalContentCondition? OptionalContent { get; }
+
+    public PdfLetter(string value, PdfRectangle boundingBox, float pointSize, int textSequence,
+        OptionalContentCondition? optionalContent = null)
     {
+        OptionalContent = optionalContent;
         Value = StringPool.Shared.GetOrAdd(value);
         BoundingBox = boundingBox;
         PointSize = pointSize;

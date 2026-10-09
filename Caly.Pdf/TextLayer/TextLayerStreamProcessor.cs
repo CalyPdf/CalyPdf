@@ -146,12 +146,6 @@ namespace Caly.Pdf.TextLayer
             in TransformationMatrix transformationMatrix,
             CharacterBoundingBox characterBoundingBox)
         {
-            if (IsOptionalContentHidden)
-            {
-                // Hidden optional content (layer) is not drawn, so its text cannot be selected or found.
-                return;
-            }
-
             unicode = ApplyActualText(unicode);
 
             if (currentOffset > 0 && _letters.Count > 0 && Diacritics.IsInCombiningDiacriticRange(unicode))
@@ -163,7 +157,7 @@ namespace Caly.Pdf.TextLayer
                     && Diacritics.TryCombineDiacriticWithPreviousLetter(unicode, attachTo.Value, out var newLetter))
                 {
                     // TODO: union of bounding boxes.
-                    _letters[^1] = new PdfLetter(newLetter, attachTo.BoundingBox, attachTo.PointSize, attachTo.TextSequence);
+                    _letters[^1] = new PdfLetter(newLetter, attachTo.BoundingBox, attachTo.PointSize, attachTo.TextSequence, attachTo.OptionalContent);
                     return;
                 }
             }
@@ -217,7 +211,8 @@ namespace Caly.Pdf.TextLayer
             var letter = new PdfLetter(unicode,
                 boundingBox,
                 (float)pointSize,
-                TextSequence);
+                TextSequence,
+                CurrentOptionalContent);
 
             _letters.Add(letter);
         }

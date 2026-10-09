@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using UglyToad.PdfPig.Actions;
+using UglyToad.PdfPig.Content;
 using UglyToad.PdfPig.Core;
 using UglyToad.PdfPig.Graphics.Colors;
 
@@ -50,4 +51,9 @@ public sealed class PdfAnnotation
     /// </list>
     /// </summary>
     public IColor? Colour { get; init; }
+
+    /// <summary>
+    /// The optional content (layer) condition the annotation belongs to, or <see langword="null"/> when it is always visible.
+    /// </summary>
+    public OptionalContentCondition? OptionalContent { get; init; }
 }

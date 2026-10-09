@@ -18,6 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using UglyToad.PdfPig.Content;
+
 namespace Caly.Pdf.Models;
 
 public sealed record PageTextLayerContent
@@ -25,4 +27,39 @@ public sealed record PageTextLayerContent
     public required IReadOnlyList<PdfLetter> Letters { get; init; }
 
     public required IReadOnlyList<PdfAnnotation> Annotations { get; init; }
+
+    /// <summary>
+    /// The content visible in <paramref name="state"/> (everything when null). Each distinct condition is
+    /// evaluated once.
+    /// </summary>
+    public PageTextLayerContent ForState(OptionalContentState? state)
+    {
+        if (state is null)
+        {
+            return this;
+        }
+
+        var visible = new Dictionary<OptionalContentCondition, bool>();
+        bool IsVisible(OptionalContentCondition? condition)
+        {
+            if (condition is null || condition.IsAlways)
+            {
+                return true;
+            }
+
+            if (!visible.TryGetValue(condition, out bool v))
+            {
+                v = condition.IsVisible(state);
+                visible[condition] = v;
+            }
+
+            return v;
+        }
+
+        return new PageTextLayerContent
+        {
+            Letters = Letters.Where(l => IsVisible(l.OptionalContent)).ToArray(),
+            Annotations = Annotations.Where(a => IsVisible(a.OptionalContent)).ToArray()
+        };
+    }
 }

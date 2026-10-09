@@ -30,6 +30,7 @@ using Caly.Pdf.PageFactories;
 using CommunityToolkit.Mvvm.Messaging;
 using SkiaSharp;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -69,7 +70,20 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
     /// <summary>Number of layered pages produced by PdfPig (not served from the cache).</summary>
     internal int LayeredPagesProcessed;
 
-    public void ClearLayeredPages() => _layeredPages.Clear();
+    /// <summary>
+    /// Page text layers as processed, with every layer's content tagged with its optional content
+    /// condition; filtered per call with the current layer state. Only used when the document has layers.
+    /// </summary>
+    private readonly ConcurrentDictionary<int, PageTextLayerContent> _rawTextLayers = new();
+
+    /// <summary>Number of page text layers produced by PdfPig (not served from the cache).</summary>
+    internal int TextLayersProcessed;
+
+    public void ClearLayerCaches()
+    {
+        _layeredPages.Clear();
+        _rawTextLayers.Clear();
+    }
 
     private Uri? _filePath;
 
@@ -389,13 +403,32 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
                 return null;
             }
 
+            var layerState = _layerState;
+            if (layerState is not null && _rawTextLayers.TryGetValue(pageNumber, out var cachedRaw))
+            {
+                return PdfTextLayerHelper.GetTextLayer(cachedRaw.ForState(_layerState), guardCt);
+            }
+
             var pageTextLayer = await ExecuteWithLockAsync(lockCt =>
                     {
                         try
                         {
+                            if (layerState is not null && _rawTextLayers.TryGetValue(pageNumber, out var cached))
+                            {
+                                // Processed by another caller while this one waited for the lock.
+                                return cached;
+                            }
+
                             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(lockCt);
                             linkedCts.CancelAfter(PageTimeOut);
-                            return document.GetPageTextLayerContent(pageNumber, linkedCts.Token);
+                            var content = document.GetPageTextLayerContent(pageNumber, linkedCts.Token);
+                            if (layerState is not null)
+                            {
+                                Interlocked.Increment(ref TextLayersProcessed);
+                                _rawTextLayers[pageNumber] = content;
+                            }
+
+                            return content;
                         }
                         catch (OperationCanceledException)
                         {
@@ -416,7 +449,8 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
                 return null;
             }
 
-            return PdfTextLayerHelper.GetTextLayer(pageTextLayer, guardCt);
+            // The state is read again: a toggle may have happened while the page was processed.
+            return PdfTextLayerHelper.GetTextLayer(layerState is null ? pageTextLayer : pageTextLayer.ForState(_layerState), guardCt);
         }, token);
     }
 

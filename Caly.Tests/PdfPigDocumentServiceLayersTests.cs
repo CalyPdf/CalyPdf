@@ -71,7 +71,7 @@ public class PdfPigDocumentServiceLayersTests
         });
     }
 
-    [AvaloniaFact(Skip = "Re-enabled by Task 5 (tagged text layer)")]
+    [AvaloniaFact]
     public async Task SetLayerVisibilityAsync_ReturnsRadioSiblingsAndChangesTheTextLayer()
     {
         await Task.Run(async () =>
@@ -146,7 +146,7 @@ public class PdfPigDocumentServiceLayersTests
     }
 
     [AvaloniaFact]
-    public async Task ClearLayeredPages_ForcesReprocessingButAToggleDoesNot()
+    public async Task ClearLayerCaches_ForcesReprocessingButAToggleDoesNot()
     {
         await Task.Run(async () =>
         {
@@ -158,15 +158,46 @@ public class PdfPigDocumentServiceLayersTests
             int viewOne = layers.Single(l => l.Name == "GWG View 1").GroupIndex!.Value;
 
             using (await service.GetRenderPageAsync(1, CancellationToken.None)) { }
+            await service.GetPageTextLayerAsync(1, CancellationToken.None);
             int processed = service.LayeredPagesProcessed;
+            int textProcessed = service.TextLayersProcessed;
+            Assert.Equal(1, textProcessed);
 
             await service.SetLayerVisibilityAsync(viewOne, true, CancellationToken.None);
             using (await service.GetRenderPageAsync(1, CancellationToken.None)) { }
+            await service.GetPageTextLayerAsync(1, CancellationToken.None);
             Assert.Equal(processed, service.LayeredPagesProcessed);
+            Assert.Equal(textProcessed, service.TextLayersProcessed);
 
-            service.ClearLayeredPages();
+            service.ClearLayerCaches();
             using (await service.GetRenderPageAsync(1, CancellationToken.None)) { }
+            await service.GetPageTextLayerAsync(1, CancellationToken.None);
             Assert.Equal(processed + 1, service.LayeredPagesProcessed);
+            Assert.Equal(textProcessed + 1, service.TextLayersProcessed);
+        });
+    }
+
+    [AvaloniaFact]
+    public async Task SetLayerVisibilityAsync_RefiltersTheTextLayerWithoutReprocessing()
+    {
+        await Task.Run(async () =>
+        {
+            await using var service = new PdfPigDocumentService(new FakeSettingsService());
+            Assert.Equal(DocumentOpeningState.Success,
+                await service.OpenDocument(File("GWG151_OptionalContent-RBGroup_X4.pdf"), null, CancellationToken.None));
+
+            var layers = (await service.GetLayersAsync(CancellationToken.None))!;
+            int viewOne = layers.Single(l => l.Name == "GWG View 1").GroupIndex!.Value;
+
+            var before = (await service.GetPageTextLayerAsync(1, CancellationToken.None))!.Select(w => w.Value).ToArray();
+            int processed = service.TextLayersProcessed;
+            Assert.Equal(1, processed);
+
+            await service.SetLayerVisibilityAsync(viewOne, true, CancellationToken.None);
+
+            var after = (await service.GetPageTextLayerAsync(1, CancellationToken.None))!.Select(w => w.Value).ToArray();
+            Assert.NotEqual(before, after);
+            Assert.Equal(processed, service.TextLayersProcessed);
         });
     }
 }

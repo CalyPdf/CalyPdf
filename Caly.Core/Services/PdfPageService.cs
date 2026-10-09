@@ -1054,7 +1054,7 @@ namespace Caly.Core.Services
             TileRenderService.Clear();
 
             // And the document service's layered pages
-            _pdfDocumentService.ClearLayeredPages();
+            _pdfDocumentService.ClearLayerCaches();
         }
 
         public async ValueTask DisposeAsync()

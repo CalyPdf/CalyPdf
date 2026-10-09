@@ -59,10 +59,6 @@ namespace Caly.Pdf.TextLayer
             foreach (Annotation annotation in _annotations.Value)
             {
                 using var optionalContentScope = EnterOptionalContent(annotation.AnnotationDictionary);
-                if (IsOptionalContentHidden)
-                {
-                    continue;
-                }
 
                 PdfRectangle rect = annotation.Rectangle;
 
@@ -132,7 +128,8 @@ namespace Caly.Pdf.TextLayer
                         Content = annotation.Content,
                         Date = annotation.ModifiedDate,
                         IsInteractive = isInteractive && hasAction,
-                        Colour = background
+                        Colour = background,
+                        OptionalContent = CurrentOptionalContent
                     });
                 }
             }
