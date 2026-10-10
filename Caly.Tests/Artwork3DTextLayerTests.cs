@@ -52,6 +52,31 @@ public class Artwork3DTextLayerTests
         Assert.Null(layer.FindArtwork3DOver(artwork.BoundingBox.Right + 50, centre.Y));
     }
 
+    /// <summary>
+    /// View names are shown from the UI thread on hover. They must be plain values captured while the
+    /// page was processed, not something read from the document (whose scanner is not thread-safe) later.
+    /// </summary>
+    [Fact]
+    public void ViewNamesAreValuesCapturedWithTheTextLayer()
+    {
+        var source = Load("box_base.pdf").Artworks3D![0];
+        string[] names = ["A", "B"];
+
+        var artwork = new PdfArtwork3D
+        {
+            PpiScale = 1,
+            BoundingBox = source.BoundingBox,
+            Artwork = source.Artwork,
+            HasNormalAppearance = false,
+            ViewNames = names,
+            DefaultViewName = "B"
+        };
+
+        Assert.Same(names, artwork.ViewNames);
+        Assert.Equal("B", artwork.DefaultViewName);
+        Assert.Same(source.ViewNames, source.ViewNames);
+    }
+
     [Fact]
     public void DocumentWithout3D_HasNoArtworkList()
     {

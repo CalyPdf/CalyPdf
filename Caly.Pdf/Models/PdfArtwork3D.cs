@@ -26,15 +26,13 @@ namespace Caly.Pdf.Models;
 /// <summary>
 /// 3D artwork (U3D or PRC) placed on a page by a 3D or rich media annotation.
 /// <para>
-/// Carries what is needed to show that the artwork is there. Nothing is decoded: the 3D data stays in the
-/// document until <see cref="Artwork3D.GetData"/> is called.
+/// Carries what is needed to show that the artwork is there, as plain values captured while the page was
+/// processed. Nothing is decoded: the 3D data stays in the document until <see cref="Artwork3D.GetData"/> is called.
 /// </para>
 /// </summary>
 public sealed class PdfArtwork3D
 {
     private const int MaxViewNames = 1_000;
-
-    private IReadOnlyList<string>? _viewNames;
 
     public required double PpiScale { get; init; }
 
@@ -45,6 +43,12 @@ public sealed class PdfArtwork3D
 
     /// <summary>
     /// The PDF-level description of the artwork: format, data, views and activation settings.
+    /// <para>
+    /// Its views and data are read from the document on demand, through the document's token scanner,
+    /// which is not thread-safe: touch <see cref="Artwork3D.Views"/>, <see cref="Artwork3D.DefaultView"/>,
+    /// <see cref="Artwork3D.GetData"/> and <see cref="Artwork3D.GetScript"/> only while holding the
+    /// document, never from the UI thread. What the UI needs is on this class as plain values.
+    /// </para>
     /// </summary>
     public required Artwork3D Artwork { get; init; }
 
@@ -53,6 +57,17 @@ public sealed class PdfArtwork3D
     /// <see langword="false"/> the page shows nothing at this rectangle.
     /// </summary>
     public required bool HasNormalAppearance { get; init; }
+
+    /// <summary>
+    /// The names of the authored views, in presentation order.
+    /// </summary>
+    public required IReadOnlyList<string> ViewNames { get; init; }
+
+    /// <summary>
+    /// The name of the view shown initially, or <see langword="null"/> when the view defined inside the
+    /// 3D data is used.
+    /// </summary>
+    public string? DefaultViewName { get; init; }
 
     public Artwork3DFormat Format => Artwork.Format;
 
@@ -67,19 +82,11 @@ public sealed class PdfArtwork3D
     };
 
     /// <summary>
-    /// The names of the authored views, in presentation order. Read from the document on first access.
+    /// Reads the view names out of the document. Call while processing the page.
     /// </summary>
-    public IReadOnlyList<string> ViewNames => _viewNames ??= GetViewNames();
-
-    /// <summary>
-    /// The name of the view shown initially, or <see langword="null"/> when the view defined inside the
-    /// 3D data is used.
-    /// </summary>
-    public string? DefaultViewName => Artwork.DefaultView is { } view ? GetName(view) : null;
-
-    private IReadOnlyList<string> GetViewNames()
+    internal static IReadOnlyList<string> GetViewNames(Artwork3D artwork)
     {
-        IReadOnlyList<Artwork3DView> views = Artwork.Views;
+        IReadOnlyList<Artwork3DView> views = artwork.Views;
         if (views.Count == 0)
         {
             return [];
@@ -92,6 +99,14 @@ public sealed class PdfArtwork3D
         }
 
         return names;
+    }
+
+    /// <summary>
+    /// Reads the default view's name out of the document. Call while processing the page.
+    /// </summary>
+    internal static string? GetDefaultViewName(Artwork3D artwork)
+    {
+        return artwork.DefaultView is { } view ? GetName(view) : null;
     }
 
     private static string GetName(Artwork3DView view)
