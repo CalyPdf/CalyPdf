@@ -101,6 +101,20 @@ GPU rendering costs roughly **+200 MB peak working set** over software on an int
 
 Set `"Debug": { "LogRenderTimings": true }` in the settings file (or tick it in the settings Debug tab) to dump render-path timings (back-end actually in use, draw-op count, mean/max draw time) to `%LOCALAPPDATA%\Caly\logs` at exit — see `Caly.Core/Services/Rendering/RenderTimings.cs`. Like `UseSoftwareRendering` it is read straight from the JSON, and is latched at the first draw, so it applies from the next launch.
 
+### 3D Artwork (U3D / PRC)
+
+Work in progress on branches named `3d` (Caly, `external/PdfPig`, `external/PdfPig.Rendering.Skia`); planning documents, specs, plans and sample surveys live outside the repository in `C:\caly-work\3d\claude` (start at its `README.md`).
+
+What exists today is **recognition only** — nothing is decoded or rendered in 3D yet:
+
+- **PdfPig** (`UglyToad.PdfPig.Artwork`): `Artwork3D.TryCreate(annotation, scanner, filterProvider, out artwork)` is the single entry point. It reads a 3D annotation (ISO 32000-2 §13.6) or the 3D asset of a RichMedia annotation (§13.7) into a read-only model: format (`U3D`/`Prc`), `GetData()` (the payload bytes, decoded on each call), authored views (`Artwork3DView`: camera matrix or U3D path, projection, background, render mode, lighting scheme, cross sections, per-node overrides), default-view resolution (`3DV` → `DV` → first view), activation settings. Views are parsed lazily; malformed entries become "absent", never exceptions. Scripts are exposed as bytes and never run.
+- **`Caly.Pdf`**: `TextLayerStreamProcessor.DrawAnnotations` calls it for annotations of type `Artwork3D`/`RichMedia` only, producing `PdfArtwork3D` items carried by `PageTextLayerContent.Artworks3D` → `PdfTextLayer.Artworks3D` (`null` when the page has none, so pages without 3D pay nothing). `PdfTextLayerHelper.GetTextLayer` must not return `PdfTextLayer.Empty` when artworks exist.
+- **`Caly.Core`**: `PageInteractiveLayerControl` draws a "3D" badge at the artwork's top-left corner (constant on-screen size: drawn at the inverse of the page zoom) and, on hover, a flyout with the format and authored view names (`TextSelectionInputHandler.HandleMouseMoveOver` checks artworks before annotations).
+
+`HasNormalAppearance` is `false` for a quarter of real-world 3D annotations (no `AP` at all, or an empty one): the page shows nothing there and only the badge marks the artwork.
+
+Decisions that constrain future work: PRC's compressed tessellation (`PRC_TYPE_TESS_3D_Compressed`) is **not** to be implemented (patent); nanoPRC (AGPL) is never to be opened; scripts are not executed (Jint is the designated engine if that ever changes, ask first); new 3D libraries target .NET 8+ and are written for speed and low allocation; commits stay local unless told otherwise.
+
 ### AOT Compatibility
 
 The desktop project supports Native AOT. Key constraints enforced in `Caly.Desktop.csproj`:
