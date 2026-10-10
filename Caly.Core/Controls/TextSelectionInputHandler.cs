@@ -405,6 +405,21 @@ internal sealed class TextSelectionInputHandler
     /// </summary>
     private void HandleMouseMoveOver(PageInteractiveLayerControl control, PointerPointProperties properties, Point loc)
     {
+        // 3D artwork comes first: its annotation may also carry plain contents, and the artwork's
+        // description (format, authored views) says more than those do.
+        PdfArtwork3D? artwork = control.PdfTextLayer!.FindArtwork3DOver(loc.X, loc.Y);
+        if (artwork is not null)
+        {
+            if (!properties.IsRightButtonPressed)
+            {
+                control.ShowArtwork3D(artwork);
+            }
+
+            control.SetDefaultCursor();
+            _owner.SetCurrentValue(PageItemsControl.InteractiveActionOverProperty, $"3D model ({artwork.FormatDisplayName})");
+            return;
+        }
+
         PdfAnnotation? annotation = control.PdfTextLayer!.FindAnnotationOver(loc.X, loc.Y);
 
         if (annotation is not null)
