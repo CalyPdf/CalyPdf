@@ -46,6 +46,28 @@ public sealed record PdfTextLayer : IReadOnlyList<PdfWord>
 
     public IReadOnlyList<PdfAnnotation> Annotations { get; }
 
+    /// <summary>
+    /// 3D artwork on the page, or <see langword="null"/> when there is none.
+    /// </summary>
+    public IReadOnlyList<PdfArtwork3D>? Artworks3D { get; init; }
+
+    public PdfArtwork3D? FindArtwork3DOver(double x, double y)
+    {
+        if (Artworks3D is null || Artworks3D.Count == 0) return null;
+
+        var point = new PdfPoint(x, y);
+
+        foreach (PdfArtwork3D artwork in Artworks3D)
+        {
+            if (artwork.BoundingBox.Contains(point, true))
+            {
+                return artwork;
+            }
+        }
+
+        return null;
+    }
+
     public PdfAnnotation? FindAnnotationOver(double x, double y)
     {
         if (Annotations is null || Annotations.Count == 0) return null;

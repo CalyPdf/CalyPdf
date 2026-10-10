@@ -25,4 +25,9 @@ public sealed record PageTextLayerContent
     public required IReadOnlyList<PdfLetter> Letters { get; init; }
 
     public required IReadOnlyList<PdfAnnotation> Annotations { get; init; }
+
+    /// <summary>
+    /// 3D artwork on the page, or <see langword="null"/> when there is none.
+    /// </summary>
+    public IReadOnlyList<PdfArtwork3D>? Artworks3D { get; init; }
 }

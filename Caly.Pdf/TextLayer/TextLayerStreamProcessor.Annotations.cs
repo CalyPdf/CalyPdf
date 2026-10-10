@@ -21,6 +21,7 @@
 using Caly.Pdf.Models;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Annotations;
+using UglyToad.PdfPig.Artwork;
 using UglyToad.PdfPig.Core;
 using UglyToad.PdfPig.Graphics.Colors;
 using UglyToad.PdfPig.Tokens;
@@ -38,6 +39,12 @@ namespace Caly.Pdf.TextLayer
         /// Processed page annotations.
         /// </summary>
         private readonly List<PdfAnnotation> _pdfAnnotations = new();
+
+        /// <summary>
+        /// 3D artwork found on the page. Stays <see langword="null"/> for pages without any, which is
+        /// nearly all of them.
+        /// </summary>
+        private List<PdfArtwork3D>? _pdfArtworks3D;
 
         private static bool IsInteractive(Annotation annotation)
         {
@@ -79,6 +86,18 @@ namespace Caly.Pdf.TextLayer
                     if (transformedBox.Area <= double.Epsilon)
                     {
                         continue;
+                    }
+
+                    if (annotation.Type is AnnotationType.Artwork3D or AnnotationType.RichMedia
+                        && Artwork3D.TryCreate(annotation, PdfScanner, FilterProvider, out Artwork3D? artwork))
+                    {
+                        (_pdfArtworks3D ??= []).Add(new PdfArtwork3D
+                        {
+                            PpiScale = _ppiScale,
+                            BoundingBox = transformedBox,
+                            Artwork = artwork,
+                            HasNormalAppearance = annotation.HasNormalAppearance
+                        });
                     }
 
                     bool isInteractive = IsInteractive(annotation);

@@ -177,12 +177,12 @@ namespace Caly.Pdf
 
             if (page.Letters.Count == 0)
             {
-                if (page.Annotations.Count == 0)
+                if (page.Annotations.Count == 0 && page.Artworks3D is null)
                 {
                     return PdfTextLayer.Empty;
                 }
 
-                return new PdfTextLayer([], page.Annotations);
+                return new PdfTextLayer([], page.Annotations) { Artworks3D = page.Artworks3D };
             }
 
             var letters = CalyDuplicateOverlappingTextProcessor.GetInPlace(page.Letters, token);
@@ -207,7 +207,7 @@ namespace Caly.Pdf
 
             AssignIndices(pdfBlocks, token);
 
-            return new PdfTextLayer(pdfBlocks, page.Annotations);
+            return new PdfTextLayer(pdfBlocks, page.Annotations) { Artworks3D = page.Artworks3D };
         }
 
         /// <summary>
