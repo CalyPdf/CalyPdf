@@ -560,7 +560,7 @@ public class Artwork3DViewModelTests
     /// form, or with exact geometry only, answers the click with why it stays a poster.
     /// </summary>
     [AvaloniaTheory]
-    [InlineData("mixed", "This 3D model uses a compressed mesh format that is not supported yet.")]
+    [InlineData("mixed", "Parts of this 3D model are compressed in a way that cannot be decoded yet.")]
     [InlineData("exact", "This 3D model has no display mesh (exact geometry only).")]
     public async Task APrcModelThatCannotBeShownSaysWhy(string name, string message)
     {
@@ -582,7 +582,7 @@ public class Artwork3DViewModelTests
     [AvaloniaFact]
     public async Task AModelThatCannotBeShownIsRememberedByItsPage()
     {
-        const string why = "This 3D model uses a compressed mesh format that is not supported yet.";
+        const string why = "Parts of this 3D model are compressed in a way that cannot be decoded yet.";
         await using var f = new Artwork3DFixture();
         f.Content = Prc("mixed");
         int reads = 0;

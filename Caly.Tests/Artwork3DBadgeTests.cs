@@ -85,7 +85,7 @@ public class Artwork3DBadgeTests
     [Fact]
     public void DescriptionOfAModelThatWasRefusedSaysWhy()
     {
-        const string why = "This 3D model uses a compressed mesh format that is not supported yet.";
+        const string why = "Parts of this 3D model are compressed in a way that cannot be decoded yet.";
         string text = PageInteractiveLayerControl.GetArtwork3DDescription("PRC", ["Front"], Artwork3DHint.Refused, why);
 
         Assert.Equal(

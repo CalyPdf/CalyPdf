@@ -19,10 +19,17 @@ public class Artwork3DPosterSilhouetteTests(ITestOutputHelper output)
     // (the saw's chuck beside the saw, before copies took their prototype's location) falls below.
     private const double MinimumOverlap = 0.85;
 
+    // Not every document can be measured this way: a poster with white parts on a white page (the other
+    // SpinFire samples), with scenery the default view hides (OfficeBuilding) or with a legend drawn
+    // into it (Trolley) covers other cells than the model does. Those were compared by eye.
+
     [Theory]
     [InlineData("tetra4d/3dpdf-Industrial-Saw-V03042024.pdf")]
     [InlineData("tetra4d/3dpdf-Auto-Engine-V03042024.pdf")]
     [InlineData("tetra4d/3dpdf-Industrial-Grinder-V03042024.pdf")]
+    [InlineData("MIL-STD-31000B_SpinFire.pdf")]                 // these three: compressed meshes
+    [InlineData("PMI Analysis_SpinFire.pdf")]
+    [InlineData("Technical Data Package_SpinFire.pdf")]
     public void TheModelCoversWhatItsPosterCovers(string document)
     {
         string? samples = Environment.GetEnvironmentVariable("CALY_3D_SAMPLES");

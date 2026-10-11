@@ -289,7 +289,7 @@ public sealed partial class Artwork3DViewModel : ViewModelBase, IDisposable
             case Artwork3DReadResult.NoGeometry:
                 return "This 3D model has no geometry Caly can show yet.";
             case Artwork3DReadResult.NotYetSupported:
-                return "This 3D model uses a compressed mesh format that is not supported yet.";
+                return "Parts of this 3D model are compressed in a way that cannot be decoded yet.";
             case Artwork3DReadResult.NoDisplayMesh:
                 return "This 3D model has no display mesh (exact geometry only).";
             case Artwork3DReadResult.UnsupportedFormat:
