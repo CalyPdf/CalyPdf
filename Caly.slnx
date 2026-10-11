@@ -55,6 +55,9 @@
     </Project>
   </Folder>
   <Folder Name="/external/Scene3D/">
+    <Project Path="external/Scene3D/src/Scene3D.Prc/Scene3D.Prc.csproj">
+      <BuildType Solution="Portable|*" Project="Release" />
+    </Project>
     <Project Path="external/Scene3D/src/Scene3D.U3D/Scene3D.U3D.csproj">
       <BuildType Solution="Portable|*" Project="Release" />
     </Project>
