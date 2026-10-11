@@ -26,8 +26,8 @@ dotnet run --project Caly.Benchmarks -c Release
 # Publish desktop (Release)
 dotnet publish Caly.Desktop -r win-x64 -c Release -f net10.0
 
-# Publish desktop (Native AOT)
-dotnet publish Caly.Desktop -r win-x64 -c AOT -f net10.0
+# Publish desktop (Native AOT; the project's AOT settings are keyed on the Portable configuration)
+dotnet publish Caly.Desktop -r win-x64 -c Portable -f net10.0
 ```
 
 ## Architecture
