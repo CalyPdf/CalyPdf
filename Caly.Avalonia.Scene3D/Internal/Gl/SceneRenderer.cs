@@ -115,8 +115,11 @@ internal sealed class SceneRenderer
         _drawListStale = true;
     }
 
-    /// <summary>Draws one frame into <paramref name="target"/> and leaves that framebuffer bound.</summary>
-    public void Render(int target, int pixelWidth, int pixelHeight, in FrameSetup setup)
+    /// <summary>
+    /// Draws one frame into <paramref name="target"/> and leaves that framebuffer bound. With
+    /// <paramref name="drawScene"/> false only the background is drawn.
+    /// </summary>
+    public void Render(int target, int pixelWidth, int pixelHeight, in FrameSetup setup, bool drawScene = true)
     {
         LastDrawCalls = LastTriangles = LastCulled = 0;
         if (pixelWidth <= 0 || pixelHeight <= 0)
@@ -124,8 +127,8 @@ internal sealed class SceneRenderer
             return;
         }
 
-        Scene? scene = _scene;
-        Matrix4x4 view = ViewCamera.ViewMatrix(setup.Pose);
+        Scene? scene = drawScene ? _scene : null;
+        Matrix4x4 view = drawScene ? ViewCamera.ViewMatrix(setup.Pose) : Matrix4x4.Identity;
         Matrix4x4 projection = default;
         bool drawable = false;
         if (scene is not null)
