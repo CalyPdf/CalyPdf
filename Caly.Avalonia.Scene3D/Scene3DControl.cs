@@ -21,8 +21,13 @@ namespace Caly.Avalonia.Scene3D;
 /// <item>left-drag rotates about the view's orbit point;</item>
 /// <item>right-drag up or down, or the wheel while the control has focus, zooms;</item>
 /// <item>Ctrl + left-drag or middle-drag pans;</item>
-/// <item>double-click or Home returns to the view.</item>
+/// <item>double-click or Home returns to the view;</item>
+/// <item>a right-click without movement is left to the host, as a request for its context menu.</item>
 /// </list>
+/// <para>
+/// A host with gestures of its own adjusts these with <see cref="ReservedModifiers"/>,
+/// <see cref="PanModifiers"/> and <see cref="ResetKey"/>.
+/// </para>
 /// <para>
 /// The control never disposes the scene. Once the scene's geometry is on the GPU the control asks the
 /// scene to release its copy (see <see cref="ReleaseGeometryAfterUpload"/>); if the control then loses its
@@ -64,6 +69,12 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
     /// <summary>A right-drag of this many pixels is one zoom step (as one notch of the wheel).</summary>
     private const float PixelsPerZoomStep = 20;
 
+    /// <summary>
+    /// A right button released having strayed less than this many pixels from where it went down is a
+    /// click, which asks for the host's context menu, and not a zoom.
+    /// </summary>
+    internal const double ContextClickTolerance = 4;
+
     private enum Drag
     {
         None,
@@ -90,6 +101,8 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
 
     private Drag _drag;
     private Point _lastPointer;
+    private Point _pressPointer;
+    private bool _movedSincePress;
 
     static Scene3DControl()
     {
@@ -137,6 +150,21 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
     /// default: a scene's geometry is otherwise held twice.
     /// </summary>
     public bool ReleaseGeometryAfterUpload { get; set; } = true;
+
+    /// <summary>
+    /// Modifier keys that belong to the host. A press or a wheel turn made with any of them down is left
+    /// unhandled, for the host's own gestures (a page pan, a page zoom). None by default.
+    /// </summary>
+    public KeyModifiers ReservedModifiers { get; set; }
+
+    /// <summary>
+    /// The modifier keys that turn a left-drag into a pan; <see cref="KeyModifiers.None"/> for no such
+    /// drag (the middle button always pans). Ctrl by default.
+    /// </summary>
+    public KeyModifiers PanModifiers { get; set; } = KeyModifiers.Control;
+
+    /// <summary>The key that returns the camera to the view, or null for none. Home by default.</summary>
+    public Key? ResetKey { get; set; } = Key.Home;
 
     /// <summary>What the control is doing.</summary>
     public Scene3DStatus Status
@@ -245,15 +273,18 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
 
     private void OnSceneChanged()
     {
-        _scenePending = Scene is not null;
-        if (Scene is null)
+        Scene? scene = Scene;
+        _scenePending = scene is not null;
+        if (scene is null)
         {
             Status = Scene3DStatus.Empty;
             StatusMessage = null;
         }
         else if (Status is not (Scene3DStatus.Unavailable or Scene3DStatus.Failed))
         {
-            Status = Scene3DStatus.Uploading;
+            // A scene that has given up its geometry cannot be uploaded, and no GPU is needed to see
+            // that: say so now, so that a host can decode again while OpenGL is still starting.
+            Status = scene.HasGeometry ? Scene3DStatus.Uploading : Scene3DStatus.NeedsScene;
         }
 
         ResetView();
@@ -274,6 +305,13 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
         PointerPoint point = e.GetCurrentPoint(this);
         Focus();
 
+        if ((e.KeyModifiers & ReservedModifiers) != 0)
+        {
+            // The host's gesture: the press travels on, unhandled.
+            _drag = Drag.None;
+            return;
+        }
+
         if (point.Properties.IsLeftButtonPressed && e.ClickCount == 2)
         {
             ResetView();
@@ -281,14 +319,16 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
             return;
         }
 
-        _drag = point.Properties.IsLeftButtonPressed ? ((e.KeyModifiers & KeyModifiers.Control) != 0 ? Drag.Pan : Drag.Rotate)
+        bool pans = PanModifiers != KeyModifiers.None && (e.KeyModifiers & PanModifiers) == PanModifiers;
+        _drag = point.Properties.IsLeftButtonPressed ? (pans ? Drag.Pan : Drag.Rotate)
             : point.Properties.IsMiddleButtonPressed ? Drag.Pan
             : point.Properties.IsRightButtonPressed ? Drag.Zoom
             : Drag.None;
 
         if (_drag != Drag.None)
         {
-            _lastPointer = point.Position;
+            _lastPointer = _pressPointer = point.Position;
+            _movedSincePress = false;
             e.Pointer.Capture(this);
             e.Handled = true;
         }
@@ -306,6 +346,7 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
         Point position = e.GetPosition(this);
         float dx = (float)(position.X - _lastPointer.X), dy = (float)(position.Y - _lastPointer.Y);
         _lastPointer = position;
+        _movedSincePress |= Math.Abs(position.X - _pressPointer.X) >= ContextClickTolerance || Math.Abs(position.Y - _pressPointer.Y) >= ContextClickTolerance;
 
         switch (_drag)
         {
@@ -326,13 +367,20 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
     /// <inheritdoc/>
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
-        base.OnPointerReleased(e);
-        if (_drag != Drag.None)
+        Drag drag = _drag;
+        if (drag != Drag.None)
         {
             _drag = Drag.None;
             e.Pointer.Capture(null);
-            e.Handled = true;
+
+            // A right button that never left its place was a click: left unhandled, so that the base
+            // class asks for the context menu and a host's menu opens. Everything else was a drag, and
+            // is marked handled before the base class sees it, which would otherwise ask for a menu
+            // after every right-drag.
+            e.Handled = drag != Drag.Zoom || _movedSincePress || e.InitialPressMouseButton != MouseButton.Right;
         }
+
+        base.OnPointerReleased(e);
     }
 
     /// <inheritdoc/>
@@ -348,7 +396,7 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
         base.OnPointerWheelChanged(e);
 
         // Without focus the wheel is left to whatever scrolls around the control.
-        if (IsFocused && _hasPose && e.Delta.Y != 0)
+        if (IsFocused && _hasPose && e.Delta.Y != 0 && (e.KeyModifiers & ReservedModifiers) == 0)
         {
             ZoomBy((float)e.Delta.Y);
             e.Handled = true;
@@ -359,7 +407,7 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
-        if (e.Key == Key.Home && !e.Handled)
+        if (ResetKey is { } resetKey && e.Key == resetKey && !e.Handled)
         {
             ResetView();
             e.Handled = true;

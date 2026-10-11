@@ -49,6 +49,13 @@ coordinates, lines and points.
   grows with the zoom squared. Instead, place the control over the *visible* part of the 3D view at
   device resolution and set `VisibleRegion` to that part (in fractions of the whole view). The framebuffer
   then never exceeds the window. `tools/Scene3DViewer/ZoomedViewHost.cs` shows how.
+- **A host with gestures of its own** sets `ReservedModifiers` (presses and wheel turns made with those
+  keys down are left unhandled: a page pan or zoom), `PanModifiers` (which modifier turns a left-drag into
+  a pan; Ctrl by default) and `ResetKey` (Home by default, null for none). A right-click without movement
+  is never handled: Avalonia then raises `ContextRequested`, and a context menu of the host opens over the
+  view. A right-drag zooms and raises nothing.
+- **A scene without geometry is reported at once**: setting one gives `NeedsScene` without waiting for
+  OpenGL, so a host can decode again while the surface is still being created.
 - **`Statistics`** gives the GPU memory held (vertices, indices, textures, framebuffer), the last frame's
   draws, triangles and time, and `TexturesPending`: the model is complete when it reaches 0.
 - **The payload must stay alive.** A scene's texture images may be slices of the payload it was read
