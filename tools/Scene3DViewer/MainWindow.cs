@@ -13,6 +13,7 @@ internal sealed class MainWindow : Window
     private readonly Scene3DControl _view3D;
     private LoadedModel? _model;
     private bool _captureRequested, _firstFrameLogged;
+    private Benchmark? _benchmark;
 
     public MainWindow(Options options)
     {
@@ -73,6 +74,21 @@ internal sealed class MainWindow : Window
             Program.Log("OpenGL: " + _view3D.GlDescription);
             Program.Log(string.Create(CultureInfo.InvariantCulture,
                 $"first frame: {s.DrawCalls} draws, {s.Triangles} triangles, {s.CulledDraws} culled, {s.Samples}x samples via {_view3D.ResolvePath}, {s.FrameMilliseconds:F1} ms, GPU {s.TotalBytes / 1048576.0:F1} MB, {s.LiveGpuObjects} GPU objects"));
+        }
+
+        if (_options.BenchmarkFrames > 0 && _view3D.Status == Scene3DStatus.Ready)
+        {
+            _benchmark ??= new Benchmark(_view3D, _options.BenchmarkFrames);
+            _benchmark.OnFrame();
+            if (_benchmark.IsDone)
+            {
+                Program.Log(Benchmark.Header);
+                Program.Log(_benchmark.Report(Path.GetFileNameWithoutExtension(_options.File!)));
+                _options.BenchmarkFrames = 0;
+                Avalonia.Threading.Dispatcher.UIThread.Post(Close);
+            }
+
+            return;
         }
 
         if (_options.Capture is { } path && _view3D.Status == Scene3DStatus.Ready && !_captureRequested)

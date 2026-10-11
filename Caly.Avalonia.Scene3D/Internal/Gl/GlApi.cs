@@ -35,6 +35,7 @@ internal sealed unsafe class GlApi
     public const int NoError = 0, OutOfMemory = 0x0505;
 
     private readonly delegate* unmanaged<int> _getError;
+    private readonly delegate* unmanaged<void> _finish;
     private readonly delegate* unmanaged<int, byte*> _getString;
     private readonly delegate* unmanaged<int, int*, void> _getIntegerv;
     private readonly delegate* unmanaged<int, int, int, int, void> _viewport;
@@ -109,6 +110,7 @@ internal sealed unsafe class GlApi
         IsEmbedded = version.Type == GlProfileType.OpenGLES;
 
         _getError = (delegate* unmanaged<int>)Load(gl, "glGetError");
+        _finish = (delegate* unmanaged<void>)Load(gl, "glFinish");
         _getString = (delegate* unmanaged<int, byte*>)Load(gl, "glGetString");
         _getIntegerv = (delegate* unmanaged<int, int*, void>)Load(gl, "glGetIntegerv");
         _viewport = (delegate* unmanaged<int, int, int, int, void>)Load(gl, "glViewport");
@@ -194,6 +196,9 @@ internal sealed unsafe class GlApi
     // ---- state ----
 
     public int GetError() => _getError();
+
+    /// <summary>Waits until the GPU has executed everything issued so far. For measurements only.</summary>
+    public void Finish() => _finish();
 
     public string GetString(int name) => Marshal.PtrToStringUTF8((nint)_getString(name)) ?? "";
 

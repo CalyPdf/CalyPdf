@@ -136,6 +136,25 @@ public class Scene3DControl : OpenGlControlBase
     /// <summary>The camera in use; for tests and the viewer.</summary>
     internal CameraPose Pose => _pose;
 
+    /// <summary>
+    /// For measurements: wait for the GPU at the end of each frame, so that the frame time in
+    /// <see cref="Statistics"/> covers the GPU's work and not only issuing it.
+    /// </summary>
+    internal bool FinishEachFrame { get; set; }
+
+    /// <summary>Managed bytes allocated while drawing the last frame; for measurements.</summary>
+    internal long LastFrameAllocatedBytes { get; private set; }
+
+    /// <summary>Turns the camera about the orbit point as a pointer drag of this many pixels would.</summary>
+    internal void RotateBy(float dx, float dy)
+    {
+        if (_hasPose)
+        {
+            _pose = OrbitController.Rotate(_pose, dx, dy, (float)Bounds.Height);
+            RequestNextFrameRendering();
+        }
+    }
+
     /// <summary>The OpenGL version and renderer strings, once initialised; for diagnostics.</summary>
     internal string? GlDescription { get; private set; }
 
@@ -265,7 +284,13 @@ public class Scene3DControl : OpenGlControlBase
                 FramebufferBudget = FramebufferBudgetBytes
             };
 
+            long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
             renderer.Render(fb, pixelWidth, pixelHeight, setup);
+            LastFrameAllocatedBytes = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+            if (FinishEachFrame)
+            {
+                renderer.Gl.Finish();
+            }
 
             if (CaptureNextFrame is { } capture)
             {

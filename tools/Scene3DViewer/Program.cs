@@ -13,6 +13,7 @@ namespace Scene3DViewer;
 //   --view N           which authored view (default: the document's default view)
 //   --size WxH         size of the 3D view in device-independent pixels (default 1200x900)
 //   --capture out.png  save what the control drew, then exit
+//   --benchmark N      turn the model for N frames, print frame times as a table row, then exit
 //   --software         start Avalonia with its software renderer (the control must report "Unavailable")
 //   --log file         also write the log lines to a file
 
@@ -29,6 +30,8 @@ internal sealed class Options
     public double Height { get; set; } = 900;
 
     public string? Capture { get; set; }
+
+    public int BenchmarkFrames { get; set; }
 
     public bool Software { get; set; }
 }
@@ -62,6 +65,7 @@ internal static class Program
                 case "--view": Options.View = int.Parse(args[++i], CultureInfo.InvariantCulture); break;
                 case "--capture": Options.Capture = Path.GetFullPath(args[++i]); break;
                 case "--software": Options.Software = true; break;
+                case "--benchmark": Options.BenchmarkFrames = int.Parse(args[++i], CultureInfo.InvariantCulture); break;
                 case "--log": _log = new StreamWriter(args[++i]); break;
                 case "--size":
                     string[] parts = args[++i].Split('x');
@@ -82,7 +86,7 @@ internal static class Program
 
         if (Options.File is null)
         {
-            Console.Error.WriteLine("usage: Scene3DViewer <file.u3d | file.pdf> [--artwork N] [--view N] [--size WxH] [--capture out.png] [--software] [--log file]");
+            Console.Error.WriteLine("usage: Scene3DViewer <file.u3d | file.pdf> [--artwork N] [--view N] [--size WxH] [--capture out.png] [--benchmark N] [--software] [--log file]");
             return 1;
         }
 
