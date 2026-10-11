@@ -84,6 +84,18 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
     
     [ObservableProperty] private IReadOnlyList<PdfRectangle[]>? _selectedWords;
 
+    /// <summary>
+    /// The 3D artwork of this page that is being viewed in place, if any. Set by the document.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ActiveArtwork3DIndex))]
+    private Artwork3DViewModel? _activeArtwork3D;
+
+    /// <summary>
+    /// Position of <see cref="ActiveArtwork3D"/> in the text layer's artworks, or -1 when none is active.
+    /// </summary>
+    public int ActiveArtwork3DIndex => ActiveArtwork3D?.ArtworkIndex ?? -1;
+
     private IReadOnlyList<Range>? _searchResultsRanges; // Needed as the text layer might not be available when we set search results
     [ObservableProperty] private IReadOnlyList<PdfRectangle[]>? _searchResults;
 

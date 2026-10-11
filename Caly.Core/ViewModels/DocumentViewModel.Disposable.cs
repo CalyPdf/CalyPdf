@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using Avalonia.Threading;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -31,6 +32,13 @@ public partial class DocumentViewModel : IAsyncDisposable
         Debug.ThrowOnUiThread();
 
         await _mainCts.CancelAsync();
+
+        if (ActiveArtwork3D is { } artwork3D)
+        {
+            // Its scene is bound to a control: let go of it where controls live. Not awaited, the
+            // UI thread may itself be waiting for this disposal.
+            Dispatcher.UIThread.Post(() => CloseArtwork3D(artwork3D, null));
+        }
 
         Parallel.ForEach(Pages.Chunk(100),
             new ParallelOptions() { MaxDegreeOfParallelism = 4 },
