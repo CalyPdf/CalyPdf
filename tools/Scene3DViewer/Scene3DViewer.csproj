@@ -16,6 +16,14 @@
 		<AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
 	</PropertyGroup>
 
+	<!-- Native AOT, to check that the control survives it:
+	       dotnet publish tools/Scene3DViewer -r win-x64 -c Release -p:ViewerAot=true
+	     (A property of its own: PublishAot given on the command line would reach the netstandard2.0
+	     projects this one references, which cannot be compiled ahead of time.) -->
+	<PropertyGroup Condition="'$(ViewerAot)' == 'true'">
+		<PublishAot>true</PublishAot>
+	</PropertyGroup>
+
 	<ItemGroup>
 		<PackageReference Include="Avalonia" Version="12.1.3" />
 		<PackageReference Include="Avalonia.Desktop" Version="12.1.3" />

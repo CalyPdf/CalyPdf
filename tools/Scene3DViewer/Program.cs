@@ -8,6 +8,7 @@ namespace Scene3DViewer;
 // Scene3DViewer: a host for Caly.Avalonia.Scene3D.
 //
 //   Scene3DViewer <file.u3d | file.pdf> [options]
+//   Scene3DViewer --selftest [--log file]
 //
 //   --artwork N         which 3D artwork of a PDF, in page order (default 0)
 //   --view N            which authored view (default: the document's default view)
@@ -20,6 +21,7 @@ namespace Scene3DViewer;
 //   --benchmark N       turn the model for N frames, print frame times as a table row, then exit
 //   --scenario recycle  take the control out of the window and put it back, as a recycled page does
 //   --exit-after S      close after S seconds
+//   --selftest          draw built-in scenes, read them back and check them; exit code 0 when all pass
 //   --software          start Avalonia with its software renderer (the control must report "Unavailable")
 //   --log file          also write the log lines to a file
 
@@ -50,6 +52,8 @@ internal sealed class Options
     public double ExitAfterSeconds { get; set; }
 
     public bool Software { get; set; }
+
+    public bool SelfTest { get; set; }
 }
 
 internal static class Program
@@ -90,6 +94,7 @@ internal static class Program
                     case "--scenario": Options.Scenario = args[++i]; break;
                     case "--exit-after": Options.ExitAfterSeconds = Number(args[++i]); break;
                     case "--software": Options.Software = true; break;
+                    case "--selftest": Options.SelfTest = true; break;
                     case "--log": _log = new StreamWriter(args[++i]); break;
                     case "--size":
                         string[] size = args[++i].Split('x');
@@ -118,7 +123,7 @@ internal static class Program
             return 1;
         }
 
-        if (Options.File is null)
+        if (Options.File is null && !Options.SelfTest)
         {
             Console.Error.WriteLine("usage: Scene3DViewer <file.u3d | file.pdf> [--artwork N] [--view N] [--size WxH] [--poster] [--zoom Z] [--at X,Y] [--capture out.png] [--benchmark N] [--scenario recycle] [--exit-after S] [--software] [--log file]");
             return 1;
@@ -144,7 +149,7 @@ internal sealed class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            desktop.MainWindow = new MainWindow(Program.Options);
+            desktop.MainWindow = Program.Options.SelfTest ? new SelfTestWindow() : new MainWindow(Program.Options);
         }
 
         base.OnFrameworkInitializationCompleted();
