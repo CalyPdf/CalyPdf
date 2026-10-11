@@ -116,10 +116,9 @@ internal sealed class DrawList
 
         Matrix4x4[] world = ArrayPool<Matrix4x4>.Shared.Rent(Math.Max(nodes.Length, 1));
         float[] opacity = ArrayPool<float>.Shared.Rent(Math.Max(nodes.Length, 1));
-        bool[] subtreeHidden = ArrayPool<bool>.Shared.Rent(Math.Max(nodes.Length, 1));
         try
         {
-            // Parents come before children, so one pass carries transforms, hiding and opacity down the tree.
+            // Parents come before children, so one pass carries transforms and opacity down the tree.
             for (int i = 0; i < nodes.Length; i++)
             {
                 SceneNode node = nodes[i];
@@ -131,12 +130,12 @@ internal sealed class DrawList
                 Matrix4x4 local = changed && change.Transform is { } transform && IsFinite(transform) ? transform : node.Local;
                 world[i] = hasParent ? local * world[node.Parent] : local;
 
-                // Hiding a node hides what hangs under it; showing one shows only itself.
-                subtreeHidden[i] = (hasParent && subtreeHidden[node.Parent]) || (changed && change.Visible == false);
                 float own = changed && change.Opacity is { } o && float.IsFinite(o) ? Math.Clamp(o, 0f, 1f) : 1f;
                 opacity[i] = (hasParent ? opacity[node.Parent] : 1f) * own;
 
-                bool visible = !subtreeHidden[i] && (changed && change.Visible is { } v ? v : node.Visible);
+                // Shown or hidden is said of the node alone, as ISO 32000 has it ("the visibility of this
+                // node"): views hide the node of an assembly and leave its parts to be seen.
+                bool visible = changed && change.Visible is { } v ? v : node.Visible;
                 if (!visible || !(opacity[i] > 0) || (uint)node.Mesh >= (uint)meshes.Length)
                 {
                     continue;
@@ -193,7 +192,6 @@ internal sealed class DrawList
         {
             ArrayPool<Matrix4x4>.Shared.Return(world);
             ArrayPool<float>.Shared.Return(opacity);
-            ArrayPool<bool>.Shared.Return(subtreeHidden);
         }
 
         Array.Sort(_records, 0, _recordCount, RecordOrder.Instance);

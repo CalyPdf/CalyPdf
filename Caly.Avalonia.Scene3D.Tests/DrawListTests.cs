@@ -129,19 +129,21 @@ public class DrawListTests
     {
         using Scene scene = Build();
 
-        // Hiding B hides its child C; showing "Hidden" shows it.
+        // Hiding B hides B and leaves its child C; showing "Hidden" shows it.
         var view = new SceneView { NodeOverrides = [new SceneNodeOverride("B", false, null, null), new SceneNodeOverride("Hidden", true, null, null)] };
         DrawList list = Prepared(scene, view);
 
         string[] drawn = Names(scene, list.Opaque).Concat(Names(scene, list.Transparent)).ToArray();
-        Assert.DoesNotContain(drawn, n => n.StartsWith("B:") || n.StartsWith("C:"));
+        Assert.DoesNotContain(drawn, n => n.StartsWith("B:"));
+        Assert.Contains("C:0", drawn);
         Assert.Contains("Hidden:1", drawn);
         Assert.Equal(-10.5f, list.VisibleBounds.Min.X);
 
-        // Hiding the group hides everything under it, and a child cannot opt back in.
+        // What a view says of a node is said of that node alone. The views of real documents hide the
+        // node of an assembly (it has nothing of its own to draw) and show, or do not mention, its parts.
         view = new SceneView { NodeOverrides = [new SceneNodeOverride("Group", false, null, null), new SceneNodeOverride("A", true, null, null)] };
         list = Prepared(scene, view);
-        Assert.Equal(["D:2", "E:0", "E:1"], Names(scene, list.Opaque).Concat(Names(scene, list.Transparent)).Order().ToArray());
+        Assert.Equal(["A:1", "B:1", "B:2", "C:0", "D:2", "E:0", "E:1"], Names(scene, list.Opaque).Concat(Names(scene, list.Transparent)).Order().ToArray());
 
         // A name that matches nothing changes nothing.
         list = Prepared(scene, new SceneView { NodeOverrides = [new SceneNodeOverride("Nobody", false, 0.1f, Matrix4x4.CreateScale(9))] });
