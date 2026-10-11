@@ -32,7 +32,7 @@ namespace Caly.Pdf.Models;
 /// </summary>
 public sealed class PdfArtwork3D
 {
-    private const int MaxViewNames = 1_000;
+    internal const int MaxViewNames = 1_000;
 
     public required double PpiScale { get; init; }
 
@@ -109,7 +109,7 @@ public sealed class PdfArtwork3D
         return artwork.DefaultView is { } view ? GetName(view) : null;
     }
 
-    private static string GetName(Artwork3DView view)
+    internal static string GetName(Artwork3DView view)
     {
         if (!string.IsNullOrWhiteSpace(view.ExternalName))
         {
