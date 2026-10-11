@@ -52,6 +52,9 @@ public class TileCacheSizeSettingTests
         public Task<PdfTextLayer?> GetPageTextLayerAsync(int pageNumber, CancellationToken token)
             => throw new NotImplementedException();
 
+        public Task<Caly.Pdf.Artwork.Artwork3DContent?> GetArtwork3DContentAsync(PdfArtwork3D artwork, CancellationToken token)
+            => throw new NotImplementedException();
+
         public Task<IRef<SKPicture>?> GetRenderPageAsync(int pageNumber, CancellationToken token)
             => throw new NotImplementedException();
 
