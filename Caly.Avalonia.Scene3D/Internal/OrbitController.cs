@@ -13,6 +13,7 @@ internal static class OrbitController
     private const float ZoomFactorPerStep = 0.9f;
 
     private const float MinimumDistance = 1e-12f;
+    private const float RelativeMinimumDistance = 1e-5f;
     private const float MaximumDistance = 1e18f;
 
     /// <summary>
@@ -98,13 +99,16 @@ internal static class OrbitController
             return;
         }
 
+        // Not so close that the camera and the orbit point become the same numbers: the floor follows the
+        // size of the coordinates involved.
+        Vector3 orbitPoint = pose.OrbitPoint;
+        float floor = MathF.Max(MinimumDistance, orbitPoint.Length() * RelativeMinimumDistance);
         float distance = pose.OrbitDistance * factor;
-        if (distance < MinimumDistance || distance > MaximumDistance || !float.IsFinite(distance))
+        if ((distance < floor && factor < 1) || distance > MaximumDistance || !float.IsFinite(distance))
         {
             return;
         }
 
-        Vector3 orbitPoint = pose.OrbitPoint;
         CameraPose zoomed = pose;
         zoomed.OrbitDistance = distance;
         zoomed.Position = orbitPoint - pose.Forward * distance;

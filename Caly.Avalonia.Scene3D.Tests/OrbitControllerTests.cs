@@ -100,17 +100,17 @@ public class OrbitControllerTests
         Vector3 orbit = pose.OrbitPoint;
         float previous = pose.OrbitDistance;
 
-        // Closer with every step, until a floor far below anything a scene measures; never to the point.
+        // Closer with every step, until a floor where camera and orbit point are still distinct numbers.
         for (int i = 0; i < 400; i++)
         {
             OrbitController.Zoom(ref pose, ref projection, 1);
 
-            Assert.True(i < 100 ? pose.OrbitDistance < previous : pose.OrbitDistance <= previous, $"step {i}: {pose.OrbitDistance} after {previous}");
+            Assert.True(i < 50 ? pose.OrbitDistance < previous : pose.OrbitDistance <= previous, $"step {i}: {pose.OrbitDistance} after {previous}");
             Assert.True(pose.OrbitDistance > 0);
             previous = pose.OrbitDistance;
         }
 
-        Assert.True(pose.OrbitDistance < 1e-6f);
+        Assert.True(pose.OrbitDistance < 1e-3f);
         Assert.True(pose.IsFinite);
         Assert.Equal(Perspective, projection);
         AssertClose(orbit, pose.OrbitPoint, 1e-2f);
