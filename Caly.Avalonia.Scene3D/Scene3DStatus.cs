@@ -38,7 +38,8 @@ public enum Scene3DStatus
 /// <param name="FramesRendered">Frames drawn since the control was created.</param>
 /// <param name="LiveGpuObjects">GPU objects created and not yet released.</param>
 /// <param name="TexturesLoaded">Textures on the GPU.</param>
-/// <param name="TexturesFailed">Textures that could not be decoded or did not fit the budget.</param>
+/// <param name="TexturesFailed">Textures that could not be decoded or uploaded.</param>
+/// <param name="TexturesPending">Textures still being decoded or waiting to be uploaded; the model is complete at 0.</param>
 public readonly record struct Scene3DStatistics(
     long VertexBytes,
     long IndexBytes,
@@ -52,7 +53,8 @@ public readonly record struct Scene3DStatistics(
     long FramesRendered,
     int LiveGpuObjects,
     int TexturesLoaded,
-    int TexturesFailed)
+    int TexturesFailed,
+    int TexturesPending)
 {
     /// <summary>All GPU memory the control accounts for.</summary>
     public long TotalBytes => VertexBytes + IndexBytes + TextureBytes + FramebufferBytes;

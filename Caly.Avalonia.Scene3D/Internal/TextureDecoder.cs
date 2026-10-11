@@ -47,15 +47,60 @@ internal static unsafe class TextureDecoder
 {
     private const SceneTextureChannels ColorChannels = SceneTextureChannels.Rgb | SceneTextureChannels.Luminance;
 
+    /// <summary>Whether the texture has an image this decoder can turn into colour.</summary>
+    public static bool HasColorImage(SceneTexture texture) => FindImages(texture, out _) >= 0;
+
     /// <summary>
-    /// Decodes a texture's colour image, combined with its separate alpha image if it has one.
+    /// The size of the texture's colour image, read from its header without decoding it. False for a
+    /// texture without a usable image or whose header claims more than <paramref name="maxSourcePixels"/>.
     /// </summary>
-    /// <param name="maxSide">Longest side of the result; larger images are scaled down.</param>
-    /// <param name="maxSourcePixels">Images whose header claims more pixels than this are refused.</param>
-    /// <returns>The pixels, or null when the texture has no image this can use.</returns>
-    public static DecodedTexture? Decode(SceneTexture texture, int maxSide, long maxSourcePixels)
+    public static bool TryGetSize(SceneTexture texture, long maxSourcePixels, out int width, out int height)
     {
-        int colorIndex = -1, alphaIndex = -1;
+        width = height = 0;
+        int colorIndex = FindImages(texture, out _);
+        if (colorIndex < 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            ReadOnlyMemory<byte> data = texture.Images[colorIndex].Data;
+            using System.Buffers.MemoryHandle pin = data.Pin();
+            using SKData encoded = SKData.Create((IntPtr)pin.Pointer, data.Length);
+            using SKCodec? codec = SKCodec.Create(encoded);
+            if (codec is null || codec.Info.Width <= 0 || codec.Info.Height <= 0 || (long)codec.Info.Width * codec.Info.Height > maxSourcePixels)
+            {
+                return false;
+            }
+
+            width = codec.Info.Width;
+            height = codec.Info.Height;
+            return true;
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>A size scaled down, keeping its proportions, so that its longer side is at most <paramref name="maxSide"/>.</summary>
+    public static (int Width, int Height) FitSize(int width, int height, int maxSide)
+    {
+        if (width <= 0 || height <= 0)
+        {
+            return (0, 0);
+        }
+
+        float scale = MathF.Min(1f, maxSide / (float)Math.Max(width, height));
+        return (Math.Max(1, (int)(width * scale)), Math.Max(1, (int)(height * scale)));
+    }
+
+    /// <summary>The index of the colour image to use, or -1; and of a separate alpha image, or -1.</summary>
+    private static int FindImages(SceneTexture texture, out int alphaIndex)
+    {
+        int colorIndex = -1;
+        alphaIndex = -1;
         for (int i = 0; i < texture.Images.Count; i++)
         {
             SceneTextureImage image = texture.Images[i];
@@ -74,6 +119,18 @@ internal static unsafe class TextureDecoder
             }
         }
 
+        return colorIndex;
+    }
+
+    /// <summary>
+    /// Decodes a texture's colour image, combined with its separate alpha image if it has one.
+    /// </summary>
+    /// <param name="maxSide">Longest side of the result; larger images are scaled down.</param>
+    /// <param name="maxSourcePixels">Images whose header claims more pixels than this are refused.</param>
+    /// <returns>The pixels, or null when the texture has no image this can use.</returns>
+    public static DecodedTexture? Decode(SceneTexture texture, int maxSide, long maxSourcePixels)
+    {
+        int colorIndex = FindImages(texture, out int alphaIndex);
         if (colorIndex < 0)
         {
             return null;
@@ -153,9 +210,7 @@ internal static unsafe class TextureDecoder
         int targetWidth = forcedWidth, targetHeight = forcedHeight;
         if (forcedWidth <= 0 || forcedHeight <= 0)
         {
-            float scale = MathF.Min(1f, maxSide / (float)Math.Max(source.Width, source.Height));
-            targetWidth = Math.Max(1, (int)(source.Width * scale));
-            targetHeight = Math.Max(1, (int)(source.Height * scale));
+            (targetWidth, targetHeight) = FitSize(source.Width, source.Height, maxSide);
         }
 
         float wanted = MathF.Max(targetWidth / (float)source.Width, targetHeight / (float)source.Height);

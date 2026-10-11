@@ -406,7 +406,7 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
         {
             var api = new GlApi(gl, GlVersion);
             GlDescription = $"{api.GetString(GlApi.Version)}; {api.GetString(GlApi.Renderer)}; max samples {api.GetInteger(GlApi.MaxSamples)}; max texture {api.GetInteger(GlApi.MaxTextureSize)}";
-            _renderer = new SceneRenderer(api);
+            _renderer = new SceneRenderer(api, () => Dispatcher.UIThread.Post(RequestNextFrameRendering, DispatcherPriority.Background));
             if (Status == Scene3DStatus.Unavailable)
             {
                 Status = Scene is null ? Scene3DStatus.Empty : Scene3DStatus.Uploading;
@@ -503,7 +503,7 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
             _statistics = new Scene3DStatistics(
                 renderer.Resources.VertexBytes,
                 renderer.Resources.IndexBytes,
-                0,
+                renderer.TextureBytes,
                 renderer.Targets.Bytes,
                 renderer.LastDrawCalls,
                 renderer.LastTriangles,
@@ -512,8 +512,15 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
                 Stopwatch.GetElapsedTime(started).TotalMilliseconds,
                 _framesRendered,
                 renderer.Gl.LiveObjects,
-                0,
-                0);
+                renderer.TexturesLoaded,
+                renderer.TexturesFailed,
+                renderer.TexturesPending);
+
+            // Textures decoded but not yet uploaded for lack of time in this frame: another frame, soon.
+            if (renderer.MoreUploadsReady)
+            {
+                RequestNextFrameRendering();
+            }
         }
         catch (Exception e) when (e is not OutOfMemoryException)
         {

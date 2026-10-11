@@ -19,7 +19,8 @@ internal sealed class MainWindow : Window
     private readonly ComboBox _views = new() { MinWidth = 220, VerticalAlignment = VerticalAlignment.Center };
     private readonly TextBlock _statistics = new() { VerticalAlignment = VerticalAlignment.Center, Foreground = Brushes.Gainsboro, FontFamily = new FontFamily("Consolas, monospace") };
     private LoadedModel? _model;
-    private bool _captureRequested, _firstFrameLogged, _scenarioStarted;
+    private bool _captureRequested, _firstFrameLogged, _texturesLogged, _scenarioStarted;
+    private long _readyAt;
     private Benchmark? _benchmark;
 
     public MainWindow(Options options)
@@ -157,9 +158,24 @@ internal sealed class MainWindow : Window
         if (!_firstFrameLogged)
         {
             _firstFrameLogged = true;
+            _texturesLogged = false;
+            _readyAt = System.Diagnostics.Stopwatch.GetTimestamp();
             Program.Log("OpenGL: " + _view3D.GlDescription);
             Program.Log(string.Create(CultureInfo.InvariantCulture,
                 $"first frame: {s.DrawCalls} draws, {s.Triangles} triangles, {s.CulledDraws} culled, {s.Samples}x samples via {_view3D.ResolvePath}, {s.FrameMilliseconds:F1} ms, GPU {s.TotalBytes / 1048576.0:F1} MB, {s.LiveGpuObjects} GPU objects"));
+        }
+
+        // Textures arrive after the first frame; everything below waits until the model is complete.
+        if (s.TexturesPending > 0)
+        {
+            return;
+        }
+
+        if (!_texturesLogged)
+        {
+            _texturesLogged = true;
+            Program.Log(string.Create(CultureInfo.InvariantCulture,
+                $"textures: {s.TexturesLoaded} loaded, {s.TexturesFailed} failed, {s.TextureBytes / 1048576.0:F1} MB, complete {System.Diagnostics.Stopwatch.GetElapsedTime(_readyAt).TotalMilliseconds:F0} ms after the first frame; frame {s.FramesRendered}"));
         }
 
         if (_options.BenchmarkFrames > 0)
@@ -178,7 +194,7 @@ internal sealed class MainWindow : Window
         }
 
         _statistics.Text = string.Create(CultureInfo.InvariantCulture,
-            $"{s.DrawCalls} draws  {s.Triangles / 1000.0:F0}k tris  {s.CulledDraws} culled  {s.Samples}x  {s.FrameMilliseconds:F1} ms  GPU {s.TotalBytes / 1048576.0:F0} MB  frame {s.FramesRendered}");
+            $"{s.DrawCalls} draws  {s.Triangles / 1000.0:F0}k tris  {s.CulledDraws} culled  {s.Samples}x  {s.FrameMilliseconds:F1} ms  GPU {s.TotalBytes / 1048576.0:F0} MB  {s.TexturesLoaded} textures  frame {s.FramesRendered}");
 
         if (_options.Scenario == "recycle" && !_scenarioStarted)
         {

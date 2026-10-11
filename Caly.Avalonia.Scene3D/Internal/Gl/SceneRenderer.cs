@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Numerics;
 using Scene3D;
 
@@ -47,13 +48,30 @@ internal sealed class SceneRenderer
     private readonly float[] _lightSpots = new float[LightRigs.MaxLights * 4];
     private readonly float[] _normalMatrix = new float[9];
 
+    /// <summary>
+    /// Texture rows are stored top first, and the formats measure V from the bottom of the image: V is
+    /// turned over after the layer's own transform.
+    /// </summary>
+    private static readonly Matrix4x4 FlipV = Matrix4x4.CreateScale(1, -1, 1) * Matrix4x4.CreateTranslation(0, 1, 0);
+
+    /// <summary>Longest a frame spends uploading textures that have arrived.</summary>
+    private static readonly TimeSpan UploadTimePerFrame = TimeSpan.FromMilliseconds(4);
+
+    private readonly TextureStreamer _streamer;
+    private int[] _textureIds = [];
+    private bool[] _materialHasAlphaTexture = [];
+    private int[] _textureOfMaterial = [], _layerOfMaterial = [];
+    private byte[] _repeatOfTexture = [];
+
     private Scene? _scene;
     private SceneView? _preparedView;
     private bool _drawListStale = true;
 
-    public SceneRenderer(GlApi gl)
+    /// <param name="texturesReady">Called on a thread-pool thread when a decoded texture waits to be uploaded: time to ask for a frame.</param>
+    public SceneRenderer(GlApi gl, Action texturesReady)
     {
         _gl = gl;
+        _streamer = new TextureStreamer(texturesReady);
         _resources = new SceneGpuResources(gl);
         _targets = new RenderTargets(gl);
 
@@ -95,6 +113,22 @@ internal sealed class SceneRenderer
 
     public int LastCulled { get; private set; }
 
+    /// <summary>Bytes of texture memory on the GPU, mipmaps included.</summary>
+    public long TextureBytes { get; private set; }
+
+    public int TexturesLoaded { get; private set; }
+
+    /// <summary>Textures still being decoded or waiting to be uploaded.</summary>
+    public int TexturesPending => _streamer.Pending;
+
+    /// <summary>Textures that could not be decoded or uploaded.</summary>
+    public int TexturesFailed => _streamer.Failed + _failedUploads;
+
+    /// <summary>Whether decoded textures were left waiting when the last frame ran out of upload time.</summary>
+    public bool MoreUploadsReady { get; private set; }
+
+    private int _failedUploads;
+
     /// <summary>
     /// Uploads a scene's geometry and makes it the scene that is drawn. The scene must hold its geometry;
     /// afterwards the renderer needs only its nodes, meshes, parts and materials.
@@ -102,17 +136,114 @@ internal sealed class SceneRenderer
     public void SetScene(Scene scene)
     {
         _scene = null;
+        ReleaseTextures();
         _resources.Upload(scene);
         _scene = scene;
         _drawListStale = true;
+
+        // Which texture each material shows, and how each texture repeats (as its first user asks).
+        TextureStreamer.TexturesOfMaterials(scene, out _textureOfMaterial, out _layerOfMaterial);
+        _textureIds = new int[scene.Textures.Count];
+        _materialHasAlphaTexture = new bool[scene.Materials.Length];
+        _repeatOfTexture = new byte[scene.Textures.Count];
+        var seen = new bool[scene.Textures.Count];
+        for (int m = 0; m < _textureOfMaterial.Length; m++)
+        {
+            int texture = _textureOfMaterial[m];
+            if (texture >= 0 && !seen[texture])
+            {
+                seen[texture] = true;
+                _repeatOfTexture[texture] = scene.TextureLayers[_layerOfMaterial[m]].Repeat;
+            }
+        }
+
+        _streamer.Start(scene);
     }
 
     /// <summary>Stops drawing the scene and frees its GPU memory.</summary>
     public void ClearScene()
     {
         _scene = null;
+        ReleaseTextures();
         _resources.Release();
         _drawListStale = true;
+    }
+
+    private void ReleaseTextures()
+    {
+        _streamer.Stop();
+        foreach (int id in _textureIds)
+        {
+            _gl.DeleteTexture(id);
+        }
+
+        _textureIds = [];
+        _materialHasAlphaTexture = [];
+        _textureOfMaterial = [];
+        _layerOfMaterial = [];
+        TextureBytes = 0;
+        TexturesLoaded = 0;
+        _failedUploads = 0;
+        MoreUploadsReady = false;
+    }
+
+    /// <summary>Uploads textures that have been decoded since the last frame, for a few milliseconds at most.</summary>
+    private void UploadReadyTextures()
+    {
+        MoreUploadsReady = false;
+        long started = Stopwatch.GetTimestamp();
+        while (_streamer.TryTake(out int index, out DecodedTexture pixels))
+        {
+            using (pixels)
+            {
+                if ((uint)index >= (uint)_textureIds.Length || _textureIds[index] != 0)
+                {
+                    continue;
+                }
+
+                _gl.DrainErrors();
+                int id = _gl.GenTexture();
+                _gl.ActiveTexture(GlApi.Texture0);
+                _gl.BindTexture(GlApi.Texture2D, id);
+                _gl.TexImage2D(pixels.Width, pixels.Height, pixels.Pixels);
+                _gl.GenerateMipmap();
+                _gl.TexParameter(GlApi.TextureMinFilter, GlApi.LinearMipmapLinear);
+                _gl.TexParameter(GlApi.TextureMagFilter, GlApi.Linear);
+                _gl.TexParameter(GlApi.TextureWrapS, (_repeatOfTexture[index] & 1) != 0 ? GlApi.Repeat : GlApi.ClampToEdge);
+                _gl.TexParameter(GlApi.TextureWrapT, (_repeatOfTexture[index] & 2) != 0 ? GlApi.Repeat : GlApi.ClampToEdge);
+                _gl.BindTexture(GlApi.Texture2D, 0);
+
+                if (_gl.DrainErrors() != GlApi.NoError)
+                {
+                    _gl.DeleteTexture(id);
+                    _failedUploads++;
+                    continue;
+                }
+
+                _textureIds[index] = id;
+                TextureBytes += TextureStreamer.GpuBytes(pixels.Width, pixels.Height);
+                TexturesLoaded++;
+
+                // A texture with transparency moves the materials that show it to the transparent pass.
+                if (pixels.HasAlpha)
+                {
+                    for (int m = 0; m < _textureOfMaterial.Length; m++)
+                    {
+                        if (_textureOfMaterial[m] == index)
+                        {
+                            _materialHasAlphaTexture[m] = true;
+                            _drawListStale = true;
+                        }
+                    }
+                }
+            }
+
+            if (Stopwatch.GetElapsedTime(started) > UploadTimePerFrame)
+            {
+                MoreUploadsReady = true;
+                break;
+            }
+        }
     }
 
     /// <summary>
@@ -127,6 +258,7 @@ internal sealed class SceneRenderer
             return;
         }
 
+        UploadReadyTextures();
         Scene? scene = drawScene ? _scene : null;
         Matrix4x4 view = drawScene ? ViewCamera.ViewMatrix(setup.Pose) : Matrix4x4.Identity;
         Matrix4x4 projection = default;
@@ -135,7 +267,7 @@ internal sealed class SceneRenderer
         {
             if (_drawListStale || !ReferenceEquals(_preparedView, setup.View))
             {
-                _drawList.Prepare(scene, setup.View);
+                _drawList.Prepare(scene, setup.View, _materialHasAlphaTexture);
                 _preparedView = setup.View;
                 _drawListStale = false;
             }
@@ -287,6 +419,17 @@ internal sealed class SceneRenderer
         flags |= (meshFlags & SceneMeshFlags.HasColors) != 0 && (material.Flags & SceneMaterialFlags.UseVertexColor) != 0 ? Shaders.FlagVertexColor : 0;
         flags |= (material.Flags & SceneMaterialFlags.AlphaTest) != 0 ? Shaders.FlagAlphaTest : 0;
 
+        // The base-colour texture, once it has arrived, for meshes that carry texture coordinates.
+        int texture = (uint)materialIndex < (uint)_textureOfMaterial.Length ? _textureOfMaterial[materialIndex] : -1;
+        if (texture >= 0 && _textureIds[texture] != 0 && (meshFlags & SceneMeshFlags.HasTexCoords) != 0)
+        {
+            SceneTextureLayer layer = scene.TextureLayers[_layerOfMaterial[materialIndex]];
+            gl.ActiveTexture(GlApi.Texture0);
+            gl.BindTexture(GlApi.Texture2D, _textureIds[texture]);
+            flags |= Shaders.FlagTexture | (layer.BlendFunction == SceneBlendFunction.Replace ? Shaders.FlagTextureReplaces : 0);
+            gl.UniformMatrix(_uTexTransform, IsFinite(layer.Transform) ? layer.Transform * FlipV : FlipV);
+        }
+
         gl.Uniform(_uFlags, flags);
         gl.Uniform(_uDiffuse, Sanitize(diffuse));
         gl.Uniform(_uSpecular, Sanitize(material.Specular));
@@ -340,9 +483,16 @@ internal sealed class SceneRenderer
     public void Dispose()
     {
         _scene = null;
+        ReleaseTextures();
+        _streamer.Dispose();
         _resources.Release();
         _targets.Release();
         _gl.DeleteProgram(_program);
+    }
+
+    private static bool IsFinite(in Matrix4x4 m)
+    {
+        return float.IsFinite(m.M11 + m.M12 + m.M13 + m.M14 + m.M21 + m.M22 + m.M23 + m.M24 + m.M31 + m.M32 + m.M33 + m.M34 + m.M41 + m.M42 + m.M43 + m.M44);
     }
 
     private static Vector3 Sanitize(Vector3 color)
