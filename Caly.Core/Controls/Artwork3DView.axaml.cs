@@ -27,7 +27,9 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Caly.Avalonia.Scene3D;
 using Caly.Core.Models;
+using Caly.Core.Services.Rendering;
 using System;
+using System.Diagnostics;
 using System.Windows.Input;
 
 namespace Caly.Core.Controls;
@@ -59,6 +61,9 @@ public sealed partial class Artwork3DView : UserControl
     private readonly Scene3DControl _view3D;
     private readonly Artwork3DPlacementPanel _panel;
 
+    // Only with the render-timings debug setting on: when this view was built, until its model shows.
+    private long _builtAt;
+
     public Artwork3DView()
     {
         InitializeComponent();
@@ -75,6 +80,26 @@ public sealed partial class Artwork3DView : UserControl
         // Until there is a model to draw, the page (the artwork's poster) shows through.
         _view3D.DefaultBackground = _view3D.Scene is null ? Colors.Transparent : Colors.White;
         _view3D.PropertyChanged += OnView3DPropertyChanged;
+
+        if (RenderTimings.IsEnabled)
+        {
+            _builtAt = Stopwatch.GetTimestamp();
+            _view3D.FrameRendered += (_, _) =>
+            {
+                if (_view3D.Status != Scene3DStatus.Ready)
+                {
+                    return;
+                }
+
+                if (_builtAt != 0)
+                {
+                    RenderTimings.RecordView3DShown(Stopwatch.GetTimestamp() - _builtAt);
+                    _builtAt = 0;
+                }
+
+                RenderTimings.RecordView3DFrame(_view3D.Statistics.FrameMilliseconds);
+            };
+        }
 
         this.FindControl<Button>("PART_Reset")!.Click += OnResetClick;
         this.FindControl<ComboBox>("PART_Views")!.DropDownClosed += OnViewsDropDownClosed;

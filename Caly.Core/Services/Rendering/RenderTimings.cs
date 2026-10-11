@@ -65,6 +65,15 @@ public static class RenderTimings
     private static string? _backend;
     private static int _exitHookInstalled;
 
+    // 3D views: time from a view being built to its first frame with a model, and frame times.
+    private static long _view3DShown;
+    private static long _view3DShownTicks;
+    private static long _view3DMaxShownTicks;
+    private static long _view3DFrames;
+    private static double _view3DFrameMs;
+    private static double _view3DMaxFrameMs;
+    private static readonly object View3DLock = new();
+
     /// <summary>
     /// Records one completed tile draw operation. <paramref name="ticks"/> is a
     /// <see cref="System.Diagnostics.Stopwatch"/> tick count.
@@ -115,6 +124,31 @@ public static class RenderTimings
         }
     }
 
+    /// <summary>
+    /// Records how long a 3D view took from being put on its page to drawing its model.
+    /// <paramref name="ticks"/> is a <see cref="System.Diagnostics.Stopwatch"/> tick count.
+    /// </summary>
+    public static void RecordView3DShown(long ticks)
+    {
+        Interlocked.Increment(ref _view3DShown);
+        Interlocked.Add(ref _view3DShownTicks, ticks);
+        UpdateMax(ref _view3DMaxShownTicks, ticks);
+        EnsureExitHook();
+    }
+
+    /// <summary>
+    /// Records one frame of a 3D view, in milliseconds as the 3D control measures it.
+    /// </summary>
+    public static void RecordView3DFrame(double milliseconds)
+    {
+        lock (View3DLock)
+        {
+            _view3DFrames++;
+            _view3DFrameMs += milliseconds;
+            _view3DMaxFrameMs = Math.Max(_view3DMaxFrameMs, milliseconds);
+        }
+    }
+
     private static void UpdateMax(ref long target, long value)
     {
         long observed = Interlocked.Read(ref target);
@@ -162,10 +196,14 @@ public static class RenderTimings
     public static void Dump()
     {
         long count = Interlocked.Read(ref _drawCount);
-        if (count == 0)
+        long shown3D = Interlocked.Read(ref _view3DShown);
+        if (count == 0 && shown3D == 0)
         {
             return;
         }
+
+        // The averages below divide by it.
+        count = Math.Max(count, 1);
 
         long ticks = Interlocked.Read(ref _drawTicks);
         long maxTicks = Interlocked.Read(ref _maxDrawTicks);
@@ -183,6 +221,15 @@ public static class RenderTimings
         sb.AppendLine($"Max draw time  : {maxTicks * toMs:F3} ms");
         sb.AppendLine($"Peak working set: {Environment.WorkingSet / (1024.0 * 1024.0):F0} MB");
         sb.AppendLine($"Peak GPU cache : {Interlocked.Read(ref _peakGpuCacheBytes) / (1024.0 * 1024.0):F1} MB, {Volatile.Read(ref _peakGpuCacheCount)} resources");
+
+        if (shown3D > 0)
+        {
+            lock (View3DLock)
+            {
+                sb.AppendLine($"3D views shown : {shown3D} (view built to model drawn: mean {Interlocked.Read(ref _view3DShownTicks) * toMs / shown3D:F0} ms, max {Interlocked.Read(ref _view3DMaxShownTicks) * toMs:F0} ms)");
+                sb.AppendLine($"3D frames      : {_view3DFrames} (mean {(_view3DFrames > 0 ? _view3DFrameMs / _view3DFrames : 0):F2} ms, max {_view3DMaxFrameMs:F2} ms)");
+            }
+        }
 
         try
         {
