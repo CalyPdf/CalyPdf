@@ -139,7 +139,7 @@ Decoding and drawing:
 
 Inside any namespace starting with `Caly.`, the simple name `Avalonia` now binds to the namespace `Caly.Avalonia` wherever `Caly.Avalonia.Scene3D` is referenced: write `global::Avalonia.X` or rely on `using` directives.
 
-Decisions that constrain future work: PRC's compressed tessellation (`PRC_TYPE_TESS_3D_Compressed`) is **not** to be implemented (patent); nanoPRC (AGPL) is never to be opened; scripts are not executed (Jint is the designated engine if that ever changes, ask first); new 3D libraries target .NET 8+ and are written for speed and low allocation; commits stay local unless told otherwise.
+Decisions that constrain future work: PRC's compressed tessellation (`PRC_TYPE_TESS_3D_Compressed`) comes after plain tessellation, as a phase of its own, and the text of US patent 8,207,965 is **never** used as a source for it (nor passages elsewhere that argue from it); nanoPRC (AGPL) is never to be opened; the PDF Association's PRC issues are used as errata and observed behaviour only; scripts are not executed (Jint is the designated engine if that ever changes, ask first); new 3D libraries target .NET 8+ and are written for speed and low allocation; commits stay local unless told otherwise.
 
 ### AOT Compatibility
 
