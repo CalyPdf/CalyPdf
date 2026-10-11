@@ -54,6 +54,14 @@
       <BuildType Solution="AOT|*" Project="Debug" />
     </Project>
   </Folder>
+  <Folder Name="/external/Scene3D/">
+    <Project Path="external/Scene3D/src/Scene3D.U3D/Scene3D.U3D.csproj">
+      <BuildType Solution="Portable|*" Project="Release" />
+    </Project>
+    <Project Path="external/Scene3D/src/Scene3D/Scene3D.csproj">
+      <BuildType Solution="Portable|*" Project="Release" />
+    </Project>
+  </Folder>
   <Folder Name="/external/Tabalonia/">
     <Project Path="external/Tabalonia/Tabalonia/Tabalonia.csproj">
       <BuildType Solution="AOT|*" Project="Debug" />
@@ -76,6 +84,12 @@
   <Project Path="Caly.Android/Caly.Android.csproj">
     <BuildType Solution="Portable|*" Project="Release" />
     <Deploy />
+  </Project>
+  <Project Path="Caly.Avalonia.Scene3D.Tests/Caly.Avalonia.Scene3D.Tests.csproj">
+    <BuildType Solution="Portable|*" Project="Release" />
+  </Project>
+  <Project Path="Caly.Avalonia.Scene3D/Caly.Avalonia.Scene3D.csproj">
+    <BuildType Solution="Portable|*" Project="Release" />
   </Project>
   <Project Path="Caly.Benchmarks/Caly.Benchmarks.csproj">
     <BuildType Solution="Portable|*" Project="Release" />

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<LangVersion>latest</LangVersion>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<IsAotCompatible>true</IsAotCompatible>
+		<AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+		<SignAssembly>True</SignAssembly>
+		<AssemblyOriginatorKeyFile>..\Caly.snk</AssemblyOriginatorKeyFile>
+		<Version>0.1.0</Version>
+		<Description>An Avalonia control that draws a Scene3D scene with OpenGL: authored views, orbit/pan/zoom, base-colour textures.</Description>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Avalonia" Version="12.1.3" />
+		<PackageReference Include="SkiaSharp" Version="3.119.4" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\external\Scene3D\src\Scene3D\Scene3D.csproj" />
+	</ItemGroup>
+
+</Project>
