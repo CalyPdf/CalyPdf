@@ -89,12 +89,13 @@ public class Artwork3DBadgeTests
         try
         {
             Assert.Equal(Artwork3DHint.ClickToView, PageInteractiveLayerControl.GetArtwork3DHint(Artwork3DFormat.U3D));
-            Assert.Equal(Artwork3DHint.FormatNotSupported, PageInteractiveLayerControl.GetArtwork3DHint(Artwork3DFormat.Prc));
+            Assert.Equal(Artwork3DHint.ClickToView, PageInteractiveLayerControl.GetArtwork3DHint(Artwork3DFormat.Prc));
             Assert.Equal(Artwork3DHint.FormatNotSupported, PageInteractiveLayerControl.GetArtwork3DHint(Artwork3DFormat.Unknown));
 
             Caly.Core.Services.Artwork3DAvailability.MarkUnavailable();
             Assert.Equal(Artwork3DHint.GpuUnavailable, PageInteractiveLayerControl.GetArtwork3DHint(Artwork3DFormat.U3D));
-            Assert.Equal(Artwork3DHint.FormatNotSupported, PageInteractiveLayerControl.GetArtwork3DHint(Artwork3DFormat.Prc));
+            Assert.Equal(Artwork3DHint.GpuUnavailable, PageInteractiveLayerControl.GetArtwork3DHint(Artwork3DFormat.Prc));
+            Assert.Equal(Artwork3DHint.FormatNotSupported, PageInteractiveLayerControl.GetArtwork3DHint(Artwork3DFormat.Unknown));
         }
         finally
         {

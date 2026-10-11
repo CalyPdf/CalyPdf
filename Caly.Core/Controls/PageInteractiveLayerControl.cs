@@ -249,7 +249,8 @@ public sealed class PageInteractiveLayerControl : Control
     /// </summary>
     internal static Artwork3DHint GetArtwork3DHint(Artwork3DFormat format)
     {
-        if (format != Artwork3DFormat.U3D)
+        // Whether a given PRC model can be shown is only known once it is read: the click finds out.
+        if (format != Artwork3DFormat.U3D && format != Artwork3DFormat.Prc)
         {
             return Artwork3DHint.FormatNotSupported;
         }

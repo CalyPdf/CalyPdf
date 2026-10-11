@@ -531,35 +531,42 @@ public class Artwork3DViewModelTests
         Assert.Empty(f.Notifications);
     }
 
-    [AvaloniaFact]
-    public async Task PrcIsRefusedWithAMessage()
+    private static Artwork3DContent Prc(string name)
     {
-        string? path = Artwork3DCameraConventionTests.CorpusDocuments("tetra4d").FirstOrDefault();
-        if (path is null)
-        {
-            Assert.Skip("Set CALY_3D_SAMPLES to the folder of sample 3D PDFs.");
-        }
-
-        await using var f = new Artwork3DFixture();
-        using Artwork3DTestDocument prc = FirstWithArtwork(path, Artwork3DFormat.Prc);
-
-        f.Document.ActivateArtwork3DCommand.Execute(new Artwork3DActivationRequest(1, 0, prc.Artworks.First(a => a.Format == Artwork3DFormat.Prc)));
-
-        Assert.Null(f.Document.ActiveArtwork3D);
-        Assert.Equal("This 3D model is in PRC format, which is not supported yet.", Assert.Single(f.Notifications));
+        return new Artwork3DContent { Payload = Artwork3DSceneReaderTests.PrcPayload(name), Format = Artwork3DFormat.Prc, Views = [], ViewNames = [], DefaultViewIndex = -1 };
     }
 
-    private static Artwork3DTestDocument FirstWithArtwork(string path, Artwork3DFormat format)
+    [AvaloniaFact]
+    public async Task APrcModelIsShownLikeAnyOther()
     {
-        for (int page = 1; ; page++)
-        {
-            Artwork3DTestDocument document = Artwork3DTestDocument.Open(path, page);
-            if (document.Artworks.Any(a => a.Format == format))
-            {
-                return document;
-            }
+        await using var f = new Artwork3DFixture();
+        f.Content = Prc("simple");
 
-            document.Dispose();
-        }
+        Artwork3DViewModel artwork = f.Activate();
+        Assert.True(await WaitUntil(() => artwork.State == Artwork3DState.Ready));
+
+        Assert.NotNull(artwork.Scene);
+        Assert.True(artwork.Scene.HasGeometry);
+        Assert.Equal([Artwork3DViewModel.WholeModelName], artwork.ViewNames);
+        Assert.Empty(f.Notifications);
+    }
+
+    /// <summary>
+    /// Whether a PRC model can be shown is known once it is read: one with parts in the compressed mesh
+    /// form, or with exact geometry only, answers the click with why it stays a poster.
+    /// </summary>
+    [AvaloniaTheory]
+    [InlineData("mixed", "This 3D model uses a compressed mesh format that is not supported yet.")]
+    [InlineData("exact", "This 3D model has no display mesh (exact geometry only).")]
+    public async Task APrcModelThatCannotBeShownSaysWhy(string name, string message)
+    {
+        await using var f = new Artwork3DFixture();
+        f.Content = Prc(name);
+
+        f.Activate();
+        Assert.True(await WaitUntil(() => f.Document.ActiveArtwork3D is null));
+
+        Assert.Null(f.Document.Pages[0].ActiveArtwork3D);
+        Assert.Equal(message, Assert.Single(f.Notifications));
     }
 }

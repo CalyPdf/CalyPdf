@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using Scene3D;
+using Scene3D.Prc;
 using Scene3D.U3D;
 using UglyToad.PdfPig.Artwork;
 
@@ -36,7 +37,16 @@ public enum Artwork3DReadResult : byte
     Malformed,
 
     /// <summary>The data was read, and holds nothing that can be drawn.</summary>
-    NoGeometry
+    NoGeometry,
+
+    /// <summary>
+    /// The data was read, but parts of the model are stored in a form the reader does not turn into
+    /// geometry yet (PRC's compressed tessellation): shown, the model would have holes.
+    /// </summary>
+    NotYetSupported,
+
+    /// <summary>The data was read, and describes the model as exact geometry only, without a mesh to draw.</summary>
+    NoDisplayMesh
 }
 
 /// <summary>
@@ -56,7 +66,7 @@ public static class Artwork3DSceneReader
     {
         scene = null;
         detail = null;
-        if (format != Artwork3DFormat.U3D)
+        if (format != Artwork3DFormat.U3D && format != Artwork3DFormat.Prc)
         {
             return Artwork3DReadResult.UnsupportedFormat;
         }
@@ -64,7 +74,9 @@ public static class Artwork3DSceneReader
         Scene read;
         try
         {
-            read = U3DReader.Read(payload, null, cancellationToken);
+            read = format == Artwork3DFormat.Prc
+                ? PrcReader.Read(payload, null, cancellationToken)
+                : U3DReader.Read(payload, null, cancellationToken);
         }
         catch (Scene3DException e)
         {
@@ -72,14 +84,60 @@ public static class Artwork3DSceneReader
             return Artwork3DReadResult.Malformed;
         }
 
-        // Files whose meshes exist only as progressive updates decode to a tree of empty nodes.
-        if (read.Indices.IsEmpty)
+        Artwork3DReadResult result = Artwork3DReadResult.Ok;
+        if (format == Artwork3DFormat.Prc)
+        {
+            // A model is shown whole or not at all: half an assembly misleads more than a poster.
+            if (!PrcReader.IsComplete(read))
+            {
+                result = Artwork3DReadResult.NotYetSupported;
+            }
+            else if (read.Indices.IsEmpty)
+            {
+                result = Artwork3DReadResult.NoDisplayMesh;
+            }
+        }
+        else if (read.Indices.IsEmpty)
+        {
+            // Files whose meshes exist only as progressive updates decode to a tree of empty nodes.
+            result = Artwork3DReadResult.NoGeometry;
+        }
+
+        if (result != Artwork3DReadResult.Ok)
         {
             read.Dispose();
-            return Artwork3DReadResult.NoGeometry;
+            return result;
         }
 
         scene = read;
         return Artwork3DReadResult.Ok;
+    }
+
+    /// <summary>
+    /// The views of the artwork with the nodes they name called as the scene calls them. A view shows,
+    /// hides and moves parts of the model by the names of their nodes; for PRC a name ends in an
+    /// identifier of the part, and the text before it may differ between the viewer that wrote the view
+    /// and the reader that built the scene. U3D names are the file's own and need nothing.
+    /// </summary>
+    /// <returns><paramref name="views"/> itself when nothing had to change.</returns>
+    public static IReadOnlyList<SceneView> ResolveViews(Artwork3DFormat format, Scene scene, IReadOnlyList<SceneView> views)
+    {
+        if (format != Artwork3DFormat.Prc)
+        {
+            return views;
+        }
+
+        SceneView[]? resolved = null;
+        for (int i = 0; i < views.Count; i++)
+        {
+            SceneView view = PrcNodeNames.Resolve(scene, views[i]);
+            if (!ReferenceEquals(view, views[i]))
+            {
+                resolved ??= [.. views];
+                resolved[i] = view;
+            }
+        }
+
+        return resolved ?? views;
     }
 }

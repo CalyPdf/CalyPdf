@@ -148,6 +148,7 @@ public sealed partial class Artwork3DViewModel : ViewModelBase, IDisposable
         CancellationToken token = _cts.Token;
         Artwork3DContent? content = null;
         Scene? scene = null;
+        IReadOnlyList<SceneView> views = [];
         string? failure = null;
         bool silent = false;
         try
@@ -161,6 +162,10 @@ public sealed partial class Artwork3DViewModel : ViewModelBase, IDisposable
             else
             {
                 failure = Read(content.Format, content.Payload, token, out scene);
+                if (scene is not null)
+                {
+                    views = Artwork3DSceneReader.ResolveViews(content.Format, scene, content.Views);
+                }
             }
         }
         catch (OperationCanceledException)
@@ -197,7 +202,7 @@ public sealed partial class Artwork3DViewModel : ViewModelBase, IDisposable
 
             _payload = content.Payload;
             _format = content.Format;
-            _views = content.Views;
+            _views = views;
 
             var names = new string[content.ViewNames.Count + 1];
             for (int i = 0; i < names.Length - 1; i++)
@@ -274,6 +279,10 @@ public sealed partial class Artwork3DViewModel : ViewModelBase, IDisposable
                 return null;
             case Artwork3DReadResult.NoGeometry:
                 return "This 3D model has no geometry Caly can show yet.";
+            case Artwork3DReadResult.NotYetSupported:
+                return "This 3D model uses a compressed mesh format that is not supported yet.";
+            case Artwork3DReadResult.NoDisplayMesh:
+                return "This 3D model has no display mesh (exact geometry only).";
             case Artwork3DReadResult.UnsupportedFormat:
                 return "This 3D model is in a format that is not supported yet.";
             default:

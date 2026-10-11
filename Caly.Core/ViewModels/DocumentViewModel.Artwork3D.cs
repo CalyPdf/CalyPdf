@@ -55,11 +55,9 @@ public partial class DocumentViewModel
             return;
         }
 
-        if (request.Artwork.Format != Artwork3DFormat.U3D)
+        if (request.Artwork.Format != Artwork3DFormat.U3D && request.Artwork.Format != Artwork3DFormat.Prc)
         {
-            NotifyArtwork3D(request.Artwork.Format == Artwork3DFormat.Unknown
-                ? "This 3D model is in a format that is not supported."
-                : $"This 3D model is in {request.Artwork.FormatDisplayName} format, which is not supported yet.");
+            NotifyArtwork3D("This 3D model is in a format that is not supported.");
             return;
         }
 
