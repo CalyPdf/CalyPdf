@@ -189,7 +189,7 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
     /// </summary>
     public PageViewModel()
     {
-        if (!Avalonia.Controls.Design.IsDesignMode)
+        if (!global::Avalonia.Controls.Design.IsDesignMode)
         {
             throw new InvalidOperationException(
                 $"{typeof(PageViewModel)} empty constructor should only be called in design mode");

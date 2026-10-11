@@ -60,7 +60,7 @@ internal sealed class ClipboardService : IClipboardService
     public ClipboardService(IClipboard? clipboard)
     {
 #if DEBUG
-        if (Avalonia.Controls.Design.IsDesignMode)
+        if (global::Avalonia.Controls.Design.IsDesignMode)
         {
             _clipboard = clipboard!;
             return;

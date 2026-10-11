@@ -37,7 +37,7 @@ public static class Debug
     [Conditional("DEBUG")]
     public static void ThrowOnUiThread()
     {
-        if (HasDedicatedUiThread && Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        if (HasDedicatedUiThread && global::Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
         {
             throw new InvalidOperationException("Call from UI thread");
         }
@@ -46,7 +46,7 @@ public static class Debug
     [Conditional("DEBUG")]
     public static void ThrowNotOnUiThread()
     {
-        if (HasDedicatedUiThread && !Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        if (HasDedicatedUiThread && !global::Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
         {
             throw new InvalidOperationException("Call from non-UI thread");
         }

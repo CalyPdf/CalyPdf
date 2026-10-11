@@ -41,7 +41,7 @@ internal sealed class FilesService : IFilesService
     {
         _windowRegistry = windowRegistry;
 #if DEBUG
-        if (Avalonia.Controls.Design.IsDesignMode)
+        if (global::Avalonia.Controls.Design.IsDesignMode)
         {
             _storageProvider = storageProvider!;
             return;

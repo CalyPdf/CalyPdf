@@ -61,7 +61,7 @@ public sealed class FilePipeStream : IDisposable, IAsyncDisposable
     internal FilePipeStream(string pipeName, TimeSpan? receiveTimeout = null)
     {
 #if DEBUG
-        if (Avalonia.Controls.Design.IsDesignMode)
+        if (global::Avalonia.Controls.Design.IsDesignMode)
         {
             pipeName = Guid.NewGuid().ToString();
         }

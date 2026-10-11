@@ -21,6 +21,7 @@
 		<ProjectReference Include="..\external\PdfPig\src\UglyToad.PdfPig.Tokens\UglyToad.PdfPig.Tokens.csproj" />
 		<ProjectReference Include="..\external\PdfPig\src\UglyToad.PdfPig\UglyToad.PdfPig.csproj" />
 		<ProjectReference Include="..\external\Scene3D\src\Scene3D\Scene3D.csproj" />
+		<ProjectReference Include="..\external\Scene3D\src\Scene3D.U3D\Scene3D.U3D.csproj" />
 	</ItemGroup>
 
 </Project>

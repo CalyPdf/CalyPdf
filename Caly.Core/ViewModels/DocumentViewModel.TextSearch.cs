@@ -253,7 +253,7 @@ public partial class DocumentViewModel
     }
 
     private void TextSearchSelectionChanged(object? sender,
-        Avalonia.Controls.Selection.TreeSelectionModelSelectionChangedEventArgs<TextSearchResult> e)
+        global::Avalonia.Controls.Selection.TreeSelectionModelSelectionChangedEventArgs<TextSearchResult> e)
     {
         if (e.SelectedItems.Count == 0)
         {
