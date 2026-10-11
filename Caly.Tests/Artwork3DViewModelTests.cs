@@ -227,6 +227,9 @@ public class Artwork3DViewModelTests
 
         Assert.True(await WaitUntil(() => f.Document.ActiveArtwork3D is null));
         Assert.Equal("This 3D model could not be read: the stream is broken", Assert.Single(f.Notifications));
+
+        // Said of this attempt, not of the model: another click tries again.
+        Assert.Null(f.Document.Pages[0].Artwork3DRefusals);
     }
 
     /// <summary>
@@ -384,6 +387,7 @@ public class Artwork3DViewModelTests
 
         Assert.Null(f.Document.ActiveArtwork3D);
         Assert.Equal("The 3D view failed: The GPU has no memory for the scene's geometry.", Assert.Single(f.Notifications));
+        Assert.Null(f.Document.Pages[0].Artwork3DRefusals);
         Assert.False(Artwork3DAvailability.IsUnavailable);
     }
 
@@ -568,5 +572,42 @@ public class Artwork3DViewModelTests
 
         Assert.Null(f.Document.Pages[0].ActiveArtwork3D);
         Assert.Equal(message, Assert.Single(f.Notifications));
+    }
+
+    /// <summary>
+    /// What reading a model found is true of it for as long as the document is open: its page remembers
+    /// it (so that hovering the artwork can say it), and another click repeats it without the model
+    /// being read again.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task AModelThatCannotBeShownIsRememberedByItsPage()
+    {
+        const string why = "This 3D model uses a compressed mesh format that is not supported yet.";
+        await using var f = new Artwork3DFixture();
+        f.Content = Prc("mixed");
+        int reads = 0;
+        f.Service.Artwork3DContent = (_, _) =>
+        {
+            reads++;
+            return Task.FromResult<Artwork3DContent?>(f.Content);
+        };
+
+        f.Activate();
+        Assert.True(await WaitUntil(() => f.Document.ActiveArtwork3D is null && f.Notifications.Count == 1));
+        Assert.Equal(why, Assert.Single(f.Document.Pages[0].Artwork3DRefusals!).Value);
+        Assert.Equal(0, Assert.Single(f.Document.Pages[0].Artwork3DRefusals!).Key);
+        Assert.Null(f.Document.Pages[1].Artwork3DRefusals);
+
+        // Clicked again: the reason again, and nothing is read.
+        f.Document.ActivateArtwork3DCommand.Execute(new Artwork3DActivationRequest(1, 0, f.Artwork));
+        Assert.Null(f.Document.ActiveArtwork3D);
+        Assert.Equal([why, why], f.Notifications);
+        Assert.Equal(1, reads);
+
+        // Another artwork of the same page is its own matter.
+        f.Content = Prc("simple");
+        Artwork3DViewModel other = f.Activate(index: 1);
+        Assert.True(await WaitUntil(() => other.State == Artwork3DState.Ready));
+        Assert.Equal(2, reads);
     }
 }

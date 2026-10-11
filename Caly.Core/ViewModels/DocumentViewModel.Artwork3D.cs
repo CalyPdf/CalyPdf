@@ -61,6 +61,13 @@ public partial class DocumentViewModel
             return;
         }
 
+        // A model that was read and cannot be shown: the reason again, without reading it again.
+        if (Pages[request.PageNumber - 1].Artwork3DRefusals is { } refusals && refusals.TryGetValue(request.ArtworkIndex, out string? refusal))
+        {
+            NotifyArtwork3D(refusal);
+            return;
+        }
+
         if (Artwork3DAvailability.IsUnavailable)
         {
             NotifyArtwork3D(Artwork3DAvailability.UnavailableMessage);
@@ -97,6 +104,11 @@ public partial class DocumentViewModel
         if ((uint)pageIndex < (uint)Pages.Count && ReferenceEquals(Pages[pageIndex].ActiveArtwork3D, artwork))
         {
             Pages[pageIndex].ActiveArtwork3D = null;
+        }
+
+        if ((uint)pageIndex < (uint)Pages.Count && artwork.ModelRefusal is { } refusal)
+        {
+            Pages[pageIndex].RefuseArtwork3D(artwork.ArtworkIndex, refusal);
         }
 
         artwork.Dispose();

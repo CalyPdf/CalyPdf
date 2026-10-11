@@ -472,7 +472,7 @@ internal sealed class TextSelectionInputHandler
             }
 
             // A hand where a click will open the model.
-            if (PageInteractiveLayerControl.GetArtwork3DHint(artwork.Format) == Artwork3DHint.ClickToView)
+            if (control.GetArtwork3DHint(artwork) == Artwork3DHint.ClickToView)
             {
                 control.SetHandCursor();
             }

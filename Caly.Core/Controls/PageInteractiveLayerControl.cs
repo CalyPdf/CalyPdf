@@ -52,7 +52,10 @@ internal enum Artwork3DHint : byte
     FormatNotSupported,
 
     /// <summary>3D views cannot be drawn in this run of the application.</summary>
-    GpuUnavailable
+    GpuUnavailable,
+
+    /// <summary>The model was read and cannot be shown; the reason comes with the hint.</summary>
+    Refused
 }
 
 /// <summary>
@@ -122,6 +125,12 @@ public sealed class PageInteractiveLayerControl : Control
     public static readonly StyledProperty<int> ActiveArtwork3DIndexProperty =
         AvaloniaProperty.Register<PageInteractiveLayerControl, int>(nameof(ActiveArtwork3DIndex), -1);
 
+    /// <summary>
+    /// Defines the <see cref="Artwork3DRefusals"/> property.
+    /// </summary>
+    public static readonly StyledProperty<IReadOnlyDictionary<int, string>?> Artwork3DRefusalsProperty =
+        AvaloniaProperty.Register<PageInteractiveLayerControl, IReadOnlyDictionary<int, string>?>(nameof(Artwork3DRefusals));
+
     private StreamGeometry[]? _selectedWordsGeometry;
     private StreamGeometry[]? _searchResultsGeometry;
 
@@ -139,6 +148,16 @@ public sealed class PageInteractiveLayerControl : Control
     {
         get => GetValue(ActiveArtwork3DIndexProperty);
         set => SetValue(ActiveArtwork3DIndexProperty, value);
+    }
+
+    /// <summary>
+    /// Why 3D artworks of the page that were read cannot be shown, by their position in the text
+    /// layer's 3D artworks; null when none was refused. Hovering one says its reason.
+    /// </summary>
+    public IReadOnlyDictionary<int, string>? Artwork3DRefusals
+    {
+        get => GetValue(Artwork3DRefusalsProperty);
+        set => SetValue(Artwork3DRefusalsProperty, value);
     }
 
     public PageInteractiveLayerControl()
@@ -247,7 +266,8 @@ public sealed class PageInteractiveLayerControl : Control
     /// <summary>
     /// Whether a click on artwork of this format will show it, and if not, why.
     /// </summary>
-    internal static Artwork3DHint GetArtwork3DHint(Artwork3DFormat format)
+    /// <param name="refusal">Why this artwork could not be shown when it was read, if it was.</param>
+    internal static Artwork3DHint GetArtwork3DHint(Artwork3DFormat format, string? refusal = null)
     {
         // Whether a given PRC model can be shown is only known once it is read: the click finds out.
         if (format != Artwork3DFormat.U3D && format != Artwork3DFormat.Prc)
@@ -255,14 +275,47 @@ public sealed class PageInteractiveLayerControl : Control
             return Artwork3DHint.FormatNotSupported;
         }
 
+        if (!string.IsNullOrEmpty(refusal))
+        {
+            return Artwork3DHint.Refused;
+        }
+
         return Artwork3DAvailability.IsUnavailable ? Artwork3DHint.GpuUnavailable : Artwork3DHint.ClickToView;
+    }
+
+    /// <summary>
+    /// Why an artwork of the page could not be shown when it was read: looked up by its position among
+    /// the page's artworks, since the artwork object itself is new whenever the text layer is rebuilt.
+    /// </summary>
+    internal static string? GetArtwork3DRefusal(IReadOnlyList<PdfArtwork3D>? artworks, PdfArtwork3D artwork, IReadOnlyDictionary<int, string>? refusals)
+    {
+        if (artworks is null || refusals is null || refusals.Count == 0)
+        {
+            return null;
+        }
+
+        for (int i = 0; i < artworks.Count; ++i)
+        {
+            if (ReferenceEquals(artworks[i], artwork))
+            {
+                return refusals.TryGetValue(i, out string? refusal) ? refusal : null;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>What hovering an artwork of this page says about viewing it.</summary>
+    internal Artwork3DHint GetArtwork3DHint(PdfArtwork3D artwork)
+    {
+        return GetArtwork3DHint(artwork.Format, GetArtwork3DRefusal(PdfTextLayer?.Artworks3D, artwork, Artwork3DRefusals));
     }
 
     /// <summary>
     /// The text shown when hovering 3D artwork: its format, the views its author defined, and what a
     /// click will do.
     /// </summary>
-    internal static string GetArtwork3DDescription(string formatDisplayName, IReadOnlyList<string> viewNames, Artwork3DHint hint)
+    internal static string GetArtwork3DDescription(string formatDisplayName, IReadOnlyList<string> viewNames, Artwork3DHint hint, string? refusal = null)
     {
         var sb = new StringBuilder();
         sb.Append("3D model (").Append(formatDisplayName).AppendLine(")");
@@ -301,6 +354,9 @@ public sealed class PageInteractiveLayerControl : Control
             case Artwork3DHint.GpuUnavailable:
                 sb.Append(Artwork3DAvailability.UnavailableMessage);
                 break;
+            case Artwork3DHint.Refused:
+                sb.Append(refusal);
+                break;
             default:
                 sb.Append(formatDisplayName).Append(" models are not supported yet.");
                 break;
@@ -309,9 +365,10 @@ public sealed class PageInteractiveLayerControl : Control
         return sb.ToString();
     }
 
-    internal static string GetArtwork3DDescription(PdfArtwork3D artwork)
+    internal string GetArtwork3DDescription(PdfArtwork3D artwork)
     {
-        return GetArtwork3DDescription(artwork.FormatDisplayName, artwork.ViewNames, GetArtwork3DHint(artwork.Format));
+        string? refusal = GetArtwork3DRefusal(PdfTextLayer?.Artworks3D, artwork, Artwork3DRefusals);
+        return GetArtwork3DDescription(artwork.FormatDisplayName, artwork.ViewNames, GetArtwork3DHint(artwork.Format, refusal), refusal);
     }
 
     internal void ShowArtwork3D(PdfArtwork3D artwork)
@@ -438,6 +495,11 @@ public sealed class PageInteractiveLayerControl : Control
             {
                 _searchResultsGeometry = null;
             }
+        }
+        else if (change.Property == Artwork3DRefusalsProperty)
+        {
+            // What the open flyout says of an artwork may no longer be true: the next pointer move writes it again.
+            _shownArtwork3D = null;
         }
 #if DEBUG
         else if (change.Property == PdfTextLayerProperty)

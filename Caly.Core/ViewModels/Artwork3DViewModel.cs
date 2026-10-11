@@ -124,6 +124,12 @@ public sealed partial class Artwork3DViewModel : ViewModelBase, IDisposable
 
     public bool IsLoading => State == Artwork3DState.Loading;
 
+    /// <summary>
+    /// Why the model cannot be shown, when reading it said so: a verdict on the model, which another
+    /// attempt would only repeat. Null for failures of the attempt (the document, the control).
+    /// </summary>
+    internal string? ModelRefusal { get; private set; }
+
     /// <summary>The authored view to show, or <c>null</c> for the whole model.</summary>
     public SceneView? SelectedView => (uint)SelectedViewIndex < (uint)_views.Count ? _views[SelectedViewIndex] : null;
 
@@ -150,6 +156,7 @@ public sealed partial class Artwork3DViewModel : ViewModelBase, IDisposable
         Scene? scene = null;
         IReadOnlyList<SceneView> views = [];
         string? failure = null;
+        string? refusal = null;
         bool silent = false;
         try
         {
@@ -161,7 +168,7 @@ public sealed partial class Artwork3DViewModel : ViewModelBase, IDisposable
             }
             else
             {
-                failure = Read(content.Format, content.Payload, token, out scene);
+                failure = refusal = Read(content.Format, content.Payload, token, out scene);
                 if (scene is not null)
                 {
                     views = Artwork3DSceneReader.ResolveViews(content.Format, scene, content.Views);
@@ -196,6 +203,7 @@ public sealed partial class Artwork3DViewModel : ViewModelBase, IDisposable
 
             if (scene is null || content is null)
             {
+                ModelRefusal = silent ? null : refusal;
                 _close(this, silent ? null : failure);
                 return;
             }
@@ -257,6 +265,7 @@ public sealed partial class Artwork3DViewModel : ViewModelBase, IDisposable
 
                 if (scene is null)
                 {
+                    ModelRefusal = failure;
                     _close(this, failure);
                     return;
                 }

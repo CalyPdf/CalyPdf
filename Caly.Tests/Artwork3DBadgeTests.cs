@@ -83,6 +83,37 @@ public class Artwork3DBadgeTests
     }
 
     [Fact]
+    public void DescriptionOfAModelThatWasRefusedSaysWhy()
+    {
+        const string why = "This 3D model uses a compressed mesh format that is not supported yet.";
+        string text = PageInteractiveLayerControl.GetArtwork3DDescription("PRC", ["Front"], Artwork3DHint.Refused, why);
+
+        Assert.Equal(
+            "3D model (PRC)" + Environment.NewLine +
+            "Views: Front" + Environment.NewLine +
+            why,
+            text);
+    }
+
+    /// <summary>
+    /// A page remembers which of its artworks could not be shown by their position in its text layer:
+    /// the layer, and the artwork objects in it, are dropped and built again as the page comes and goes.
+    /// </summary>
+    [Fact]
+    public void ARefusalIsFoundByTheArtworksPlaceOnThePage()
+    {
+        using Artwork3DTestDocument box = Artwork3DTestDocument.OpenBox();
+        Caly.Pdf.Models.PdfArtwork3D artwork = box.Artworks[0];
+        var refusals = new Dictionary<int, string> { [0] = "why" };
+
+        Assert.Equal("why", PageInteractiveLayerControl.GetArtwork3DRefusal([artwork], artwork, refusals));
+        Assert.Null(PageInteractiveLayerControl.GetArtwork3DRefusal([artwork], artwork, new Dictionary<int, string> { [1] = "another one's" }));
+        Assert.Null(PageInteractiveLayerControl.GetArtwork3DRefusal([artwork], artwork, null));
+        Assert.Null(PageInteractiveLayerControl.GetArtwork3DRefusal(null, artwork, refusals));
+        Assert.Null(PageInteractiveLayerControl.GetArtwork3DRefusal([], artwork, refusals));
+    }
+
+    [Fact]
     public void TheHintFollowsTheFormatAndWhether3DWorksHere()
     {
         Caly.Core.Services.Artwork3DAvailability.MarkAvailable();
@@ -92,7 +123,12 @@ public class Artwork3DBadgeTests
             Assert.Equal(Artwork3DHint.ClickToView, PageInteractiveLayerControl.GetArtwork3DHint(Artwork3DFormat.Prc));
             Assert.Equal(Artwork3DHint.FormatNotSupported, PageInteractiveLayerControl.GetArtwork3DHint(Artwork3DFormat.Unknown));
 
+            // A model that was read and refused says so, whatever else is true.
+            Assert.Equal(Artwork3DHint.Refused, PageInteractiveLayerControl.GetArtwork3DHint(Artwork3DFormat.Prc, "why"));
+            Assert.Equal(Artwork3DHint.FormatNotSupported, PageInteractiveLayerControl.GetArtwork3DHint(Artwork3DFormat.Unknown, "why"));
+
             Caly.Core.Services.Artwork3DAvailability.MarkUnavailable();
+            Assert.Equal(Artwork3DHint.Refused, PageInteractiveLayerControl.GetArtwork3DHint(Artwork3DFormat.Prc, "why"));
             Assert.Equal(Artwork3DHint.GpuUnavailable, PageInteractiveLayerControl.GetArtwork3DHint(Artwork3DFormat.U3D));
             Assert.Equal(Artwork3DHint.GpuUnavailable, PageInteractiveLayerControl.GetArtwork3DHint(Artwork3DFormat.Prc));
             Assert.Equal(Artwork3DHint.FormatNotSupported, PageInteractiveLayerControl.GetArtwork3DHint(Artwork3DFormat.Unknown));
