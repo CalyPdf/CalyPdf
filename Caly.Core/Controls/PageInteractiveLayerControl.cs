@@ -26,6 +26,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using Avalonia.VisualTree;
+using Caly.Core.Services;
 using Caly.Core.Utilities;
 using Caly.Pdf.Models;
 using System.Collections.Generic;
@@ -34,9 +35,25 @@ using System.Linq;
 using System.Text;
 using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Styling;
+using UglyToad.PdfPig.Artwork;
 using UglyToad.PdfPig.Core;
 
 namespace Caly.Core.Controls;
+
+/// <summary>
+/// What hovering 3D artwork says about viewing it.
+/// </summary>
+internal enum Artwork3DHint : byte
+{
+    /// <summary>A click shows the model.</summary>
+    ClickToView,
+
+    /// <summary>There is no reader for the artwork's format.</summary>
+    FormatNotSupported,
+
+    /// <summary>3D views cannot be drawn in this run of the application.</summary>
+    GpuUnavailable
+}
 
 /// <summary>
 /// Control that represents the text layer of a PDF page, handling text selection and interaction.
@@ -69,7 +86,9 @@ public sealed class PageInteractiveLayerControl : Control
     private const int Artwork3DMaxViewNames = 10;
 
     private static readonly ImmutableSolidColorBrush Artwork3DBadgeBrush = new(Color.FromArgb(0xCC, 0x1F, 0x29, 0x37));
-    private static FormattedText? _artwork3DBadgeText;
+    // Per control, built when a badge is first drawn: it holds on to a typeface, and those do not
+    // outlive the application's font manager.
+    private FormattedText? _artwork3DBadgeText;
 
     private PdfArtwork3D? _shownArtwork3D;
 
@@ -226,9 +245,23 @@ public sealed class PageInteractiveLayerControl : Control
     }
 
     /// <summary>
-    /// The text shown when hovering 3D artwork: its format and the views its author defined.
+    /// Whether a click on artwork of this format will show it, and if not, why.
     /// </summary>
-    internal static string GetArtwork3DDescription(string formatDisplayName, IReadOnlyList<string> viewNames)
+    internal static Artwork3DHint GetArtwork3DHint(Artwork3DFormat format)
+    {
+        if (format != Artwork3DFormat.U3D)
+        {
+            return Artwork3DHint.FormatNotSupported;
+        }
+
+        return Artwork3DAvailability.IsUnavailable ? Artwork3DHint.GpuUnavailable : Artwork3DHint.ClickToView;
+    }
+
+    /// <summary>
+    /// The text shown when hovering 3D artwork: its format, the views its author defined, and what a
+    /// click will do.
+    /// </summary>
+    internal static string GetArtwork3DDescription(string formatDisplayName, IReadOnlyList<string> viewNames, Artwork3DHint hint)
     {
         var sb = new StringBuilder();
         sb.Append("3D model (").Append(formatDisplayName).AppendLine(")");
@@ -259,13 +292,25 @@ public sealed class PageInteractiveLayerControl : Control
             sb.AppendLine();
         }
 
-        sb.Append("Interactive 3D viewing is not available yet.");
+        switch (hint)
+        {
+            case Artwork3DHint.ClickToView:
+                sb.Append("Click to view in 3D.");
+                break;
+            case Artwork3DHint.GpuUnavailable:
+                sb.Append(Artwork3DAvailability.UnavailableMessage);
+                break;
+            default:
+                sb.Append(formatDisplayName).Append(" models are not supported yet.");
+                break;
+        }
+
         return sb.ToString();
     }
 
     internal static string GetArtwork3DDescription(PdfArtwork3D artwork)
     {
-        return GetArtwork3DDescription(artwork.FormatDisplayName, artwork.ViewNames);
+        return GetArtwork3DDescription(artwork.FormatDisplayName, artwork.ViewNames, GetArtwork3DHint(artwork.Format));
     }
 
     internal void ShowArtwork3D(PdfArtwork3D artwork)
@@ -510,8 +555,16 @@ public sealed class PageInteractiveLayerControl : Control
         _artwork3DBadgeText ??= new FormattedText("3D", CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
             new Typeface(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold), Artwork3DBadgeFontSize, Brushes.White);
 
-        foreach (PdfArtwork3D artwork in artworks)
+        int active = ActiveArtwork3DIndex;
+        for (int i = 0; i < artworks.Count; ++i)
         {
+            if (i == active)
+            {
+                // Being viewed: its view has a toolbar at this corner.
+                continue;
+            }
+
+            PdfArtwork3D artwork = artworks[i];
             Rect badge = GetArtwork3DBadgeRect(artwork.BoundingBox, zoom);
             if (!badge.Intersects(visibleArea))
             {

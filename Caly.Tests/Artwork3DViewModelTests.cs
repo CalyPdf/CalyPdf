@@ -184,6 +184,10 @@ public class Artwork3DViewModelTests
         };
 
         Artwork3DViewModel first = f.Activate(page: 1);
+
+        // The first read must be the one held at the gate: wait until it got there.
+        Assert.True(SpinWait.SpinUntil(() => Volatile.Read(ref calls) == 1, TimeSpan.FromSeconds(5)));
+
         Artwork3DViewModel second = f.Activate(page: 2);
         Assert.True(await WaitUntil(() => second.State == Artwork3DState.Ready));
 

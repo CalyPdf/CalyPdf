@@ -21,6 +21,7 @@
 using System;
 using Avalonia;
 using Avalonia.Input;
+using Caly.Core.Models;
 using Caly.Core.Utilities;
 using Caly.Pdf.Models;
 using UglyToad.PdfPig.Actions;
@@ -50,6 +51,12 @@ internal sealed class TextSelectionInputHandler
     private bool _isMultipleClickSelection;
 
     private Point? _startPointerPressed;
+
+    /// <summary>
+    /// How far, in page units, the pointer may stray between press and release and still have
+    /// clicked a 3D artwork rather than dragged across it.
+    /// </summary>
+    private const double Artwork3DClickTolerance = 3.0;
 
     public TextSelectionInputHandler(PageItemsControl owner)
     {
@@ -169,6 +176,7 @@ internal sealed class TextSelectionInputHandler
             return;
         }
 
+        Point? startPointerPressed = _startPointerPressed;
         _startPointerPressed = null;
 
         var pointerPoint = e.GetCurrentPoint(control);
@@ -180,10 +188,12 @@ internal sealed class TextSelectionInputHandler
 
             var point = pointerPoint.Position;
 
-            // Annotation
-            PdfAnnotation? annotation = control.PdfTextLayer.FindAnnotationOver(point.X, point.Y);
-
-            if (!HandleAnnotationAction(_owner, annotation))
+            // 3D artwork comes first, as it does when hovering: a click on it asks to view it.
+            if (TryActivateArtwork3D(control, startPointerPressed, point))
+            {
+                // Nothing else lies under a 3D artwork that a click could mean.
+            }
+            else if (!HandleAnnotationAction(_owner, control.PdfTextLayer.FindAnnotationOver(point.X, point.Y)))
             {
                 // Annotation not found or action not handled, we check for words.
                 // Words
@@ -218,6 +228,52 @@ internal sealed class TextSelectionInputHandler
         }
 
         e.PreventGestureRecognition();
+    }
+
+    /// <summary>
+    /// Asks the owner to show the 3D artwork under a click, if there is one.
+    /// </summary>
+    /// <returns><c>true</c> if the click was on 3D artwork, whether or not anything can show it.</returns>
+    private bool TryActivateArtwork3D(PageInteractiveLayerControl control, Point? pressed, Point released)
+    {
+        if (control.PdfTextLayer?.Artworks3D is not { Count: > 0 } artworks || !control.PageNumber.HasValue)
+        {
+            return false;
+        }
+
+        PdfArtwork3D? artwork = control.PdfTextLayer.FindArtwork3DOver(released.X, released.Y);
+        if (artwork is null)
+        {
+            return false;
+        }
+
+        // A press that wandered off before the release was a drag, even where there was no text to select.
+        if (!pressed.HasValue || pressed.Value.Euclidean(released) > Artwork3DClickTolerance)
+        {
+            return true;
+        }
+
+        int index = -1;
+        for (int i = 0; i < artworks.Count; ++i)
+        {
+            if (ReferenceEquals(artworks[i], artwork))
+            {
+                index = i;
+                break;
+            }
+        }
+
+        if (index >= 0 && _owner.ActivateArtwork3D is { } command)
+        {
+            control.HideAnnotation();
+            var request = new Artwork3DActivationRequest(control.PageNumber.Value, index, artwork);
+            if (command.CanExecute(request))
+            {
+                command.Execute(request);
+            }
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -415,7 +471,16 @@ internal sealed class TextSelectionInputHandler
                 control.ShowArtwork3D(artwork);
             }
 
-            control.SetDefaultCursor();
+            // A hand where a click will open the model.
+            if (PageInteractiveLayerControl.GetArtwork3DHint(artwork.Format) == Artwork3DHint.ClickToView)
+            {
+                control.SetHandCursor();
+            }
+            else
+            {
+                control.SetDefaultCursor();
+            }
+
             _owner.SetCurrentValue(PageItemsControl.InteractiveActionOverProperty, $"3D model ({artwork.FormatDisplayName})");
             return;
         }

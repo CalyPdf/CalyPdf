@@ -1,3 +1,4 @@
+using UglyToad.PdfPig.Artwork;
 using Avalonia;
 using Caly.Core.Controls;
 using UglyToad.PdfPig.Core;
@@ -52,25 +53,53 @@ public class Artwork3DBadgeTests
     [Fact]
     public void DescriptionListsFormatAndViews()
     {
-        string text = PageInteractiveLayerControl.GetArtwork3DDescription("PRC", ["Front", "Iso View"]);
+        string text = PageInteractiveLayerControl.GetArtwork3DDescription("PRC", ["Front", "Iso View"], Artwork3DHint.FormatNotSupported);
 
         Assert.Equal(
             "3D model (PRC)" + Environment.NewLine +
             "Views: Front, Iso View" + Environment.NewLine +
-            "Interactive 3D viewing is not available yet.",
+            "PRC models are not supported yet.",
             text);
     }
 
     [Fact]
     public void DescriptionWithoutViews()
     {
-        string text = PageInteractiveLayerControl.GetArtwork3DDescription("U3D", []);
+        string text = PageInteractiveLayerControl.GetArtwork3DDescription("U3D", [], Artwork3DHint.ClickToView);
 
         Assert.Equal(
             "3D model (U3D)" + Environment.NewLine +
             "No authored views" + Environment.NewLine +
-            "Interactive 3D viewing is not available yet.",
+            "Click to view in 3D.",
             text);
+    }
+
+    [Fact]
+    public void DescriptionSaysWhenTheGpuIsMissing()
+    {
+        string text = PageInteractiveLayerControl.GetArtwork3DDescription("U3D", ["Front"], Artwork3DHint.GpuUnavailable);
+
+        Assert.EndsWith(Environment.NewLine + "3D needs the GPU renderer.", text);
+    }
+
+    [Fact]
+    public void TheHintFollowsTheFormatAndWhether3DWorksHere()
+    {
+        Caly.Core.Services.Artwork3DAvailability.MarkAvailable();
+        try
+        {
+            Assert.Equal(Artwork3DHint.ClickToView, PageInteractiveLayerControl.GetArtwork3DHint(Artwork3DFormat.U3D));
+            Assert.Equal(Artwork3DHint.FormatNotSupported, PageInteractiveLayerControl.GetArtwork3DHint(Artwork3DFormat.Prc));
+            Assert.Equal(Artwork3DHint.FormatNotSupported, PageInteractiveLayerControl.GetArtwork3DHint(Artwork3DFormat.Unknown));
+
+            Caly.Core.Services.Artwork3DAvailability.MarkUnavailable();
+            Assert.Equal(Artwork3DHint.GpuUnavailable, PageInteractiveLayerControl.GetArtwork3DHint(Artwork3DFormat.U3D));
+            Assert.Equal(Artwork3DHint.FormatNotSupported, PageInteractiveLayerControl.GetArtwork3DHint(Artwork3DFormat.Prc));
+        }
+        finally
+        {
+            Caly.Core.Services.Artwork3DAvailability.MarkAvailable();
+        }
     }
 
     [Fact]
@@ -78,7 +107,7 @@ public class Artwork3DBadgeTests
     {
         string[] names = Enumerable.Range(1, 12).Select(i => $"V{i}").ToArray();
 
-        string text = PageInteractiveLayerControl.GetArtwork3DDescription("PRC", names);
+        string text = PageInteractiveLayerControl.GetArtwork3DDescription("PRC", names, Artwork3DHint.FormatNotSupported);
 
         Assert.Contains("Views: V1, V2, V3, V4, V5, V6, V7, V8, V9, V10 and 2 more", text);
         Assert.DoesNotContain("V11", text);
@@ -89,7 +118,7 @@ public class Artwork3DBadgeTests
     {
         string[] names = Enumerable.Range(1, 10).Select(i => $"V{i}").ToArray();
 
-        string text = PageInteractiveLayerControl.GetArtwork3DDescription("PRC", names);
+        string text = PageInteractiveLayerControl.GetArtwork3DDescription("PRC", names, Artwork3DHint.FormatNotSupported);
 
         Assert.Contains("V10" + Environment.NewLine, text);
         Assert.DoesNotContain("more", text);
