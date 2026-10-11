@@ -171,6 +171,14 @@ public sealed partial class Artwork3DViewModel : ViewModelBase, IDisposable
         {
             failure = CouldNotBeRead(e.Message);
         }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            // A document broken in a way nothing foresaw. The view must still end, with a reason,
+            // rather than say "Loading" for ever while the exception goes unobserved.
+            scene?.Dispose();
+            scene = null;
+            failure = CouldNotBeRead(e.Message);
+        }
 
         await Dispatcher.UIThread.InvokeAsync(() =>
         {

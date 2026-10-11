@@ -229,6 +229,23 @@ public class Artwork3DViewModelTests
         Assert.Equal("This 3D model could not be read: the stream is broken", Assert.Single(f.Notifications));
     }
 
+    /// <summary>
+    /// Whatever a broken document makes the reading throw, the view must not be left saying
+    /// "Loading" for ever, and nothing may escape as an unobserved exception.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task AnUnexpectedFailureWhileReadingClosesTheViewAndSaysWhy()
+    {
+        await using var f = new Artwork3DFixture();
+        f.Service.Artwork3DContent = (_, _) => throw new InvalidOperationException("the view dictionary is not a dictionary");
+
+        Artwork3DViewModel artwork = f.Activate();
+
+        Assert.True(await WaitUntil(() => f.Document.ActiveArtwork3D is null));
+        await artwork.Completion;
+        Assert.Equal("This 3D model could not be read: the view dictionary is not a dictionary", Assert.Single(f.Notifications));
+    }
+
     [AvaloniaFact]
     public async Task AClosedDocumentClosesTheViewSilently()
     {
