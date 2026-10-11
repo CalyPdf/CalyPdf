@@ -490,6 +490,16 @@ internal sealed class SceneRenderer
         _gl.DeleteProgram(_program);
     }
 
+    /// <summary>
+    /// For a context that was lost: its objects went with it, so nothing is deleted, but the decoding of
+    /// textures nobody will take is stopped. The renderer cannot be used afterwards.
+    /// </summary>
+    public void Abandon()
+    {
+        _scene = null;
+        _streamer.Dispose();
+    }
+
     private static bool IsFinite(in Matrix4x4 m)
     {
         return float.IsFinite(m.M11 + m.M12 + m.M13 + m.M14 + m.M21 + m.M22 + m.M23 + m.M24 + m.M31 + m.M32 + m.M33 + m.M34 + m.M41 + m.M42 + m.M43 + m.M44);

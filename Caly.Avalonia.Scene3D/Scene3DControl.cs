@@ -437,6 +437,7 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
     protected override void OnOpenGlLost()
     {
         // The context is gone and its objects with it; there is nothing to delete.
+        _renderer?.Abandon();
         ForgetGpuState();
     }
 

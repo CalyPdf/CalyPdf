@@ -34,7 +34,12 @@ coordinates, lines and points.
 ## Things a host must know
 
 - **GPU only.** Under Avalonia's software renderer OpenGL never initialises. The control then stays blank
-  and, half a second after it is attached, reports `Status == Unavailable`.
+  and, half a second after it is attached, reports `Status == Unavailable`. That is the state at that
+  moment, not a verdict: if OpenGL initialises later (a slow start, a busy UI thread) the status moves on
+  to `Uploading` and `Ready`, so a host that falls back to a poster must be ready to come back from it.
+- **`Failed` stays** until another scene is set, also across leaving and re-entering the visual tree.
+- **`Status` changes while a frame is drawn.** Do not change the visual tree from a handler of that
+  change; post it.
 - **The scene's geometry moves to the GPU.** After uploading, the control calls `Scene.ReleaseGeometry()`
   (switch: `ReleaseGeometryAfterUpload`). When the control leaves the visual tree its GPU objects are
   released; back in the tree it reports `NeedsScene`, and the host must give it a scene that holds its
@@ -47,7 +52,9 @@ coordinates, lines and points.
 - **`Statistics`** gives the GPU memory held (vertices, indices, textures, framebuffer), the last frame's
   draws, triangles and time, and `TexturesPending`: the model is complete when it reaches 0.
 - **The payload must stay alive.** A scene's texture images may be slices of the payload it was read
-  from; they are decoded in the background after the scene is set.
+  from; they are decoded in the background after the scene is set. Replacing the scene or detaching the
+  control cancels that work but does not wait for an image already being decoded, so the payload must be
+  memory the garbage collector owns (a `byte[]`), not a pooled or native buffer handed back on dispose.
 - Naming: inside any namespace that starts with `Caly.`, the simple name `Avalonia` now means
   `Caly.Avalonia`. Write `global::Avalonia.X` (or use a `using`) where code names Avalonia types in full.
 
