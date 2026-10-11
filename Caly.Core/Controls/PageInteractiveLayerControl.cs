@@ -97,13 +97,29 @@ public sealed class PageInteractiveLayerControl : Control
     public static readonly StyledProperty<IReadOnlyList<PdfRectangle[]>?> SearchResultsProperty =
         AvaloniaProperty.Register<PageInteractiveLayerControl, IReadOnlyList<PdfRectangle[]>?>(nameof(SearchResults));
 
+    /// <summary>
+    /// Defines the <see cref="ActiveArtwork3DIndex"/> property.
+    /// </summary>
+    public static readonly StyledProperty<int> ActiveArtwork3DIndexProperty =
+        AvaloniaProperty.Register<PageInteractiveLayerControl, int>(nameof(ActiveArtwork3DIndex), -1);
+
     private StreamGeometry[]? _selectedWordsGeometry;
     private StreamGeometry[]? _searchResultsGeometry;
 
     static PageInteractiveLayerControl()
     {
         AffectsRender<PageInteractiveLayerControl>(PdfTextLayerProperty, VisibleAreaProperty,
-            SelectedWordsProperty, SearchResultsProperty);
+            SelectedWordsProperty, SearchResultsProperty, ActiveArtwork3DIndexProperty);
+    }
+
+    /// <summary>
+    /// Position, in the text layer's 3D artworks, of the one being viewed in place; -1 when none is.
+    /// Its view has a toolbar where the badge would be.
+    /// </summary>
+    public int ActiveArtwork3DIndex
+    {
+        get => GetValue(ActiveArtwork3DIndexProperty);
+        set => SetValue(ActiveArtwork3DIndexProperty, value);
     }
 
     public PageInteractiveLayerControl()

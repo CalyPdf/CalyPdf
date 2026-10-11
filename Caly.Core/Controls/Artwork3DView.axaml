@@ -1,0 +1,85 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Caly.Core.ViewModels"
+             xmlns:controls="clr-namespace:Caly.Core.Controls"
+             xmlns:scene3d="clr-namespace:Caly.Avalonia.Scene3D;assembly=Caly.Avalonia.Scene3D"
+             x:Class="Caly.Core.Controls.Artwork3DView"
+             x:DataType="vm:Artwork3DViewModel"
+             x:CompileBindings="True"
+             StatusCommand="{Binding ControlStatusChangedCommand}">
+
+	<!-- A piece of 3D artwork being viewed in place. Built by PageItem only while its page has one. -->
+	<controls:Artwork3DPlacementPanel Name="PART_Panel"
+	                                  ArtworkBounds="{Binding Bounds}">
+
+		<scene3d:Scene3DControl Name="PART_Scene3D"
+		                        Scene="{Binding Scene}"
+		                        View="{Binding SelectedView}"/>
+
+		<!-- Where the "3D" badge was. -->
+		<Border Name="PART_Toolbar"
+		        Margin="4"
+		        Padding="3"
+		        CornerRadius="4"
+		        BorderThickness="1"
+		        BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+		        Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
+			<StackPanel Orientation="Horizontal"
+			            Spacing="3">
+
+				<TextBlock Text="Loading 3D…"
+				           FontSize="12"
+				           Margin="6,2"
+				           VerticalAlignment="Center"
+				           IsVisible="{Binding IsLoading}"/>
+
+				<ComboBox Name="PART_Views"
+				          ItemsSource="{Binding ViewNames}"
+				          SelectedIndex="{Binding SelectedViewIndex}"
+				          IsVisible="{Binding !IsLoading}"
+				          MinWidth="120"
+				          MaxWidth="260"
+				          MinHeight="26"
+				          Padding="8,2,0,2"
+				          FontSize="12"
+				          VerticalAlignment="Center"
+				          ToolTip.Tip="3D view"/>
+
+				<Button Name="PART_Reset"
+				        IsVisible="{Binding !IsLoading}"
+				        Width="26"
+				        Height="26"
+				        Padding="0"
+				        Background="Transparent"
+				        VerticalAlignment="Center"
+				        ToolTip.Tip="Reset view">
+					<Path Data="M 11.2 4.2 A 5 5 0 1 0 12 7.5 M 11.6 1 L 11.6 4.6 L 8 4.6"
+					      Stroke="{Binding $parent[Button].Foreground}"
+					      StrokeThickness="1.4"
+					      StrokeLineCap="Round"
+					      StrokeJoin="Round"
+					      Width="14"
+					      Height="14"/>
+				</Button>
+
+				<Button Name="PART_Close"
+				        Command="{Binding CloseCommand}"
+				        Width="26"
+				        Height="26"
+				        Padding="0"
+				        Background="Transparent"
+				        VerticalAlignment="Center"
+				        ToolTip.Tip="Close 3D view">
+					<Path Data="M 3 3 L 11 11 M 11 3 L 3 11"
+					      Stroke="{Binding $parent[Button].Foreground}"
+					      StrokeThickness="1.4"
+					      StrokeLineCap="Round"
+					      Width="14"
+					      Height="14"/>
+				</Button>
+
+			</StackPanel>
+		</Border>
+
+	</controls:Artwork3DPlacementPanel>
+</UserControl>

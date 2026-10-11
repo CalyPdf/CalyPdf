@@ -15,58 +15,60 @@ using static Caly.Tests.Fakes.DocumentTestHarness;
 
 namespace Caly.Tests;
 
+/// <summary>A loaded document whose service hands out the content of the box of box_base.pdf.</summary>
+internal sealed class Artwork3DFixture : IAsyncDisposable
+{
+    private readonly object _recipient = new();
+
+    public Artwork3DFixture(int pageCount = 2)
+    {
+        using (Artwork3DTestDocument box = Artwork3DTestDocument.OpenBox())
+        {
+            Artwork = box.Artworks[0];
+            Content = Artwork3DContentReader.Read(Artwork);
+        }
+
+        Service = new RenderingPdfDocumentService { Artwork3DContent = (_, _) => Task.FromResult<Artwork3DContent?>(Content) };
+        PageService = new PdfPageService(Service);
+        Document = NewLoadedDocument(Service, PageService, pageCount);
+        App.Messenger.Register<ShowNotificationMessage>(_recipient, (_, m) => Notifications.Add(m.Value.Message ?? ""));
+        Artwork3DAvailability.MarkAvailable();
+    }
+
+    public PdfArtwork3D Artwork { get; }
+
+    public Artwork3DContent Content { get; set; }
+
+    public RenderingPdfDocumentService Service { get; }
+
+    public PdfPageService PageService { get; }
+
+    public DocumentViewModel Document { get; }
+
+    public List<string> Notifications { get; } = [];
+
+    public Artwork3DViewModel Activate(int page = 1, int index = 0)
+    {
+        Document.ActivateArtwork3DCommand.Execute(new Artwork3DActivationRequest(page, index, Artwork));
+        return Document.ActiveArtwork3D!;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        // Ends whatever the view model still has running (a grace period, a read).
+        Document.ActiveArtwork3D?.CloseCommand.Execute(null);
+        App.Messenger.UnregisterAll(_recipient);
+        Artwork3DAvailability.MarkAvailable();
+        await PageService.DisposeAsync();
+    }
+}
+
 /// <summary>
 /// One 3D artwork being viewed: loading, the one-view-per-document rule, coming back after the control
 /// lost its GPU resources, failures and their messages, and giving everything back on close.
 /// </summary>
 public class Artwork3DViewModelTests
 {
-    /// <summary>A loaded document whose service hands out the content of the box of box_base.pdf.</summary>
-    private sealed class Fixture : IAsyncDisposable
-    {
-        private readonly object _recipient = new();
-
-        public Fixture(int pageCount = 2)
-        {
-            using (Artwork3DTestDocument box = Artwork3DTestDocument.OpenBox())
-            {
-                Artwork = box.Artworks[0];
-                Content = Artwork3DContentReader.Read(Artwork);
-            }
-
-            Service = new RenderingPdfDocumentService { Artwork3DContent = (_, _) => Task.FromResult<Artwork3DContent?>(Content) };
-            PageService = new PdfPageService(Service);
-            Document = NewLoadedDocument(Service, PageService, pageCount);
-            App.Messenger.Register<ShowNotificationMessage>(_recipient, (_, m) => Notifications.Add(m.Value.Message ?? ""));
-            Artwork3DAvailability.MarkAvailable();
-        }
-
-        public PdfArtwork3D Artwork { get; }
-
-        public Artwork3DContent Content { get; set; }
-
-        public RenderingPdfDocumentService Service { get; }
-
-        public PdfPageService PageService { get; }
-
-        public DocumentViewModel Document { get; }
-
-        public List<string> Notifications { get; } = [];
-
-        public Artwork3DViewModel Activate(int page = 1, int index = 0)
-        {
-            Document.ActivateArtwork3DCommand.Execute(new Artwork3DActivationRequest(page, index, Artwork));
-            return Document.ActiveArtwork3D!;
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            App.Messenger.UnregisterAll(_recipient);
-            Artwork3DAvailability.MarkAvailable();
-            await PageService.DisposeAsync();
-        }
-    }
-
     private static Artwork3DContent With(Artwork3DContent content, ReadOnlyMemory<byte> payload)
     {
         return new Artwork3DContent
@@ -78,7 +80,7 @@ public class Artwork3DViewModelTests
     [AvaloniaFact]
     public async Task ActivationLoadsTheSceneAndSelectsTheDefaultView()
     {
-        await using var f = new Fixture();
+        await using var f = new Artwork3DFixture();
 
         Artwork3DViewModel artwork = f.Activate();
 
@@ -104,7 +106,7 @@ public class Artwork3DViewModelTests
     [AvaloniaFact]
     public async Task SelectingTheLastEntryMeansTheWholeModel()
     {
-        await using var f = new Fixture();
+        await using var f = new Artwork3DFixture();
         Artwork3DViewModel artwork = f.Activate();
         Assert.True(await WaitUntil(() => artwork.State == Artwork3DState.Ready));
         var changed = new List<string?>();
@@ -122,7 +124,7 @@ public class Artwork3DViewModelTests
     [AvaloniaFact]
     public async Task ADocumentWithoutViewsShowsTheWholeModel()
     {
-        await using var f = new Fixture();
+        await using var f = new Artwork3DFixture();
         f.Content = new Artwork3DContent { Payload = f.Content.Payload, Format = Artwork3DFormat.U3D, Views = [], ViewNames = [], DefaultViewIndex = -1 };
 
         Artwork3DViewModel artwork = f.Activate();
@@ -136,7 +138,7 @@ public class Artwork3DViewModelTests
     [AvaloniaFact]
     public async Task ActivatingTheSameArtworkAgainChangesNothing()
     {
-        await using var f = new Fixture();
+        await using var f = new Artwork3DFixture();
         Artwork3DViewModel artwork = f.Activate();
         Assert.True(await WaitUntil(() => artwork.State == Artwork3DState.Ready));
 
@@ -147,7 +149,7 @@ public class Artwork3DViewModelTests
     [AvaloniaFact]
     public async Task ASecondActivationClosesTheFirst()
     {
-        await using var f = new Fixture();
+        await using var f = new Artwork3DFixture();
         Artwork3DViewModel first = f.Activate(page: 1);
         Assert.True(await WaitUntil(() => first.State == Artwork3DState.Ready));
         Scene firstScene = first.Scene!;
@@ -167,7 +169,7 @@ public class Artwork3DViewModelTests
     [AvaloniaFact]
     public async Task ASecondActivationWhileTheFirstIsLoadingDiscardsItsResult()
     {
-        await using var f = new Fixture();
+        await using var f = new Artwork3DFixture();
         var gate = new TaskCompletionSource();
         Artwork3DContent content = f.Content;
         int calls = 0;
@@ -199,7 +201,7 @@ public class Artwork3DViewModelTests
     [AvaloniaFact]
     public async Task APayloadThatCannotBeReadClosesTheViewAndSaysWhy()
     {
-        await using var f = new Fixture();
+        await using var f = new Artwork3DFixture();
         f.Content = With(f.Content, new byte[64]);
 
         Artwork3DViewModel artwork = f.Activate();
@@ -214,7 +216,7 @@ public class Artwork3DViewModelTests
     [AvaloniaFact]
     public async Task ADocumentThatCannotGiveThePayloadClosesTheViewAndSaysWhy()
     {
-        await using var f = new Fixture();
+        await using var f = new Artwork3DFixture();
         f.Service.Artwork3DContent = (_, _) => throw new Artwork3DContentException("the stream is broken");
 
         f.Activate();
@@ -226,7 +228,7 @@ public class Artwork3DViewModelTests
     [AvaloniaFact]
     public async Task AClosedDocumentClosesTheViewSilently()
     {
-        await using var f = new Fixture();
+        await using var f = new Artwork3DFixture();
         f.Service.Artwork3DContent = (_, _) => Task.FromResult<Artwork3DContent?>(null);
 
         f.Activate();
@@ -238,7 +240,7 @@ public class Artwork3DViewModelTests
     [AvaloniaFact]
     public async Task NeedsSceneDecodesAgainAndDisposesTheOldScene()
     {
-        await using var f = new Fixture();
+        await using var f = new Artwork3DFixture();
         int reads = 0;
         Artwork3DContent content = f.Content;
         f.Service.Artwork3DContent = (_, _) =>
@@ -268,7 +270,7 @@ public class Artwork3DViewModelTests
     [AvaloniaFact]
     public async Task NeedsSceneWhileStillLoadingStartsNoSecondLoad()
     {
-        await using var f = new Fixture();
+        await using var f = new Artwork3DFixture();
         var gate = new TaskCompletionSource();
         Artwork3DContent content = f.Content;
         int reads = 0;
@@ -292,7 +294,7 @@ public class Artwork3DViewModelTests
     [AvaloniaFact]
     public async Task AControlThatStaysUnavailableIsRememberedAndTheNextClickIsRefused()
     {
-        await using var f = new Fixture();
+        await using var f = new Artwork3DFixture();
         TimeSpan grace = Artwork3DViewModel.UnavailableGrace;
         Artwork3DViewModel.UnavailableGrace = TimeSpan.FromMilliseconds(30);
         try
@@ -325,7 +327,7 @@ public class Artwork3DViewModelTests
     [AvaloniaFact]
     public async Task AControlThatWasOnlySlowToStartIsNotCalledUnavailable()
     {
-        await using var f = new Fixture();
+        await using var f = new Artwork3DFixture();
         TimeSpan grace = Artwork3DViewModel.UnavailableGrace;
         Artwork3DViewModel.UnavailableGrace = TimeSpan.FromMilliseconds(60);
         try
@@ -353,7 +355,7 @@ public class Artwork3DViewModelTests
     [AvaloniaFact]
     public async Task AFailedControlClosesTheViewAndSaysWhy()
     {
-        await using var f = new Fixture();
+        await using var f = new Artwork3DFixture();
         Artwork3DViewModel artwork = f.Activate();
         Assert.True(await WaitUntil(() => artwork.State == Artwork3DState.Ready));
 
@@ -367,7 +369,7 @@ public class Artwork3DViewModelTests
     [AvaloniaFact]
     public async Task CloseGivesEverythingBack()
     {
-        await using var f = new Fixture();
+        await using var f = new Artwork3DFixture();
 
         (WeakReference payload, WeakReference scene) = await ActivateAndClose(f);
 
@@ -395,7 +397,7 @@ public class Artwork3DViewModelTests
     /// Views a copy of the payload that nothing else holds, closes the view, and returns weak references
     /// to that payload and to the scene. A method of its own so that no local keeps them alive.
     /// </summary>
-    private static async Task<(WeakReference Payload, WeakReference Scene)> ActivateAndClose(Fixture f)
+    private static async Task<(WeakReference Payload, WeakReference Scene)> ActivateAndClose(Artwork3DFixture f)
     {
         Artwork3DContent original = f.Content;
         byte[] copy = original.Payload.ToArray();
@@ -423,7 +425,7 @@ public class Artwork3DViewModelTests
     [AvaloniaFact]
     public async Task ClosingWhileLoadingDisposesTheLateScene()
     {
-        await using var f = new Fixture();
+        await using var f = new Artwork3DFixture();
         var gate = new TaskCompletionSource();
         Artwork3DContent content = f.Content;
         f.Service.Artwork3DContent = async (_, _) =>
@@ -450,7 +452,7 @@ public class Artwork3DViewModelTests
     [AvaloniaFact]
     public async Task AResultThatArrivesAfterCloseIsDisposed()
     {
-        await using var f = new Fixture();
+        await using var f = new Artwork3DFixture();
         int reads = 0;
         Artwork3DContent content = f.Content;
         f.Service.Artwork3DContent = (_, _) =>
@@ -482,7 +484,7 @@ public class Artwork3DViewModelTests
     [AvaloniaFact]
     public async Task DisposingTheDocumentClosesTheView()
     {
-        await using var f = new Fixture();
+        await using var f = new Artwork3DFixture();
         Artwork3DViewModel artwork = f.Activate();
         Assert.True(await WaitUntil(() => artwork.State == Artwork3DState.Ready));
         Scene scene = artwork.Scene!;
@@ -498,7 +500,7 @@ public class Artwork3DViewModelTests
     [AvaloniaFact]
     public async Task ARequestForAPageThatDoesNotExistIsIgnored()
     {
-        await using var f = new Fixture();
+        await using var f = new Artwork3DFixture();
 
         f.Document.ActivateArtwork3DCommand.Execute(new Artwork3DActivationRequest(99, 0, f.Artwork));
         f.Document.ActivateArtwork3DCommand.Execute(new Artwork3DActivationRequest(0, 0, f.Artwork));
@@ -517,7 +519,7 @@ public class Artwork3DViewModelTests
             Assert.Skip("Set CALY_3D_SAMPLES to the folder of sample 3D PDFs.");
         }
 
-        await using var f = new Fixture();
+        await using var f = new Artwork3DFixture();
         using Artwork3DTestDocument prc = FirstWithArtwork(path, Artwork3DFormat.Prc);
 
         f.Document.ActivateArtwork3DCommand.Execute(new Artwork3DActivationRequest(1, 0, prc.Artworks.First(a => a.Format == Artwork3DFormat.Prc)));
