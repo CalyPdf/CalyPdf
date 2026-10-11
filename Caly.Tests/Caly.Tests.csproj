@@ -18,8 +18,8 @@
 		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
 		<PackageReference Include="xunit.v3" Version="3.2.2" />
 		<PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
-		  <PrivateAssets>all</PrivateAssets>
-		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
 	</ItemGroup>
 
@@ -27,6 +27,7 @@
 		<ProjectReference Include="..\Caly.Core\Caly.Core.csproj" />
 		<ProjectReference Include="..\Caly.Printing\Caly.Printing.Core\Caly.Printing.Core.csproj" />
 		<ProjectReference Include="..\Caly.Printing\Caly.Printing.Unix\Caly.Printing.Unix.csproj" />
+		<ProjectReference Include="..\external\Scene3D\src\Scene3D.U3D\Scene3D.U3D.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -35,7 +36,7 @@
 
 	<ItemGroup>
 		<None Update="Documents\2108.11480_vertical_only.pdf">
-		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 		<None Update="Documents\box_base.pdf">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
