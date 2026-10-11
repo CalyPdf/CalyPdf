@@ -1,6 +1,7 @@
 using Avalonia.Media.Imaging;
 using Caly.Pdf.Artwork;
 using Scene3D;
+using Scene3D.Prc;
 using Scene3D.U3D;
 using SkiaSharp;
 using UglyToad.PdfPig;
@@ -11,7 +12,7 @@ using UglyToad.PdfPig.Rendering.Skia;
 
 namespace Scene3DViewer;
 
-/// <summary>A scene and the views authored for it, from a .u3d file or from the 3D artwork of a PDF.</summary>
+/// <summary>A scene and the views authored for it, from a .u3d or .prc file or from the 3D artwork of a PDF.</summary>
 internal sealed class LoadedModel
 {
     public required string Title { get; init; }
@@ -45,9 +46,9 @@ internal static class ModelSource
         byte[] file = File.ReadAllBytes(path);
         string name = Path.GetFileName(path);
 
-        if (U3DReader.IsU3D(file))
+        if (U3DReader.IsU3D(file) || PrcReader.IsPrc(file))
         {
-            Scene scene = U3DReader.Read(file);
+            Scene scene = Read(U3DReader.IsU3D(file) ? Artwork3DFormat.U3D : Artwork3DFormat.Prc, file, name);
             return new LoadedModel { Title = name, Scene = scene, Views = [], LoadMilliseconds = System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds };
         }
 
@@ -60,11 +61,6 @@ internal static class ModelSource
                 if (!Artwork3D.TryCreate(annotation, document.Structure.TokenScanner, document.Structure.FilterProvider, out Artwork3D? artwork) || seen++ != artworkIndex)
                 {
                     continue;
-                }
-
-                if (artwork.Format != Artwork3DFormat.U3D)
-                {
-                    throw new InvalidDataException($"The 3D artwork of '{name}' is {artwork.FormatName ?? "of an unknown format"}; only U3D can be shown.");
                 }
 
                 // The 3D view box if the annotation has one, else the annotation's rectangle.
@@ -90,13 +86,15 @@ internal static class ModelSource
                     views.Add(Artwork3DViewConverter.Convert(defaultView, width, height));
                 }
 
-                Scene scene = U3DReader.Read(artwork.GetData());
+                // As Caly reads it: a PRC model is shown whole or not at all, and its views name its nodes
+                // by identifiers that have to be matched to the scene's.
+                Scene scene = Read(artwork.Format, artwork.GetData(), name);
                 double load = System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds;
                 return new LoadedModel
                 {
                     Title = $"{name}, page {page.Number}",
                     Scene = scene,
-                    Views = views,
+                    Views = Artwork3DSceneReader.ResolveViews(artwork.Format, scene, views),
                     DefaultView = defaultIndex,
                     AspectRatio = height > 0 ? width / height : 0,
                     Poster = posterWidth > 0 && annotation.HasNormalAppearance() ? RenderPoster(document, page, annotation.Rectangle, posterWidth) : null,
@@ -106,6 +104,15 @@ internal static class ModelSource
         }
 
         throw new InvalidDataException(seen == 0 ? $"'{name}' has no 3D artwork." : $"'{name}' has {seen} 3D artworks; there is no number {artworkIndex}.");
+    }
+
+    /// <exception cref="InvalidDataException">The data cannot be shown; the message says why.</exception>
+    private static Scene Read(Artwork3DFormat format, ReadOnlyMemory<byte> data, string name)
+    {
+        Artwork3DReadResult result = Artwork3DSceneReader.TryRead(format, data, out Scene? scene, out string? detail);
+        return result == Artwork3DReadResult.Ok && scene is not null
+            ? scene
+            : throw new InvalidDataException($"The 3D model of '{name}' ({format}) cannot be shown: {result}{(detail is null ? "" : " — " + detail)}.");
     }
 
     private static bool HasNormalAppearance(this Annotation annotation)

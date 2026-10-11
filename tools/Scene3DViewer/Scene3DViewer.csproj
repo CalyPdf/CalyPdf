@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-	<!-- A small host for Caly.Avalonia.Scene3D: opens a .u3d file or the 3D artwork of a PDF and shows it.
+	<!-- A small host for Caly.Avalonia.Scene3D: opens a .u3d or .prc file or the 3D artwork of a PDF and shows it.
 	     Also carries the control's self-test, benchmark and capture modes (see Program.cs). -->
 	<PropertyGroup>
 		<OutputType>Exe</OutputType>
@@ -36,6 +36,7 @@
 		<ProjectReference Include="..\..\Caly.Pdf\Caly.Pdf.csproj" />
 		<ProjectReference Include="..\..\external\PdfPig.Rendering.Skia\UglyToad.PdfPig.Rendering.Skia\UglyToad.PdfPig.Rendering.Skia.csproj" />
 		<ProjectReference Include="..\..\external\Scene3D\src\Scene3D.U3D\Scene3D.U3D.csproj" />
+		<ProjectReference Include="..\..\external\Scene3D\src\Scene3D.Prc\Scene3D.Prc.csproj" />
 	</ItemGroup>
 
 </Project>

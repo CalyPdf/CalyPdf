@@ -7,7 +7,7 @@ namespace Scene3DViewer;
 
 // Scene3DViewer: a host for Caly.Avalonia.Scene3D.
 //
-//   Scene3DViewer <file.u3d | file.pdf> [options]
+//   Scene3DViewer <file.u3d | file.prc | file.pdf> [options]
 //   Scene3DViewer --selftest [--log file]
 //
 //   --artwork N         which 3D artwork of a PDF, in page order (default 0)
@@ -18,7 +18,7 @@ namespace Scene3DViewer;
 //   --transparent       no background: the view is drawn over a striped panel that must show through
 //   --zoom Z            page zoom to emulate: the view is Z times the size of its viewport (default 1)
 //   --at X,Y            the point of the view, in fractions, at the middle of the viewport (default 0.5,0.5)
-//   --capture out.png   save what the control drew, then exit
+//   --capture out.png   save what the control drew (with --poster, also the poster as out.poster.png), then exit
 //   --benchmark N       turn the model for N frames, print frame times as a table row, then exit
 //   --scenario recycle  take the control out of the window and put it back, as a recycled page does
 //   --exit-after S      close after S seconds
@@ -129,7 +129,7 @@ internal static class Program
 
         if (Options.File is null && !Options.SelfTest)
         {
-            Console.Error.WriteLine("usage: Scene3DViewer <file.u3d | file.pdf> [--artwork N] [--view N] [--size WxH] [--poster] [--zoom Z] [--at X,Y] [--capture out.png] [--benchmark N] [--scenario recycle] [--exit-after S] [--software] [--log file]");
+            Console.Error.WriteLine("usage: Scene3DViewer <file.u3d | file.prc | file.pdf> [--artwork N] [--view N] [--size WxH] [--poster] [--zoom Z] [--at X,Y] [--capture out.png] [--benchmark N] [--scenario recycle] [--exit-after S] [--software] [--log file]");
             return 1;
         }
 

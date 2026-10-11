@@ -120,7 +120,7 @@ internal sealed class MainWindow : Window
         {
             Program.Log("cannot load: " + e.Message);
             Program.ExitCode = 2;
-            Opened += (_, _) => Close();
+            Opened += (_, _) => Dispatcher.UIThread.Post(Close);
             return false;
         }
 
@@ -231,6 +231,9 @@ internal sealed class MainWindow : Window
             _view3D.CaptureNextFrame = (pixels, width, height) =>
             {
                 SavePng(path, pixels, width, height);
+
+                // With --poster, the document's own picture goes beside the capture, for comparing the two.
+                _model?.Poster?.Save(Path.ChangeExtension(path, ".poster.png"));
                 Program.Log(string.Create(CultureInfo.InvariantCulture,
                     $"captured {width}x{height} to {path} (page zoom {_host.Zoom:0.##}, region {_view3D.VisibleRegion})"));
                 if (_options.ExitAfterSeconds <= 0)
