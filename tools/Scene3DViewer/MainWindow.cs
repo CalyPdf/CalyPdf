@@ -44,6 +44,18 @@ internal sealed class MainWindow : Window
         _host.Zoom = options.Zoom;
         _host.Centre = options.Centre;
         _host.Children.Add(_view3D);
+        if (options.Transparent)
+        {
+            // Stripes behind the control: with a transparent background they must be seen around the model.
+            _view3D.DefaultBackground = Colors.Transparent;
+            _host.Background = new LinearGradientBrush
+            {
+                StartPoint = new RelativePoint(0, 0, RelativeUnit.Absolute),
+                EndPoint = new RelativePoint(40, 40, RelativeUnit.Absolute),
+                SpreadMethod = GradientSpreadMethod.Repeat,
+                GradientStops = { new GradientStop(Colors.Gold, 0), new GradientStop(Colors.Gold, 0.5), new GradientStop(Colors.SteelBlue, 0.5), new GradientStop(Colors.SteelBlue, 1) }
+            };
+        }
 
         _view3D.FrameRendered += OnFrameRendered;
         _view3D.PropertyChanged += (_, e) =>
@@ -123,6 +135,16 @@ internal sealed class MainWindow : Window
     {
         int index = _views.SelectedIndex;
         SceneView? view = _model is not null && (uint)index < (uint)_model.Views.Count ? _model.Views[index] : null;
+        if (view is not null && _options.Transparent)
+        {
+            // The same view without its background colour, so that the control's transparent default applies.
+            view = new SceneView
+            {
+                Name = view.Name, CameraToWorld = view.CameraToWorld, CameraNodePath = view.CameraNodePath, OrbitDistance = view.OrbitDistance,
+                Projection = view.Projection, Lighting = view.Lighting, NodeOverrides = view.NodeOverrides
+            };
+        }
+
         Program.Log(view is null ? "view: whole scene" : $"view {index}: '{view.Name}', lighting {view.Lighting}, {view.NodeOverrides.Count} node overrides");
         _view3D.View = view;
     }

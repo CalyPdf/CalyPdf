@@ -41,6 +41,10 @@ dotnet publish Caly.Desktop -r win-x64 -c AOT -f net10.0
 | `Caly.Android` / `Caly.iOS` | Mobile platform heads |
 | `Caly.Pdf` | PDF parsing, text extraction, layout analysis via PdfPig |
 | `Caly.Tests` | xUnit unit tests |
+| `Caly.Printing.Tests` | xUnit tests for `Caly.Printing.*`: unit tests, plus tests that print to a real spooler (Windows spooler, CUPS). The spooler tests run only in the `Printing` GitHub Actions workflow, which provisions the queue named by `CALY_TEST_PRINTER`; locally they skip, on CI a missing queue fails them |
+| `Caly.Avalonia.Scene3D` | `Scene3DControl`: draws a `Scene3D` scene (3D artwork) with OpenGL |
+| `Caly.Avalonia.Scene3D.Tests` | xUnit tests of the control's GPU-free parts |
+| `tools/Scene3DViewer` | Host for the 3D control: viewer, benchmark, GPU self-test |
 | `Caly.Benchmarks` | BenchmarkDotNet performance benchmarks |
 
 ### Layered Architecture
@@ -103,15 +107,26 @@ Set `"Debug": { "LogRenderTimings": true }` in the settings file (or tick it in 
 
 ### 3D Artwork (U3D / PRC)
 
-Work in progress on branches named `3d` (Caly, `external/PdfPig`, `external/PdfPig.Rendering.Skia`); planning documents, specs, plans and sample surveys live outside the repository in `C:\caly-work\3d\claude` (start at its `README.md`).
+Work in progress on branches named `3d` (Caly, `external/PdfPig`, `external/PdfPig.Rendering.Skia`, `external/Scene3D`); planning documents, specs, plans and sample surveys live outside the repository in `C:\caly-work\3d\claude` (start at its `README.md`).
 
-What exists today is **recognition only** — nothing is decoded or rendered in 3D yet:
+What exists today: **the app recognises 3D artwork; U3D can be decoded and drawn, but only in a separate viewer tool** — the control is not yet placed on Caly's pages.
+
+In the app (recognition only):
 
 - **PdfPig** (`UglyToad.PdfPig.Artwork`): `Artwork3D.TryCreate(annotation, scanner, filterProvider, out artwork)` is the single entry point. It reads a 3D annotation (ISO 32000-2 §13.6) or the 3D asset of a RichMedia annotation (§13.7) into a read-only model: format (`U3D`/`Prc`), `GetData()` (the payload bytes, decoded on each call), authored views (`Artwork3DView`: camera matrix or U3D path, projection, background, render mode, lighting scheme, cross sections, per-node overrides), default-view resolution (`3DV` → `DV` → first view), activation settings. Views are parsed lazily; malformed entries become "absent", never exceptions. Scripts are exposed as bytes and never run.
 - **`Caly.Pdf`**: `TextLayerStreamProcessor.DrawAnnotations` calls it for annotations of type `Artwork3D`/`RichMedia` only, producing `PdfArtwork3D` items carried by `PageTextLayerContent.Artworks3D` → `PdfTextLayer.Artworks3D` (`null` when the page has none, so pages without 3D pay nothing). `PdfTextLayerHelper.GetTextLayer` must not return `PdfTextLayer.Empty` when artworks exist.
 - **`Caly.Core`**: `PageInteractiveLayerControl` draws a "3D" badge at the artwork's top-left corner (constant on-screen size: drawn at the inverse of the page zoom) and, on hover, a flyout with the format and authored view names (`TextSelectionInputHandler.HandleMouseMoveOver` checks artworks before annotations).
 
-`HasNormalAppearance` is `false` for a quarter of real-world 3D annotations (no `AP` at all, or an empty one): the page shows nothing there and only the badge marks the artwork.
+`HasNormalAppearance` is `false` for a quarter of real-world 3D annotations (no `AP` at all, or an empty one): the page shows nothing there and only the badge marks the artwork. Where a poster exists it need not picture the model: SimLab's are the view's background colour and nothing else.
+
+Decoding and drawing (not yet wired into the app):
+
+- **`external/Scene3D`** (a stand-alone local repository, net8.0, BCL only, not yet a submodule — the `3d` branch builds only where that folder exists): `Scene3D` is the format-neutral scene (flat pooled arrays, unified vertices, `SceneView` for a way of looking at it, a GLB writer); `Scene3D.U3D` has `U3DReader.Read(payload)`. Only the *base* level of U3D meshes is decoded; every real file seen keeps all its geometry there. Its README describes it as built.
+- **`Caly.Pdf/Artwork/Artwork3DViewConverter`**: PdfPig `Artwork3DView` → `SceneView`. It reads lazily parsed parts of the view, so call it while the page is processed, under the document lock. A PDF camera looks along +Z with +X to the viewer's *left* (the files are right-handed whatever ISO 32000 says); the converter negates X and Z. This is asserted on 88 real views that give their camera both ways (`Artwork3DCameraConventionTests`, needs `CALY_3D_SAMPLES`).
+- **`Caly.Avalonia.Scene3D`**: `Scene3DControl`, an `OpenGlControlBase` that draws a `Scene` for a `SceneView` with orbit/pan/zoom. See its README, in particular "Things a host must know": GPU only (reports `Unavailable` under the software renderer), the scene's geometry moves to the GPU and the control reports `NeedsScene` after it left the visual tree, and `VisibleRegion` is how a zoomed page keeps the framebuffer no larger than the window. Everything with logic is GPU-free and unit-tested (`Caly.Avalonia.Scene3D.Tests`); the GL code is checked by `tools/Scene3DViewer --selftest` on a real GPU, because there is no headless OpenGL.
+- **`tools/Scene3DViewer`**: opens a `.u3d` or a PDF's 3D artwork; view list, poster beside the live view, page-zoom emulation, `--benchmark`, `--capture`, `--selftest`. Native AOT: `dotnet publish tools/Scene3DViewer -r win-x64 -c Release -p:ViewerAot=true` (not `-p:PublishAot=true`, which reaches the netstandard2.0 projects it references).
+
+Inside any namespace starting with `Caly.`, the simple name `Avalonia` now binds to the namespace `Caly.Avalonia` wherever `Caly.Avalonia.Scene3D` is referenced: write `global::Avalonia.X` or rely on `using` directives.
 
 Decisions that constrain future work: PRC's compressed tessellation (`PRC_TYPE_TESS_3D_Compressed`) is **not** to be implemented (patent); nanoPRC (AGPL) is never to be opened; scripts are not executed (Jint is the designated engine if that ever changes, ask first); new 3D libraries target .NET 8+ and are written for speed and low allocation; commits stay local unless told otherwise.
 

@@ -15,6 +15,7 @@ namespace Scene3DViewer;
 //   --size WxH          size of the 3D view in device-independent pixels
 //                       (default: 700 high, as wide as the document's proportions make it)
 //   --poster            show the document's own picture of the artwork beside the live view
+//   --transparent       no background: the view is drawn over a striped panel that must show through
 //   --zoom Z            page zoom to emulate: the view is Z times the size of its viewport (default 1)
 //   --at X,Y            the point of the view, in fractions, at the middle of the viewport (default 0.5,0.5)
 //   --capture out.png   save what the control drew, then exit
@@ -38,6 +39,8 @@ internal sealed class Options
     public double? Height { get; set; }
 
     public bool Poster { get; set; }
+
+    public bool Transparent { get; set; }
 
     public double Zoom { get; set; } = 1;
 
@@ -88,6 +91,7 @@ internal static class Program
                     case "--artwork": Options.Artwork = int.Parse(args[++i], CultureInfo.InvariantCulture); break;
                     case "--view": Options.View = int.Parse(args[++i], CultureInfo.InvariantCulture); break;
                     case "--poster": Options.Poster = true; break;
+                    case "--transparent": Options.Transparent = true; break;
                     case "--zoom": Options.Zoom = Number(args[++i]); break;
                     case "--capture": Options.Capture = Path.GetFullPath(args[++i]); break;
                     case "--benchmark": Options.BenchmarkFrames = int.Parse(args[++i], CultureInfo.InvariantCulture); break;
