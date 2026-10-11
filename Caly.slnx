@@ -78,6 +78,11 @@
       <BuildType Solution="Portable|*" Project="Release" />
     </Project>
   </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Scene3DViewer/Scene3DViewer.csproj">
+      <BuildType Solution="Portable|*" Project="Release" />
+    </Project>
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
   </Folder>
