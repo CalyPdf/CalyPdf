@@ -45,6 +45,18 @@ internal sealed class SelfTest
 
             return covered / (double)(width * height);
         }
+
+        /// <summary>Number of the frame's pixels that are the given colour, to within a few levels.</summary>
+        public int Count((int R, int G, int B) colour)
+        {
+            int count = 0;
+            for (int i = 0; i < pixels.Length; i += 4)
+            {
+                count += Math.Abs(pixels[i] - colour.R) + Math.Abs(pixels[i + 1] - colour.G) + Math.Abs(pixels[i + 2] - colour.B) <= 12 ? 1 : 0;
+            }
+
+            return count;
+        }
     }
 
     private sealed record Case(string Name, Func<Scene> Build, SceneView View, Rect Region, Action<Frame, Checks> Check);
@@ -195,6 +207,27 @@ internal sealed class SelfTest
         });
     }
 
+    /// <summary>Line segments or points through the given positions, one index each in order.</summary>
+    private static void AddPrimitives(SceneBuilder builder, SceneTopology topology, float[] positions, int material)
+    {
+        builder.BeginMesh(builder.AddName(topology.ToString()), SceneMeshFlags.None, topology);
+        positions.CopyTo(builder.AllocateVertices(positions.Length / 3).Positions);
+        Span<uint> indices = builder.AllocateIndices(positions.Length / 3);
+        for (int i = 0; i < indices.Length; i++)
+        {
+            indices[i] = (uint)i;
+        }
+
+        builder.AddPart(indices.Length, 0);
+        int mesh = builder.EndMesh();
+        int binding = builder.AddBinding(material);
+        builder.AddNode(new SceneNode
+        {
+            Parent = -1, Local = Matrix4x4.Identity, Kind = SceneNodeKind.Model, Mesh = mesh, Light = -1, Camera = -1,
+            FirstBinding = binding, BindingCount = 1, Name = builder.AddName("node"), Visible = true
+        });
+    }
+
     private static Scene Build(Action<SceneBuilder> fill)
     {
         using var builder = new SceneBuilder();
@@ -282,6 +315,31 @@ internal sealed class SelfTest
                     checks.Colour("top right", frame.At(1 - inset - 0.05, 0.05), (0, 255, 0));
                     checks.Colour("bottom left", frame.At(inset + 0.05, 0.95), (0, 0, 255));
                     checks.Colour("bottom right", frame.At(1 - inset - 0.05, 0.95), (255, 255, 255));
+                }),
+
+            // A green line 2 units long in a view 4 units high: half the height in pixels, one pixel wide,
+            // and green though its material asks for light (a line has no surface to light).
+            new Case("line segment",
+                () => Build(b => AddPrimitives(b, SceneTopology.Lines, [-1, 0.013f, 0, 1, 0.013f, 0], AddMaterial(b, new Vector3(0, 1, 0), lit: true))),
+                FrontView(), whole,
+                (frame, checks) =>
+                {
+                    int green = frame.Count((0, 255, 0));
+                    checks.Near("green pixels along the line", green, frame.Height / 2.0, frame.Height * 0.06);
+                    double touched = frame.CoverageOver(BackgroundBytes) * frame.Width * frame.Height;
+                    checks.Report(touched >= green && touched <= green * 4.0, string.Create(CultureInfo.InvariantCulture, $"a thin line, its edges smoothed: {touched:F0} pixels touched for {green} of the line itself"));
+                }),
+
+            // Three white points, each a few pixels across; the one at the origin covers the centre.
+            new Case("points",
+                () => Build(b => AddPrimitives(b, SceneTopology.Points, [0, 0, 0, -1, 1, 0, 1, -1, 0], AddMaterial(b, Vector3.One))),
+                FrontView(), whole,
+                (frame, checks) =>
+                {
+                    checks.Colour("the point at the centre", frame.At(0.5, 0.5), (255, 255, 255));
+                    double size = Math.Max(3.0, frame.Height / 270.0);
+                    checks.Near("white pixels of three points", frame.Count((255, 255, 255)), 3 * size * size, 3 * size * size * 0.7);
+                    checks.Colour("between the points is background", frame.At(0.5, 0.3), BackgroundBytes);
                 })
         ];
     }

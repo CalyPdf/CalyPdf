@@ -14,7 +14,10 @@ namespace Caly.Avalonia.Scene3D.Internal.Gl;
 /// </summary>
 internal sealed unsafe class GlApi
 {
+    public const int Points = 0x0000;
+    public const int Lines = 0x0001;
     public const int Triangles = 0x0004;
+    public const int ProgramPointSize = 0x8642;
     public const int DepthBufferBit = 0x0100, ColorBufferBit = 0x4000;
     public const int Less = 0x0201, LessOrEqual = 0x0203;
     public const int One = 1, SrcAlpha = 0x0302, OneMinusSrcAlpha = 0x0303;

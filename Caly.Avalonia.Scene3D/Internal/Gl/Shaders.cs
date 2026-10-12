@@ -21,6 +21,7 @@ internal static class Shaders
         uniform mat4 uProjection;
         uniform mat3 uNormalMatrix;
         uniform mat4 uTexTransform;
+        uniform float uPointSize;
 
         in vec3 aPosition;
         in vec3 aNormal;
@@ -40,6 +41,7 @@ internal static class Shaders
             vTexCoord = (uTexTransform * vec4(aTexCoord, 0.0, 1.0)).xy;
             vColor = aColor;
             gl_Position = uProjection * position;
+            gl_PointSize = uPointSize;
         }
         """;
 

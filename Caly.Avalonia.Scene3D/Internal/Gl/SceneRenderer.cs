@@ -37,7 +37,7 @@ internal sealed class SceneRenderer
     private readonly DrawList _drawList = new();
 
     private readonly int _program;
-    private readonly int _uModelView, _uProjection, _uNormalMatrix, _uTexTransform;
+    private readonly int _uModelView, _uProjection, _uNormalMatrix, _uTexTransform, _uPointSize;
     private readonly int _uFlags, _uDiffuse, _uSpecular, _uEmissive, _uOpacity, _uShininess, _uAlphaCutoff, _uTexture;
     private readonly int _uAmbientLight, _uLightCount, _uLightPosition, _uLightColor, _uLightAttenuation, _uLightSpot;
 
@@ -82,6 +82,7 @@ internal sealed class SceneRenderer
         _uProjection = gl.GetUniformLocation(_program, "uProjection");
         _uNormalMatrix = gl.GetUniformLocation(_program, "uNormalMatrix");
         _uTexTransform = gl.GetUniformLocation(_program, "uTexTransform");
+        _uPointSize = gl.GetUniformLocation(_program, "uPointSize");
         _uFlags = gl.GetUniformLocation(_program, "uFlags");
         _uDiffuse = gl.GetUniformLocation(_program, "uDiffuse");
         _uSpecular = gl.GetUniformLocation(_program, "uSpecular");
@@ -289,7 +290,7 @@ internal sealed class SceneRenderer
 
             if (drawable)
             {
-                Draw(scene!, setup, view, projection);
+                Draw(scene!, setup, view, projection, pixelHeight);
             }
 
             if (_targets.End(target))
@@ -299,7 +300,7 @@ internal sealed class SceneRenderer
         }
     }
 
-    private void Draw(Scene scene, in FrameSetup setup, in Matrix4x4 view, in Matrix4x4 projection)
+    private void Draw(Scene scene, in FrameSetup setup, in Matrix4x4 view, in Matrix4x4 projection, int pixelHeight)
     {
         GlApi gl = _gl;
         _drawList.Update(view, view * projection);
@@ -314,6 +315,14 @@ internal sealed class SceneRenderer
         gl.UniformMatrix(_uProjection, projection);
         gl.UniformMatrix(_uTexTransform, Matrix4x4.Identity);
         gl.Uniform(_uTexture, 0);
+
+        // The points of a point set: four pixels across on a view 1080 high, never under three. OpenGL ES
+        // always takes the size from the shader; desktop OpenGL has to be told to.
+        gl.Uniform(_uPointSize, MathF.Max(3f, pixelHeight / 270f));
+        if (!gl.IsEmbedded)
+        {
+            gl.Enable(GlApi.ProgramPointSize);
+        }
         SetLights(scene, setup.View?.Lighting ?? SceneLighting.Artwork, view);
 
         var state = new DrawState { Mesh = -1, Material = int.MinValue, Opacity = float.NaN, Orthographic = setup.Projection.Kind == SceneProjection.Orthographic };
@@ -348,6 +357,7 @@ internal sealed class SceneRenderer
         public int Material;
         public float Opacity;
         public SceneMeshFlags MeshFlags;
+        public SceneTopology Topology;
         public bool Orthographic;
     }
 
@@ -368,12 +378,15 @@ internal sealed class SceneRenderer
         }
 
         SceneMeshFlags meshFlags = scene.Meshes[item.Mesh].Flags;
-        if (item.Material != state.Material || item.Opacity != state.Opacity || meshFlags != state.MeshFlags)
+        SceneTopology topology = scene.Meshes[item.Mesh].Topology;
+        if (item.Material != state.Material || item.Opacity != state.Opacity || meshFlags != state.MeshFlags || topology != state.Topology)
         {
-            SetMaterial(scene, item.Material, item.Opacity, meshFlags, state.Orthographic);
+            // Line segments and points have no surface for light to fall on: they are drawn in their colour.
+            SetMaterial(scene, item.Material, item.Opacity, meshFlags, state.Orthographic, lit: topology == SceneTopology.Triangles);
             state.Material = item.Material;
             state.Opacity = item.Opacity;
             state.MeshFlags = meshFlags;
+            state.Topology = topology;
         }
 
         Matrix4x4 modelView = item.World * view;
@@ -395,12 +408,13 @@ internal sealed class SceneRenderer
         }
 
         gl.UniformMatrix3(_uNormalMatrix, n);
-        gl.DrawElements(GlApi.Triangles, item.IndexCount, GlApi.UnsignedInt, (nint)item.IndexStart * 4);
+        int mode = topology switch { SceneTopology.Lines => GlApi.Lines, SceneTopology.Points => GlApi.Points, _ => GlApi.Triangles };
+        gl.DrawElements(mode, item.IndexCount, GlApi.UnsignedInt, (nint)item.IndexStart * 4);
         LastDrawCalls++;
-        LastTriangles += item.IndexCount / 3;
+        LastTriangles += topology == SceneTopology.Triangles ? item.IndexCount / 3 : 0;
     }
 
-    private void SetMaterial(Scene scene, int materialIndex, float nodeOpacity, SceneMeshFlags meshFlags, bool orthographic)
+    private void SetMaterial(Scene scene, int materialIndex, float nodeOpacity, SceneMeshFlags meshFlags, bool orthographic, bool lit = true)
     {
         GlApi gl = _gl;
 
@@ -414,7 +428,7 @@ internal sealed class SceneRenderer
         Vector3 diffuse = material.Diffuse == Vector3.Zero ? material.Ambient : material.Diffuse;
 
         int flags = orthographic ? Shaders.FlagOrthographic : 0;
-        flags |= (material.Flags & SceneMaterialFlags.Lit) != 0 ? Shaders.FlagLit : 0;
+        flags |= lit && (material.Flags & SceneMaterialFlags.Lit) != 0 ? Shaders.FlagLit : 0;
         flags |= (meshFlags & SceneMeshFlags.HasNormals) != 0 ? Shaders.FlagHasNormals : 0;
         flags |= (meshFlags & SceneMeshFlags.HasColors) != 0 && (material.Flags & SceneMaterialFlags.UseVertexColor) != 0 ? Shaders.FlagVertexColor : 0;
         flags |= (material.Flags & SceneMaterialFlags.AlphaTest) != 0 ? Shaders.FlagAlphaTest : 0;
