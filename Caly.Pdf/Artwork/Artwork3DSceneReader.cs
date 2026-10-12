@@ -102,7 +102,7 @@ public static class Artwork3DSceneReader
         }
         else if (read.Indices.IsEmpty)
         {
-            // Files whose meshes exist only as progressive updates decode to a tree of empty nodes.
+            // Nothing to draw: nodes without geometry, or geometry the reader does not read.
             result = Artwork3DReadResult.NoGeometry;
             detail = WhyNoGeometry(read.Diagnostics);
         }
@@ -119,11 +119,11 @@ public static class Artwork3DSceneReader
 
     /// <summary>
     /// Why a U3D model that was read has nothing to draw, from what its reader said it left out; null when
-    /// that says nothing. Meshes come first: a model of meshes in a vendor's blocks has lines as well.
+    /// that says nothing.
     /// </summary>
     public static string? WhyNoGeometry(IReadOnlyList<SceneDiagnostic> diagnostics)
     {
-        bool extension = false, progressive = false, lines = false;
+        bool extension = false, progressive = false;
         foreach (SceneDiagnostic diagnostic in diagnostics)
         {
             switch (diagnostic.Code)
@@ -134,18 +134,15 @@ public static class Artwork3DSceneReader
                 case "extension-skipped":
                     extension = true;
                     break;
+                // Progressive detail that could not be followed, and no base mesh under it.
                 case "mesh-progressive-only":
                     progressive = true;
-                    break;
-                case "line-set-skipped" or "point-set-skipped":
-                    lines = true;
                     break;
             }
         }
 
         return extension ? "This 3D model stores its meshes in a vendor extension of U3D that is not supported yet."
-            : progressive ? "This 3D model stores its meshes as progressive detail only, which is not supported yet."
-            : lines ? "This 3D model is made of lines or points, which are not shown yet."
+            : progressive ? "The progressive detail of this 3D model's meshes could not be read."
             : null;
     }
 

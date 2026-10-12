@@ -57,14 +57,12 @@ public class Artwork3DSceneReaderTests
 
     /// <summary>
     /// A U3D model that is read and has nothing to draw says why, from what its reader left out: meshes in
-    /// a vendor's own blocks (Right Hemisphere's compressed mesh of Acrobat 3D exports), meshes kept as
-    /// progressive detail only, lines and points.
+    /// a vendor's own blocks (Right Hemisphere's compressed mesh of Acrobat 3D exports), or progressive
+    /// detail that could not be followed and no base under it.
     /// </summary>
     [Theory]
     [InlineData("extension-skipped", "This 3D model stores its meshes in a vendor extension of U3D that is not supported yet.")]
-    [InlineData("mesh-progressive-only", "This 3D model stores its meshes as progressive detail only, which is not supported yet.")]
-    [InlineData("line-set-skipped", "This 3D model is made of lines or points, which are not shown yet.")]
-    [InlineData("point-set-skipped", "This 3D model is made of lines or points, which are not shown yet.")]
+    [InlineData("mesh-progressive-only", "The progressive detail of this 3D model's meshes could not be read.")]
     [InlineData("animation-skipped", null)]
     public void AU3DModelWithNothingToDrawSaysWhy(string code, string? expected)
     {
@@ -74,9 +72,9 @@ public class Artwork3DSceneReaderTests
     }
 
     [Fact]
-    public void MeshesInAVendorExtensionComeBeforeLinesAsTheReason()
+    public void MeshesInAVendorExtensionComeFirstAsTheReason()
     {
-        SceneDiagnostic[] diagnostics = [new(SceneDiagnosticSeverity.Warning, "line-set-skipped", "", 1), new(SceneDiagnosticSeverity.Warning, "extension-skipped", "", 2)];
+        SceneDiagnostic[] diagnostics = [new(SceneDiagnosticSeverity.Warning, "mesh-progressive-only", "", 1), new(SceneDiagnosticSeverity.Warning, "extension-skipped", "", 2)];
 
         Assert.Equal("This 3D model stores its meshes in a vendor extension of U3D that is not supported yet.", Artwork3DSceneReader.WhyNoGeometry(diagnostics));
     }
