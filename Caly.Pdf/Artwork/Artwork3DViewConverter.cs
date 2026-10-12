@@ -166,7 +166,9 @@ public static class Artwork3DViewConverter
         }
 
         double degrees = fieldOfView ?? 0;
-        if (perspectiveScaling == Artwork3DScaling.Value && perspectiveScalingValue is > 0 && sizeKnown && degrees is > 0 and < 180)
+        // A diameter of one unit of the view box, or less, is not one: writers put the number 1 there (every
+        // number of the sample documents is 1), and read as a diameter it makes a lens of 179 degrees.
+        if (perspectiveScaling == Artwork3DScaling.Value && perspectiveScalingValue is > 1 && sizeKnown && degrees is > 0 and < 180)
         {
             // The cone of the field of view covers a circle of the given diameter in view-box units; the
             // cone that covers the height instead is narrower or wider in proportion.

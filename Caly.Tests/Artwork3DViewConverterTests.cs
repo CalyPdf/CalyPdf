@@ -88,6 +88,21 @@ public class Artwork3DViewConverterTests
         Assert.Equal((60f, SceneViewBinding.Width), (unknown.FieldOfView, unknown.Binding));
     }
 
+    /// <summary>
+    /// Writers put the number 1 where a diameter belongs (every number of the sample documents is 1: twelve
+    /// views of four documents, three writers). A circle one unit of the view box across would make a lens
+    /// of 179 degrees of a field of view of 30, and the model a speck: it is no diameter, and the view is
+    /// bound as one that says nothing.
+    /// </summary>
+    [Fact]
+    public void APerspectiveDiameterOfOneIsNotADiameter()
+    {
+        SceneViewProjection p = Artwork3DViewConverter.ToProjection(
+            Artwork3DProjectionType.Perspective, 30, Artwork3DScaling.Value, 1, 1, Artwork3DScaling.Absolute, Artwork3DClippingStyle.AutomaticNearFar, null, null, 411, 677);
+
+        Assert.Equal((30f, SceneViewBinding.Width), (p.FieldOfView, p.Binding));
+    }
+
     [Fact]
     public void AnOrthographicScaleIsBoundToAnExtentOfTheView()
     {
