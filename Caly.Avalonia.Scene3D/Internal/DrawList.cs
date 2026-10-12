@@ -245,6 +245,28 @@ internal sealed class DrawList
     /// <summary>The world-space box around a mesh's box under a transform; false if it is not finite.</summary>
     private static bool TryWorldBounds(in SceneBounds local, in Matrix4x4 world, out Vector3 min, out Vector3 max)
     {
+        if (System.Runtime.Intrinsics.Vector128.IsHardwareAccelerated)
+        {
+            var rowX = System.Runtime.Intrinsics.Vector128.Create(world.M11, world.M12, world.M13, 0f);
+            var rowY = System.Runtime.Intrinsics.Vector128.Create(world.M21, world.M22, world.M23, 0f);
+            var rowZ = System.Runtime.Intrinsics.Vector128.Create(world.M31, world.M32, world.M33, 0f);
+            var rowT = System.Runtime.Intrinsics.Vector128.Create(world.M41, world.M42, world.M43, 0f);
+
+            Vector3 c = (local.Min + local.Max) * 0.5f;
+            Vector3 e = (local.Max - local.Min) * 0.5f;
+
+            var newCenter = rowT + rowX * c.X + rowY * c.Y + rowZ * c.Z;
+            var newExtent = System.Runtime.Intrinsics.Vector128.Abs(rowX) * e.X + System.Runtime.Intrinsics.Vector128.Abs(rowY) * e.Y + System.Runtime.Intrinsics.Vector128.Abs(rowZ) * e.Z;
+
+            var minVec = newCenter - newExtent;
+            var maxVec = newCenter + newExtent;
+
+            min = new Vector3(minVec[0], minVec[1], minVec[2]);
+            max = new Vector3(maxVec[0], maxVec[1], maxVec[2]);
+
+            return float.IsFinite(min.X + min.Y + min.Z + max.X + max.Y + max.Z);
+        }
+
         min = new Vector3(float.PositiveInfinity);
         max = new Vector3(float.NegativeInfinity);
         for (int corner = 0; corner < 8; corner++)
@@ -262,9 +284,35 @@ internal sealed class DrawList
     /// <summary>Whether a box lies wholly on the outer side of one plane of the view volume.</summary>
     private static bool IsOutside(Vector3 min, Vector3 max, in Matrix4x4 viewProjection)
     {
+        if (System.Runtime.Intrinsics.Vector128.IsHardwareAccelerated)
+        {
+            var rowX = System.Runtime.Intrinsics.Vector128.Create(viewProjection.M11, viewProjection.M12, viewProjection.M13, viewProjection.M14);
+            var rowY = System.Runtime.Intrinsics.Vector128.Create(viewProjection.M21, viewProjection.M22, viewProjection.M23, viewProjection.M24);
+            var rowZ = System.Runtime.Intrinsics.Vector128.Create(viewProjection.M31, viewProjection.M32, viewProjection.M33, viewProjection.M34);
+            var rowW = System.Runtime.Intrinsics.Vector128.Create(viewProjection.M41, viewProjection.M42, viewProjection.M43, viewProjection.M44);
+
+            int outside = 0b111111;
+            for (int corner = 0; corner < 8 && outside != 0; corner++)
+            {
+                float px = (corner & 1) == 0 ? min.X : max.X;
+                float py = (corner & 2) == 0 ? min.Y : max.Y;
+                float pz = (corner & 4) == 0 ? min.Z : max.Z;
+
+                var clip = rowW + rowX * px + rowY * py + rowZ * pz;
+                float cx = clip[0], cy = clip[1], cz = clip[2], cw = clip[3];
+
+                int beyond = (cx < -cw ? 1 : 0) | (cx > cw ? 2 : 0)
+                    | (cy < -cw ? 4 : 0) | (cy > cw ? 8 : 0)
+                    | (cz < -cw ? 16 : 0) | (cz > cw ? 32 : 0);
+                outside &= beyond;
+            }
+
+            return outside != 0;
+        }
+
         // One bit per plane, kept while every corner so far is beyond that plane.
-        int outside = 0b111111;
-        for (int corner = 0; corner < 8 && outside != 0; corner++)
+        int outsideScalar = 0b111111;
+        for (int corner = 0; corner < 8 && outsideScalar != 0; corner++)
         {
             Vector4 clip = Vector4.Transform(
                 new Vector4((corner & 1) == 0 ? min.X : max.X, (corner & 2) == 0 ? min.Y : max.Y, (corner & 4) == 0 ? min.Z : max.Z, 1),
@@ -273,10 +321,10 @@ internal sealed class DrawList
             int beyond = (clip.X < -clip.W ? 1 : 0) | (clip.X > clip.W ? 2 : 0)
                 | (clip.Y < -clip.W ? 4 : 0) | (clip.Y > clip.W ? 8 : 0)
                 | (clip.Z < -clip.W ? 16 : 0) | (clip.Z > clip.W ? 32 : 0);
-            outside &= beyond;
+            outsideScalar &= beyond;
         }
 
-        return outside != 0;
+        return outsideScalar != 0;
     }
 
     private static bool IsFinite(in Matrix4x4 m)
