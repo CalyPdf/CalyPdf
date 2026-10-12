@@ -59,7 +59,10 @@ public static class Artwork3DSceneReader
     /// Reads a scene. Never throws for bad data; only cancellation is thrown.
     /// </summary>
     /// <param name="scene">The scene when the result is <see cref="Artwork3DReadResult.Ok"/>; the caller owns and disposes it.</param>
-    /// <param name="detail">For <see cref="Artwork3DReadResult.Malformed"/>, what was wrong.</param>
+    /// <param name="detail">
+    /// For <see cref="Artwork3DReadResult.Malformed"/>, what was wrong; for <see cref="Artwork3DReadResult.NoGeometry"/>,
+    /// a sentence for the reader of the document saying why there is nothing to draw, when the model's reader knows.
+    /// </param>
     /// <exception cref="OperationCanceledException">Cancellation was requested.</exception>
     public static Artwork3DReadResult TryRead(Artwork3DFormat format, ReadOnlyMemory<byte> payload,
         out Scene? scene, out string? detail, CancellationToken cancellationToken = default)
@@ -101,6 +104,7 @@ public static class Artwork3DSceneReader
         {
             // Files whose meshes exist only as progressive updates decode to a tree of empty nodes.
             result = Artwork3DReadResult.NoGeometry;
+            detail = WhyNoGeometry(read.Diagnostics);
         }
 
         if (result != Artwork3DReadResult.Ok)
@@ -111,6 +115,38 @@ public static class Artwork3DSceneReader
 
         scene = read;
         return Artwork3DReadResult.Ok;
+    }
+
+    /// <summary>
+    /// Why a U3D model that was read has nothing to draw, from what its reader said it left out; null when
+    /// that says nothing. Meshes come first: a model of meshes in a vendor's blocks has lines as well.
+    /// </summary>
+    public static string? WhyNoGeometry(IReadOnlyList<SceneDiagnostic> diagnostics)
+    {
+        bool extension = false, progressive = false, lines = false;
+        foreach (SceneDiagnostic diagnostic in diagnostics)
+        {
+            switch (diagnostic.Code)
+            {
+                // Blocks of a type the file declares itself: in real files, Right Hemisphere's compressed
+                // mesh ("RHAdobeMeshResource") of Acrobat 3D and Deep Exploration exports, which no public
+                // document describes.
+                case "extension-skipped":
+                    extension = true;
+                    break;
+                case "mesh-progressive-only":
+                    progressive = true;
+                    break;
+                case "line-set-skipped" or "point-set-skipped":
+                    lines = true;
+                    break;
+            }
+        }
+
+        return extension ? "This 3D model stores its meshes in a vendor extension of U3D that is not supported yet."
+            : progressive ? "This 3D model stores its meshes as progressive detail only, which is not supported yet."
+            : lines ? "This 3D model is made of lines or points, which are not shown yet."
+            : null;
     }
 
     /// <summary>

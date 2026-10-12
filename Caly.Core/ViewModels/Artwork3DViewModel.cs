@@ -287,7 +287,7 @@ public sealed partial class Artwork3DViewModel : ViewModelBase, IDisposable
             case Artwork3DReadResult.Ok:
                 return null;
             case Artwork3DReadResult.NoGeometry:
-                return "This 3D model has no geometry Caly can show yet.";
+                return detail ?? "This 3D model has no geometry Caly can show yet.";
             case Artwork3DReadResult.NotYetSupported:
                 return "Parts of this 3D model are compressed in a way that cannot be decoded yet.";
             case Artwork3DReadResult.NoDisplayMesh:

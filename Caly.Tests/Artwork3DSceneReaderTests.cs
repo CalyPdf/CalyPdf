@@ -55,6 +55,32 @@ public class Artwork3DSceneReaderTests
         Assert.Null(scene);
     }
 
+    /// <summary>
+    /// A U3D model that is read and has nothing to draw says why, from what its reader left out: meshes in
+    /// a vendor's own blocks (Right Hemisphere's compressed mesh of Acrobat 3D exports), meshes kept as
+    /// progressive detail only, lines and points.
+    /// </summary>
+    [Theory]
+    [InlineData("extension-skipped", "This 3D model stores its meshes in a vendor extension of U3D that is not supported yet.")]
+    [InlineData("mesh-progressive-only", "This 3D model stores its meshes as progressive detail only, which is not supported yet.")]
+    [InlineData("line-set-skipped", "This 3D model is made of lines or points, which are not shown yet.")]
+    [InlineData("point-set-skipped", "This 3D model is made of lines or points, which are not shown yet.")]
+    [InlineData("animation-skipped", null)]
+    public void AU3DModelWithNothingToDrawSaysWhy(string code, string? expected)
+    {
+        SceneDiagnostic[] diagnostics = [new(SceneDiagnosticSeverity.Warning, "node-parent-missing", "", 3), new(SceneDiagnosticSeverity.Warning, code, "", 1)];
+
+        Assert.Equal(expected, Artwork3DSceneReader.WhyNoGeometry(diagnostics));
+    }
+
+    [Fact]
+    public void MeshesInAVendorExtensionComeBeforeLinesAsTheReason()
+    {
+        SceneDiagnostic[] diagnostics = [new(SceneDiagnosticSeverity.Warning, "line-set-skipped", "", 1), new(SceneDiagnosticSeverity.Warning, "extension-skipped", "", 2)];
+
+        Assert.Equal("This 3D model stores its meshes in a vendor extension of U3D that is not supported yet.", Artwork3DSceneReader.WhyNoGeometry(diagnostics));
+    }
+
     [Fact]
     public void AFormatWithoutAReaderIsNotSupported()
     {
