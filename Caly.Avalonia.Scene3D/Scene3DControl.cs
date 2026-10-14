@@ -112,6 +112,13 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
 
     // The camera: where the current view puts it, moved by the user since.
     private CameraPose _pose;
+
+    // The camera node the pose came from, when an animation moves it (or a node above it): the pose is
+    // kept as the view put it, in the frame of that node as it stands in the scene, and drawn carried
+    // along with the node as the animation moves it.
+    private int _cameraNode = -1;
+    private bool _cameraAnimated;
+    private Matrix4x4 _cameraNodeInverse = Matrix4x4.Identity;
     private SceneViewProjection _projection = ViewCamera.DefaultProjection;
     private bool _hasPose;
 
@@ -275,6 +282,19 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
     /// <summary>The camera in use; for tests and the viewer.</summary>
     internal CameraPose Pose => _pose;
 
+    /// <summary>The pose the camera is drawn from now: <see cref="Pose"/>, carried along by the animation of its camera node, if it has one.</summary>
+    internal CameraPose DisplayedPose => DisplayedPoseAt(AnimationTime);
+
+    private CameraPose DisplayedPoseAt(double seconds)
+    {
+        if (!_cameraAnimated || !_hasPose || Scene is not { } scene)
+        {
+            return _pose;
+        }
+
+        return ViewCamera.Carry(_pose, _cameraNodeInverse * ViewCamera.AnimatedWorldMatrix(scene, _cameraNode, seconds));
+    }
+
     /// <summary>The projection in use; for tests and the viewer.</summary>
     internal SceneViewProjection Projection => _projection;
 
@@ -313,13 +333,17 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
     {
         if (Scene is { } scene)
         {
-            _pose = ViewCamera.ResolvePose(scene, View, out _projection);
+            _pose = ViewCamera.ResolvePose(scene, View, out _projection, out _cameraNode);
+            _cameraNodeInverse = Matrix4x4.Identity;
+            _cameraAnimated = _cameraNode >= 0 && ViewCamera.IsAnimatedNode(scene, _cameraNode)
+                && Matrix4x4.Invert(scene.GetWorldMatrix(_cameraNode), out _cameraNodeInverse);
             _hasPose = true;
             CameraOrientation = _pose.Orientation;
         }
         else
         {
             _hasPose = false;
+            _cameraAnimated = false;
             CameraOrientation = Quaternion.Identity;
         }
 
@@ -616,10 +640,17 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
 
             Rect region = VisibleRegion;
             SceneView? view = View;
+            double? animationTime = HasAnimation ? AnimationTime : null;
+            CameraPose pose = DisplayedPoseAt(animationTime ?? 0);
+            if (_cameraAnimated)
+            {
+                CameraOrientation = pose.Orientation;
+            }
+
             Color background = DefaultBackground;
             var setup = new FrameSetup
             {
-                Pose = _pose,
+                Pose = pose,
                 Projection = _projection,
                 FullViewSize = FullViewSize,
                 Region = new ViewRegion((float)region.X, (float)region.Y, (float)region.Right, (float)region.Bottom),
@@ -628,7 +659,7 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
                     ? new Vector4(authored, 1)
                     : new Vector4(background.R / 255f, background.G / 255f, background.B / 255f, background.A / 255f),
                 FramebufferBudget = FramebufferBudgetBytes,
-                AnimationTime = HasAnimation ? AnimationTime : null
+                AnimationTime = animationTime
             };
 
             // Without a camera (no scene) or a scene on the GPU, only the background is drawn.

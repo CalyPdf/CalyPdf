@@ -396,4 +396,78 @@ public class ViewCameraTests
         Assert.True(ViewCamera.TryProjectionMatrix(projection, Wide, ViewRegion.Full, 1, 10, out Matrix4x4 matrix));
         Assert.True(IsFinite(matrix));
     }
+
+    // ---- a camera carried by an animated node ----
+
+    private static Scene Rigged() => TestScenes.RiggedCamera();
+
+    [Fact]
+    public void TheWorldMatrixOfANodeIncludesTheAnimationsOfItsAncestors()
+    {
+        using Scene scene = Rigged();
+
+        Assert.True(ViewCamera.IsAnimatedNode(scene, 2));
+        AssertClose(new Vector3(1, -20, 0), ViewCamera.AnimatedWorldMatrix(scene, 2, 0).Translation);
+        AssertClose(new Vector3(6, -20, 0), ViewCamera.AnimatedWorldMatrix(scene, 2, 1).Translation);
+        // The motion loops: 2.5 s is half a second into the second round.
+        AssertClose(new Vector3(3.5f, -20, 0), ViewCamera.AnimatedWorldMatrix(scene, 2, 2.5).Translation);
+    }
+
+    [Fact]
+    public void ANodeNothingMovesIsNotAnimated()
+    {
+        using Scene scene = TestScenes.Box(TestScenes.LookFrom(new Vector3(0, -20, 0), Vector3.Zero, Vector3.UnitZ));
+
+        Assert.False(ViewCamera.IsAnimatedNode(scene, 2));
+    }
+
+    [Fact]
+    public void ThePoseResolvedFromACameraNodeSaysWhichNode()
+    {
+        using Scene scene = Rigged();
+
+        ViewCamera.ResolvePose(scene, null, out _, out int node);
+        Assert.Equal(2, node);
+
+        using Scene plain = TestScenes.Box();
+        ViewCamera.ResolvePose(plain, null, out _, out int none);
+        Assert.Equal(-1, none);
+    }
+
+    [Fact]
+    public void ACarriedPoseMovesAndTurnsWithItsNode()
+    {
+        ViewCamera.TryPoseFromMatrix(TestScenes.LookFrom(new Vector3(0, -20, 0), Vector3.Zero, Vector3.UnitZ), out CameraPose pose);
+        pose.OrbitDistance = 20;
+
+        // The node turns a quarter about Z and moves 5 along X.
+        CameraPose carried = ViewCamera.Carry(pose, Matrix4x4.CreateRotationZ(MathF.PI / 2) * Matrix4x4.CreateTranslation(5, 0, 0));
+
+        // From (0, -20, 0) the quarter turn takes it to (20, 0, 0), then 5 along X; it looked along +Y, now along -X.
+        AssertClose(new Vector3(25, 0, 0), carried.Position);
+        AssertClose(new Vector3(-1, 0, 0), carried.Forward);
+        AssertClose(Vector3.UnitZ, carried.Up);
+        Assert.Equal(20, carried.OrbitDistance);
+    }
+
+    [Fact]
+    public void CarryingByTheIdentityChangesNothing()
+    {
+        ViewCamera.TryPoseFromMatrix(TestScenes.LookFrom(new Vector3(3, -20, 2), Vector3.Zero, Vector3.UnitZ), out CameraPose pose);
+
+        CameraPose same = ViewCamera.Carry(pose, Matrix4x4.Identity);
+
+        AssertClose(pose.Position, same.Position);
+        AssertClose(pose.Forward, same.Forward);
+    }
+
+    [Fact]
+    public void ACarryThatCannotBeUsedLeavesThePoseAlone()
+    {
+        ViewCamera.TryPoseFromMatrix(TestScenes.LookFrom(new Vector3(3, -20, 2), Vector3.Zero, Vector3.UnitZ), out CameraPose pose);
+
+        CameraPose same = ViewCamera.Carry(pose, new Matrix4x4());
+
+        AssertClose(pose.Position, same.Position);
+    }
 }

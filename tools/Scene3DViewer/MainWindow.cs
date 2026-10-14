@@ -155,7 +155,7 @@ internal sealed class MainWindow : Window
             };
         }
 
-        Program.Log(view is null ? "view: whole scene" : $"view {index}: '{view.Name}', lighting {view.Lighting}, {view.NodeOverrides.Count} node overrides");
+        Program.Log(view is null ? "view: whole scene" : $"view {index}: '{view.Name}', lighting {view.Lighting}, {view.NodeOverrides.Count} node overrides, camera {(view.CameraNodePath.Count > 0 ? "node " + string.Join('/', view.CameraNodePath) : view.CameraToWorld is null ? "none" : "matrix")}");
         _view3D.View = view;
     }
 

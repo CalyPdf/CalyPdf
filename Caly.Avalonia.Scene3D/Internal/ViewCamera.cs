@@ -67,11 +67,14 @@ internal static class ViewCamera
     /// pose; the scene's first camera node; a default view of the whole scene. A source that is missing
     /// or unusable (not finite, collapsed) is passed over.
     /// </summary>
-    public static CameraPose ResolvePose(Scene scene, SceneView? view, out SceneViewProjection projection)
+    public static CameraPose ResolvePose(Scene scene, SceneView? view, out SceneViewProjection projection) => ResolvePose(scene, view, out projection, out _);
+
+    /// <summary>As above, and says which camera node the pose is that of (-1 for a pose from a matrix or the default).</summary>
+    public static CameraPose ResolvePose(Scene scene, SceneView? view, out SceneViewProjection projection, out int cameraNode)
     {
         SceneBounds bounds = scene.ComputeWorldBounds();
         CameraPose pose = default;
-        int cameraNode = -1;
+        cameraNode = -1;
         bool found = false;
 
         if (view is { CameraNodePath.Count: > 0 })
@@ -163,6 +166,75 @@ internal static class ViewCamera
         }
 
         return pose;
+    }
+
+    /// <summary>The world matrix of a node while its own animations, and those of the nodes above it, are at <paramref name="seconds"/>.</summary>
+    public static Matrix4x4 AnimatedWorldMatrix(Scene scene, int node, double seconds)
+    {
+        ReadOnlySpan<SceneNode> nodes = scene.Nodes;
+        Matrix4x4 world = Matrix4x4.Identity;
+        bool first = true;
+
+        // Parents precede children, so the walk ends; the counter guards against a corrupt tree.
+        for (int guard = 0; node >= 0 && guard <= nodes.Length; guard++)
+        {
+            Matrix4x4 local = nodes[node].Local;
+            foreach (SceneAnimation animation in scene.Animations)
+            {
+                if (animation.NodeName == nodes[node].Name)
+                {
+                    // The motion happens in the own space of the node, before its placement.
+                    local = animation.Sample(seconds) * local;
+                }
+            }
+
+            world = first ? local : world * local;
+            first = false;
+            node = nodes[node].Parent;
+        }
+
+        return world;
+    }
+
+    /// <summary>Whether an animation moves the node or any node above it.</summary>
+    public static bool IsAnimatedNode(Scene scene, int node)
+    {
+        if (scene.Animations.Count == 0)
+        {
+            return false;
+        }
+
+        ReadOnlySpan<SceneNode> nodes = scene.Nodes;
+        for (int guard = 0; node >= 0 && guard <= nodes.Length; guard++)
+        {
+            foreach (SceneAnimation animation in scene.Animations)
+            {
+                if (animation.NodeName == nodes[node].Name)
+                {
+                    return true;
+                }
+            }
+
+            node = nodes[node].Parent;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// The pose a camera has when the node it hangs on has moved by <paramref name="delta"/> (world to
+    /// world, rigid): carried along with it, orbit distance kept. A delta that gives no pose changes nothing.
+    /// </summary>
+    public static CameraPose Carry(in CameraPose pose, in Matrix4x4 delta)
+    {
+        Matrix4x4 cameraToWorld = Matrix4x4.CreateFromQuaternion(pose.Orientation) * Matrix4x4.CreateTranslation(pose.Position);
+        if (!TryPoseFromMatrix(cameraToWorld * delta, out CameraPose carried))
+        {
+            return pose;
+        }
+
+        carried.OrbitDistance = pose.OrbitDistance;
+        return carried;
     }
 
     /// <summary>

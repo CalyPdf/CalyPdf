@@ -94,6 +94,25 @@ internal static class TestScenes
         return builder.Build();
     }
 
+    /// <summary>
+    /// A box at the origin, and a camera node "Eye" under a group "Rig" that slides 10 along X in 2 seconds
+    /// (looping); the camera looks along +Y from (0, -20, 0) in the group's space, the group stands at x = 1.
+    /// </summary>
+    public static Scene RiggedCamera(bool autoPlay = false)
+    {
+        using var builder = new SceneBuilder();
+        builder.AddMaterial(new SceneMaterial { Ambient = new Vector3(0.75f), Opacity = 1, Flags = SceneMaterialFlags.Lit, Name = builder.AddName("") });
+        int mesh = AddBox(builder, new Vector3(-1), new Vector3(1));
+        builder.AddNode(Node(builder.AddName("BoxNode"), mesh: mesh));
+        int rig = builder.AddNode(Node(builder.AddName("Rig"), -1, Matrix4x4.CreateTranslation(1, 0, 0)));
+        int camera = builder.AddCamera(new SceneCamera { Projection = SceneProjection.Perspective, FieldOfView = 40, Near = 1, Far = 1000, Name = builder.AddName("Eye") });
+        builder.AddNode(Node(builder.AddName("Eye"), rig, LookFrom(new Vector3(0, -20, 0), Vector3.Zero, Vector3.UnitZ), camera: camera));
+        builder.AddAnimation(new SceneAnimation("slide", builder.AddName("Rig"),
+            [new SceneKeyFrame(0, Vector3.Zero, Quaternion.Identity, Vector3.One), new SceneKeyFrame(2, new Vector3(10, 0, 0), Quaternion.Identity, Vector3.One)], true, 1, 0));
+        builder.AutoPlayAnimations = autoPlay;
+        return builder.Build();
+    }
+
     public static Scene Empty()
     {
         using var builder = new SceneBuilder();

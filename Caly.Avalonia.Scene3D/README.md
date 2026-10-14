@@ -59,7 +59,10 @@ coordinates, lines and points.
   `RestartAnimation()` and `SeekAnimation(seconds)` move the playhead, `AnimationTime` and
   `IsAnimationPlaying` read it, `AnimationDuration` is the longest run. While it plays the control draws a
   frame after frame (the draw list is worked out again each frame, about 100 bytes of garbage); paused, it
-  draws only when something changes. A new scene starts its animations again. A scene is animated
+  draws only when something changes. A new scene starts its animations again. When the camera of the view is
+  a camera node that an animation moves (or that hangs under a node it moves), the camera is carried along
+  with that node: the pose the view gave and the user steers stays in the frame of the node as the scene
+  places it, and what is drawn is that pose moved by what the animation has done to the node since. A scene is animated
   (`Scene.IsAnimated`) when a node has an animation or a skinned mesh's skeleton has a motion; skinned
   meshes are skinned on the GPU (bones and weights as vertex attributes, the frame's bone matrices in a
   float texture), so they need OpenGL ES 3.0 or desktop 3.2 like the rest of the control, and their

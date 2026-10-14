@@ -114,6 +114,51 @@ public class Scene3DControlTests
     }
 
     [AvaloniaFact]
+    public void TheCameraOfAnAnimatedRigFollowsItAndTheStartingPoseIsKept()
+    {
+        using Scene scene = TestScenes.RiggedCamera();
+        (Window window, Scene3DControl control) = Show(scene);
+
+        // Where the view puts the camera: the group stands at x = 1.
+        Assert.Equal(1, control.Pose.Position.X, 3);
+
+        control.SeekAnimation(1);
+
+        // The rig is 5 along its slide at one second; the pose the user steers by is where it began.
+        Assert.Equal(6, control.DisplayedPose.Position.X, 3);
+        Assert.Equal(-20, control.DisplayedPose.Position.Y, 3);
+        Assert.Equal(1, control.Pose.Position.X, 3);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void ACameraThatNothingMovesStaysWhereItIs()
+    {
+        using Scene scene = TestScenes.Box(TestScenes.LookFrom(new Vector3(0, -20, 0), Vector3.Zero, Vector3.UnitZ));
+        (Window window, Scene3DControl control) = Show(scene);
+
+        control.SeekAnimation(1);
+
+        Assert.Equal(control.Pose.Position, control.DisplayedPose.Position);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void SteeringTheCameraOfAMovingRigIsDoneInTheRigsFrame()
+    {
+        using Scene scene = TestScenes.RiggedCamera();
+        (Window window, Scene3DControl control) = Show(scene);
+        control.SeekAnimation(1);
+
+        control.ZoomBy(1);
+
+        // Zoomed in along the view axis (+Y), still 5 further along X with the rig.
+        Assert.Equal(6, control.DisplayedPose.Position.X, 3);
+        Assert.True(control.DisplayedPose.Position.Y > -20);
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void SeekingPutsThePausedAnimationAtThatTime()
     {
         using Scene scene = TestScenes.AnimatedBox(autoPlay: false);
