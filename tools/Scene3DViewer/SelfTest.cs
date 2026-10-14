@@ -172,7 +172,7 @@ internal sealed class SelfTest
         Lighting = SceneLighting.Headlamp
     };
 
-    private static int AddMaterial(SceneBuilder builder, Vector3 colour, float opacity = 1, bool lit = false, int texture = -1)
+    private static int AddMaterial(SceneBuilder builder, Vector3 colour, float opacity = 1, bool lit = false, int texture = -1, Vector3 emissive = default)
     {
         int firstLayer = 0, layers = 0;
         if (texture >= 0)
@@ -183,7 +183,7 @@ internal sealed class SelfTest
 
         return builder.AddMaterial(new SceneMaterial
         {
-            Diffuse = colour, Opacity = opacity, Flags = lit ? SceneMaterialFlags.Lit : SceneMaterialFlags.None, FirstLayer = firstLayer, LayerCount = layers, Name = builder.AddName("material")
+            Diffuse = colour, Emissive = emissive, Opacity = opacity, Flags = lit ? SceneMaterialFlags.Lit : SceneMaterialFlags.None, FirstLayer = firstLayer, LayerCount = layers, Name = builder.AddName("material")
         });
     }
 
@@ -310,6 +310,19 @@ internal sealed class SelfTest
                     checks.Colour("top right", frame.At(0.5 + dx, 0.375), (0, 255, 0));
                     checks.Colour("bottom left", frame.At(0.5 - dx, 0.625), (0, 0, 255));
                     checks.Colour("bottom right", frame.At(0.5 + dx, 0.625), (255, 255, 255));
+                }),
+
+            // A texture modulates the whole lit colour, emissive included: a surface that glows white under a
+            // picture shows the picture (as the Shoe of the sample documents does), not white added to it.
+            new Case("emissive under a texture",
+                () => Build(b => AddSquare(b, 1, 0, AddMaterial(b, Vector3.One, lit: true, texture: b.AddTexture(Quarters()), emissive: Vector3.One))),
+                FrontView(), whole,
+                (frame, checks) =>
+                {
+                    double dx = 0.125 * frame.Height / frame.Width;
+                    checks.Colour("top left of the square", frame.At(0.5 - dx, 0.375), (255, 0, 0));
+                    checks.Colour("top right", frame.At(0.5 + dx, 0.375), (0, 255, 0));
+                    checks.Colour("bottom left", frame.At(0.5 - dx, 0.625), (0, 0, 255));
                 }),
 
             // Half-transparent blue in front of opaque red: half of each.

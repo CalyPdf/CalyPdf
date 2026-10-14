@@ -125,6 +125,7 @@ internal static class Shaders
         void main()
         {
             vec3 base = uDiffuse;
+            vec3 modulate = vec3(1.0);
             float alpha = uOpacity;
 
             if ((uFlags & 4) != 0)
@@ -136,7 +137,17 @@ internal static class Shaders
             if ((uFlags & 8) != 0)
             {
                 vec4 texel = texture(uTexture, vTexCoord);
-                base = (uFlags & 16) != 0 ? texel.rgb : base * texel.rgb;
+                // A texture modulates the whole lit colour, emissive included, as in fixed-function lighting (a
+                // material that glows white under a dark picture is dark); it replaces the colour outright when told to.
+                if ((uFlags & 16) != 0)
+                {
+                    base = texel.rgb;
+                }
+                else
+                {
+                    modulate = texel.rgb;
+                }
+
                 alpha *= texel.a;
             }
 
@@ -145,7 +156,7 @@ internal static class Shaders
                 discard;
             }
 
-            vec3 color = base;
+            vec3 color = base * modulate;
             if ((uFlags & 1) != 0)
             {
                 // Without normals the surface is shaded flat, from how its position changes across the pixel.
@@ -160,7 +171,8 @@ internal static class Shaders
                     normal = -normal;
                 }
 
-                color = uEmissive + base * uAmbientLight;
+                vec3 lit = uEmissive + base * uAmbientLight;
+                vec3 shine = vec3(0.0);
                 for (int i = 0; i < MAX_LIGHTS; i++)
                 {
                     if (i >= uLightCount)
@@ -192,9 +204,13 @@ internal static class Shaders
                     {
                         vec3 halfway = normalize(toLight + toViewer);
                         float specular = pow(max(dot(normal, halfway), 0.0), uShininess);
-                        color += (base * diffuse + uSpecular * specular) * uLightColor[i] * strength;
+                        lit += base * diffuse * uLightColor[i] * strength;
+                        shine += uSpecular * specular * uLightColor[i] * strength;
                     }
                 }
+
+                // The highlight is added after the texture, as with a separate specular colour.
+                color = lit * modulate + shine;
             }
 
             // Premultiplied, as the surface is composited.

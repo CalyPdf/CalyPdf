@@ -21,7 +21,7 @@ var view3D = new Scene3DControl
 | Geometry | Every mesh instance of the scene, hidden nodes left out; meshes without normals shaded flat |
 | Views | Camera (a pose or a camera node of the scene), perspective or orthographic projection, background colour, lighting scheme, per-node visibility, opacity and transform |
 | Lighting | The schemes of ISO 32000-2 Table 321 with its colours and directions, or the scene's own lights; two-sided |
-| Materials | Diffuse, specular, emissive, opacity, alpha test, vertex colours; transparent surfaces drawn last, back to front |
+| Materials | Diffuse, specular, emissive, opacity, alpha test, vertex colours; a texture modulates the whole lit colour (emissive included) and the specular highlight is added after it; transparent surfaces drawn last, back to front |
 | Textures | The base-colour texture of each material (JPEG or PNG, with a separate alpha image if any), decoded off the UI thread after the first frame |
 | Pointer | Left-drag rotates about the view's orbit point; right-drag or the wheel (while focused) zooms; Ctrl + left-drag or middle-drag pans; double-click or Home returns to the view |
 | Anti-aliasing | 4 samples per pixel in the control's own framebuffer, fewer when that would exceed 96 MB |
