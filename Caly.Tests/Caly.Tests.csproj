@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFramework>net10.0</TargetFramework>
@@ -27,7 +27,7 @@
 		<ProjectReference Include="..\Caly.Core\Caly.Core.csproj" />
 		<ProjectReference Include="..\Caly.Printing\Caly.Printing.Core\Caly.Printing.Core.csproj" />
 		<ProjectReference Include="..\Caly.Printing\Caly.Printing.Unix\Caly.Printing.Unix.csproj" />
-		<ProjectReference Include="..\external/Scene3D\src\Caly.Rendering.Scene3D.U3D\Caly.Rendering.Scene3D.U3D.csproj" />
+		<ProjectReference Include="..\external\Scene3D\Caly.Rendering.Scene3D.U3D\Caly.Rendering.Scene3D.U3D.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

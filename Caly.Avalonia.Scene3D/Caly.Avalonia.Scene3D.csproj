@@ -20,7 +20,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\external/Scene3D\src\Caly.Rendering.Scene3D\Caly.Rendering.Scene3D.csproj" />
+		<ProjectReference Include="..\external\Scene3D\Caly.Rendering.Scene3D\Caly.Rendering.Scene3D.csproj" />
 	</ItemGroup>
 
 </Project>

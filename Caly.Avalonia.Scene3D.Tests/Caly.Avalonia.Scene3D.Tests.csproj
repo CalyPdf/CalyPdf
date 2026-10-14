@@ -26,7 +26,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\Caly.Avalonia.Scene3D\Caly.Avalonia.Scene3D.csproj" />
-		<ProjectReference Include="..\external/Scene3D\src\Caly.Rendering.Scene3D.U3D\Caly.Rendering.Scene3D.U3D.csproj" />
+		<ProjectReference Include="..\external\Scene3D\Caly.Rendering.Scene3D.U3D\Caly.Rendering.Scene3D.U3D.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
