@@ -1,6 +1,6 @@
 using Caly.Pdf.Artwork;
-using Scene3D;
-using Scene3D.Prc;
+using Caly.Rendering.Scene3D;
+using Caly.Rendering.Scene3D.Prc;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Annotations;
 using UglyToad.PdfPig.Artwork;

@@ -2,7 +2,7 @@ using Caly.Pdf;
 using Caly.Pdf.Artwork;
 using Caly.Pdf.Models;
 using Caly.Pdf.PageFactories;
-using Scene3D;
+using Caly.Rendering.Scene3D;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Artwork;
 using UglyToad.PdfPig.Tokens;

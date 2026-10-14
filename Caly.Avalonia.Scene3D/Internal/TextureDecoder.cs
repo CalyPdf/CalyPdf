@@ -1,5 +1,5 @@
 using System.Buffers;
-using Scene3D;
+using Caly.Rendering.Scene3D;
 using SkiaSharp;
 
 namespace Caly.Avalonia.Scene3D.Internal;

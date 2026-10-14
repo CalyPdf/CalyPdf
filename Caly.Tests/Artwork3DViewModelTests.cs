@@ -9,7 +9,7 @@ using Caly.Pdf.Artwork;
 using Caly.Pdf.Models;
 using Caly.Tests.Fakes;
 using CommunityToolkit.Mvvm.Messaging;
-using Scene3D;
+using Caly.Rendering.Scene3D;
 using UglyToad.PdfPig.Artwork;
 using static Caly.Tests.Fakes.DocumentTestHarness;
 

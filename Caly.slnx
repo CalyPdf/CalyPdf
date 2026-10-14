@@ -55,13 +55,13 @@
     </Project>
   </Folder>
   <Folder Name="/external/Scene3D/">
-    <Project Path="external/Scene3D/src/Scene3D.Prc/Scene3D.Prc.csproj">
+    <Project Path="external/Scene3D/src/Caly.Rendering.Scene3D.Prc/Caly.Rendering.Scene3D.Prc.csproj">
       <BuildType Solution="Portable|*" Project="Release" />
     </Project>
-    <Project Path="external/Scene3D/src/Scene3D.U3D/Scene3D.U3D.csproj">
+    <Project Path="external/Scene3D/src/Caly.Rendering.Scene3D.U3D/Caly.Rendering.Scene3D.U3D.csproj">
       <BuildType Solution="Portable|*" Project="Release" />
     </Project>
-    <Project Path="external/Scene3D/src/Scene3D/Scene3D.csproj">
+    <Project Path="external/Scene3D/src/Caly.Rendering.Scene3D/Caly.Rendering.Scene3D.csproj">
       <BuildType Solution="Portable|*" Project="Release" />
     </Project>
   </Folder>

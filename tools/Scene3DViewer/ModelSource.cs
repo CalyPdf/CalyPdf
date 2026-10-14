@@ -1,8 +1,8 @@
 using Avalonia.Media.Imaging;
 using Caly.Pdf.Artwork;
-using Scene3D;
-using Scene3D.Prc;
-using Scene3D.U3D;
+using Caly.Rendering.Scene3D;
+using Caly.Rendering.Scene3D.Prc;
+using Caly.Rendering.Scene3D.U3D;
 using SkiaSharp;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Annotations;

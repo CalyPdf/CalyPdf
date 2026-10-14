@@ -28,7 +28,7 @@ using Caly.Pdf.Artwork;
 using Caly.Pdf.Models;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Scene3D;
+using Caly.Rendering.Scene3D;
 using System;
 using System.Collections.Generic;
 using System.Threading;

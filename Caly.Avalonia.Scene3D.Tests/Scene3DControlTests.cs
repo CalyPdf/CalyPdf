@@ -6,7 +6,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Media;
 using Caly.Avalonia.Scene3D.Internal;
-using Scene3D;
+using Caly.Rendering.Scene3D;
 using Vector = Avalonia.Vector;
 
 namespace Caly.Avalonia.Scene3D.Tests;

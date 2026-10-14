@@ -1,6 +1,6 @@
 using Caly.Pdf.Artwork;
-using Scene3D;
-using Scene3D.Prc;
+using Caly.Rendering.Scene3D;
+using Caly.Rendering.Scene3D.Prc;
 using UglyToad.PdfPig.Artwork;
 
 namespace Caly.Tests;
@@ -90,7 +90,7 @@ public class Artwork3DSceneReaderTests
     }
 
     /// <summary>
-    /// A small PRC file from <c>Documents</c>: written by the tests of Scene3D
+    /// A small PRC file from <c>Documents</c>: written by the tests of Caly.Rendering.Scene3D
     /// (<c>PrcFuzzTests.TheSeedFilesAreWrittenOutOnRequest</c>), which is where such files can be made.
     /// </summary>
     internal static byte[] PrcPayload(string name)

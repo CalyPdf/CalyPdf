@@ -4,7 +4,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using Caly.Avalonia.Scene3D;
-using Scene3D;
+using Caly.Rendering.Scene3D;
 using SkiaSharp;
 
 namespace Scene3DViewer;

@@ -1,6 +1,6 @@
 using System.Numerics;
 using Caly.Pdf.Artwork;
-using Scene3D;
+using Caly.Rendering.Scene3D;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Annotations;
 using UglyToad.PdfPig.Artwork;

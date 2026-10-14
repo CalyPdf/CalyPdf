@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using System.Numerics;
-using Scene3D;
+using Caly.Rendering.Scene3D;
 
 namespace Caly.Avalonia.Scene3D.Internal.Gl;
 

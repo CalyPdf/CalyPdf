@@ -19,7 +19,7 @@
 // SOFTWARE.
 
 using System.Numerics;
-using Scene3D;
+using Caly.Rendering.Scene3D;
 using UglyToad.PdfPig.Artwork;
 
 namespace Caly.Pdf.Artwork;

@@ -18,9 +18,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-using Scene3D;
-using Scene3D.Prc;
-using Scene3D.U3D;
+using Caly.Rendering.Scene3D;
+using Caly.Rendering.Scene3D.Prc;
+using Caly.Rendering.Scene3D.U3D;
 using UglyToad.PdfPig.Artwork;
 
 namespace Caly.Pdf.Artwork;

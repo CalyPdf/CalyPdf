@@ -11,7 +11,7 @@
 		<SignAssembly>True</SignAssembly>
 		<AssemblyOriginatorKeyFile>..\Caly.snk</AssemblyOriginatorKeyFile>
 		<Version>0.1.0</Version>
-		<Description>An Avalonia control that draws a Scene3D scene with OpenGL: authored views, orbit/pan/zoom, base-colour textures.</Description>
+		<Description>An Avalonia control that draws a Caly.Rendering.Scene3D scene with OpenGL: authored views, orbit/pan/zoom, base-colour textures.</Description>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -20,7 +20,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\external\Scene3D\src\Scene3D\Scene3D.csproj" />
+		<ProjectReference Include="..\external/Scene3D\src\Caly.Rendering.Scene3D\Caly.Rendering.Scene3D.csproj" />
 	</ItemGroup>
 
 </Project>

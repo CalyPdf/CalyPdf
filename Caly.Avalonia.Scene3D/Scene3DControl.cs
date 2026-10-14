@@ -10,7 +10,7 @@ using Avalonia.Rendering;
 using Avalonia.Threading;
 using Caly.Avalonia.Scene3D.Internal;
 using Caly.Avalonia.Scene3D.Internal.Gl;
-using Scene3D;
+using Caly.Rendering.Scene3D;
 
 namespace Caly.Avalonia.Scene3D;
 

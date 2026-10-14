@@ -10,7 +10,7 @@ using Caly.Avalonia.Scene3D;
 using Caly.Core.Controls;
 using Caly.Core.Services;
 using Caly.Core.ViewModels;
-using Scene3D;
+using Caly.Rendering.Scene3D;
 using static Caly.Tests.Fakes.DocumentTestHarness;
 
 namespace Caly.Tests;

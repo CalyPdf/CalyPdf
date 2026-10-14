@@ -1,6 +1,6 @@
 using System.Numerics;
 using Caly.Avalonia.Scene3D.Internal;
-using Scene3D;
+using Caly.Rendering.Scene3D;
 
 namespace Caly.Avalonia.Scene3D.Tests;
 
