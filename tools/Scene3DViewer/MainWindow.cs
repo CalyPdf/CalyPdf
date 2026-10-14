@@ -102,6 +102,16 @@ internal sealed class MainWindow : Window
 
         ApplyView();
         _view3D.Scene = _model.Scene;
+        if (_model.Scene.Animations.Count > 0)
+        {
+            Program.Log(string.Create(CultureInfo.InvariantCulture, $"animations: {_model.Scene.Animations.Count}, {_model.Scene.AnimationDuration:0.###} s, {(_model.Scene.AutoPlayAnimations ? "plays at once" : "waits for play")}"));
+        }
+
+        if (options.AnimationTime is { } animationTime)
+        {
+            _view3D.SeekAnimation(animationTime);
+            _view3D.PauseAnimation();
+        }
 
         Closed += (_, _) => _model?.Scene.Dispose();
         if (options.ExitAfterSeconds > 0)

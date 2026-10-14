@@ -273,4 +273,119 @@ public class DrawListTests
 
         Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - before);
     }
+
+    /// <summary>A group "Arm" at x = 1 with a box "Hand" under it at x = 2, and a box "Still" at x = 20.</summary>
+    private static Scene BuildAnimated(Action<SceneBuilder>? more = null)
+    {
+        using var builder = new SceneBuilder();
+        int box = TestScenes.AddBox(builder, new Vector3(-0.5f), new Vector3(0.5f), "Box");
+        int arm = builder.AddNode(TestScenes.Node(builder.AddName("Arm"), -1, Matrix4x4.CreateTranslation(1, 0, 0)));
+        builder.AddNode(TestScenes.Node(builder.AddName("Hand"), arm, Matrix4x4.CreateTranslation(2, 0, 0), box));
+        builder.AddNode(TestScenes.Node(builder.AddName("Still"), -1, Matrix4x4.CreateTranslation(20, 0, 0), box));
+
+        // Arm slides 10 along X in one second and stays there.
+        builder.AddAnimation(new SceneAnimation("slide", builder.AddName("Arm"),
+            [new SceneKeyFrame(0, Vector3.Zero, Quaternion.Identity, Vector3.One), new SceneKeyFrame(1, new Vector3(10, 0, 0), Quaternion.Identity, Vector3.One)], false, 1, 0));
+        more?.Invoke(builder);
+        return builder.Build();
+    }
+
+    private static Vector3 WorldOf(Scene scene, DrawList list, string node)
+    {
+        foreach (DrawItem item in list.Opaque)
+        {
+            if (scene.GetName(scene.Nodes[item.Node].Name) == node)
+            {
+                return item.World.Translation;
+            }
+        }
+
+        throw new InvalidOperationException($"{node} is not drawn.");
+    }
+
+    [Fact]
+    public void WithoutATimeAnimationsDoNotMoveAnything()
+    {
+        using Scene scene = BuildAnimated();
+        var list = new DrawList();
+        list.Prepare(scene, null);
+        (Matrix4x4 v, Matrix4x4 vp) = Camera();
+        list.Update(v, vp);
+
+        Assert.Equal(new Vector3(3, 0, 0), WorldOf(scene, list, "Hand"));
+    }
+
+    [Fact]
+    public void AnAnimatedNodeMovesItsDescendantsWithIt()
+    {
+        using Scene scene = BuildAnimated();
+        var list = new DrawList();
+        list.Prepare(scene, null, default, animationTime: 0.5);
+        (Matrix4x4 v, Matrix4x4 vp) = Camera();
+        list.Update(v, vp);
+
+        // Half way along the slide: the arm is 5 on, the hand moves with it; the other box stays.
+        Assert.Equal(new Vector3(8, 0, 0), WorldOf(scene, list, "Hand"));
+        Assert.Equal(new Vector3(20, 0, 0), WorldOf(scene, list, "Still"));
+    }
+
+    [Fact]
+    public void TheAnimationIsAppliedBeforeTheNodesOwnPlacement()
+    {
+        // The arm is turned a quarter about Z where it stands: its motion happens in its own space, so a
+        // slide along X goes along the arm's turned X, which is world Y.
+        using Scene scene = BuildAnimated();
+        var view = new SceneView
+        {
+            NodeOverrides = [new SceneNodeOverride("Arm", null, null, Matrix4x4.CreateRotationZ(MathF.PI / 2) * Matrix4x4.CreateTranslation(1, 0, 0))]
+        };
+        var list = new DrawList();
+        list.Prepare(scene, view, default, animationTime: 1.0);
+        (Matrix4x4 v, Matrix4x4 vp) = Camera();
+        list.Update(v, vp);
+
+        Vector3 hand = WorldOf(scene, list, "Hand");
+        Assert.Equal(1f, hand.X, 3);
+        Assert.Equal(12f, hand.Y, 3);
+    }
+
+    [Fact]
+    public void TheVisibleBoundsFollowTheAnimation()
+    {
+        using Scene scene = BuildAnimated();
+        var list = new DrawList();
+
+        list.Prepare(scene, null, default, animationTime: 0);
+        float before = list.VisibleBounds.Min.X;
+        list.Prepare(scene, null, default, animationTime: 1);
+
+        Assert.Equal(2.5f, before, 3);
+        Assert.Equal(12.5f, list.VisibleBounds.Min.X, 3);
+        Assert.Equal(20.5f, list.VisibleBounds.Max.X, 3);
+    }
+
+    [Fact]
+    public void TwoAnimationsOfOneNodeCombine()
+    {
+        using Scene scene = BuildAnimated(b => b.AddAnimation(new SceneAnimation("up", b.AddName("Arm"),
+            [new SceneKeyFrame(0, Vector3.Zero, Quaternion.Identity, Vector3.One), new SceneKeyFrame(1, new Vector3(0, 4, 0), Quaternion.Identity, Vector3.One)], false, 1, 0)));
+        var list = new DrawList();
+        list.Prepare(scene, null, default, animationTime: 1);
+        (Matrix4x4 v, Matrix4x4 vp) = Camera();
+        list.Update(v, vp);
+
+        Assert.Equal(new Vector3(13, 4, 0), WorldOf(scene, list, "Hand"));
+    }
+
+    [Fact]
+    public void ANonFiniteTimeIsTheStartOfTheAnimation()
+    {
+        using Scene scene = BuildAnimated();
+        var list = new DrawList();
+        list.Prepare(scene, null, default, animationTime: double.NaN);
+        (Matrix4x4 v, Matrix4x4 vp) = Camera();
+        list.Update(v, vp);
+
+        Assert.Equal(new Vector3(3, 0, 0), WorldOf(scene, list, "Hand"));
+    }
 }

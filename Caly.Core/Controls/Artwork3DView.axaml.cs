@@ -106,6 +106,8 @@ public sealed partial class Artwork3DView : UserControl
         }
 
         this.FindControl<Button>("PART_Reset")!.Click += OnResetClick;
+        this.FindControl<Button>("PART_PlayPause")!.Click += OnPlayPauseClick;
+        this.FindControl<Button>("PART_RestartAnimation")!.Click += OnRestartAnimationClick;
         this.FindControl<ComboBox>("PART_Views")!.DropDownClosed += OnViewsDropDownClosed;
     }
 
@@ -187,6 +189,26 @@ public sealed partial class Artwork3DView : UserControl
                 }
             });
         }
+    }
+
+    private void OnPlayPauseClick(object? sender, RoutedEventArgs e)
+    {
+        if (_view3D.IsAnimationPlaying)
+        {
+            _view3D.PauseAnimation();
+        }
+        else
+        {
+            _view3D.PlayAnimation();
+        }
+
+        _view3D.Focus();
+    }
+
+    private void OnRestartAnimationClick(object? sender, RoutedEventArgs e)
+    {
+        _view3D.RestartAnimation();
+        _view3D.Focus();
     }
 
     private void OnResetClick(object? sender, RoutedEventArgs e)

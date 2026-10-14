@@ -63,6 +63,19 @@ internal static class TestScenes
         return builder.Build();
     }
 
+    /// <summary>A box that slides 10 along X in two seconds, looping or holding its end; plays at once if asked.</summary>
+    public static Scene AnimatedBox(bool autoPlay, bool loop = true)
+    {
+        using var builder = new SceneBuilder();
+        builder.AddMaterial(new SceneMaterial { Ambient = new Vector3(0.75f), Opacity = 1, Flags = SceneMaterialFlags.Lit, Name = builder.AddName("") });
+        int mesh = AddBox(builder, new Vector3(-1), new Vector3(1));
+        builder.AddNode(Node(builder.AddName("Mover"), mesh: mesh));
+        builder.AddAnimation(new SceneAnimation("slide", builder.AddName("Mover"),
+            [new SceneKeyFrame(0, Vector3.Zero, Quaternion.Identity, Vector3.One), new SceneKeyFrame(2, new Vector3(10, 0, 0), Quaternion.Identity, Vector3.One)], loop, 1, 0));
+        builder.AutoPlayAnimations = autoPlay;
+        return builder.Build();
+    }
+
     public static Scene Empty()
     {
         using var builder = new SceneBuilder();

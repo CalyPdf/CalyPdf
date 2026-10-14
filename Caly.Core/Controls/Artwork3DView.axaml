@@ -45,6 +45,56 @@
 				          VerticalAlignment="Center"
 				          ToolTip.Tip="3D view"/>
 
+				<!-- Only for a model that moves. -->
+				<Button Name="PART_PlayPause"
+				        Width="26"
+				        Height="26"
+				        Padding="0"
+				        Background="Transparent"
+				        VerticalAlignment="Center"
+				        ToolTip.Tip="Play or pause the animation">
+					<Button.IsVisible>
+						<MultiBinding Converter="{x:Static BoolConverters.And}">
+							<Binding Path="!IsLoading"/>
+							<Binding Path="#PART_Scene3D.HasAnimation"/>
+						</MultiBinding>
+					</Button.IsVisible>
+					<Panel Width="14" Height="14">
+						<Path Data="M 3.5 2 L 11.5 7 L 3.5 12 Z"
+						      Fill="{Binding $parent[Button].Foreground}"
+						      Stroke="{Binding $parent[Button].Foreground}"
+						      StrokeThickness="1"
+						      StrokeJoin="Round"
+						      IsVisible="{Binding !#PART_Scene3D.IsAnimationPlaying}"/>
+						<Path Data="M 4 2 L 4 12 M 10 2 L 10 12"
+						      Stroke="{Binding $parent[Button].Foreground}"
+						      StrokeThickness="2.2"
+						      IsVisible="{Binding #PART_Scene3D.IsAnimationPlaying}"/>
+					</Panel>
+				</Button>
+
+				<Button Name="PART_RestartAnimation"
+				        Width="26"
+				        Height="26"
+				        Padding="0"
+				        Background="Transparent"
+				        VerticalAlignment="Center"
+				        ToolTip.Tip="Play the animation from the start">
+					<Button.IsVisible>
+						<MultiBinding Converter="{x:Static BoolConverters.And}">
+							<Binding Path="!IsLoading"/>
+							<Binding Path="#PART_Scene3D.HasAnimation"/>
+						</MultiBinding>
+					</Button.IsVisible>
+					<Path Data="M 3 2 L 3 12 M 12 2 L 5.5 7 L 12 12 Z"
+					      Stroke="{Binding $parent[Button].Foreground}"
+					      StrokeThickness="1.4"
+					      StrokeLineCap="Round"
+					      StrokeJoin="Round"
+					      Width="14"
+					      Height="14"/>
+				</Button>
+
 				<Button Name="PART_Reset"
 				        IsVisible="{Binding !IsLoading}"
 				        Width="26"

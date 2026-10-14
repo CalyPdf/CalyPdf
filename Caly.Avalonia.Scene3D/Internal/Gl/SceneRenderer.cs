@@ -22,6 +22,9 @@ internal struct FrameSetup
     /// <summary>Background colour, not premultiplied; alpha 0 leaves what is behind the control visible.</summary>
     public Vector4 Background;
 
+    /// <summary>Seconds into the scene's animations, or null for the scene as it is placed.</summary>
+    public double? AnimationTime;
+
     /// <summary>Most bytes the multisampled framebuffer may take.</summary>
     public long FramebufferBudget;
 }
@@ -65,6 +68,7 @@ internal sealed class SceneRenderer
 
     private Scene? _scene;
     private SceneView? _preparedView;
+    private double? _preparedAnimationTime;
     private bool _drawListStale = true;
 
     /// <param name="texturesReady">Called on a thread-pool thread when a decoded texture waits to be uploaded: time to ask for a frame.</param>
@@ -266,10 +270,11 @@ internal sealed class SceneRenderer
         bool drawable = false;
         if (scene is not null)
         {
-            if (_drawListStale || !ReferenceEquals(_preparedView, setup.View))
+            if (_drawListStale || !ReferenceEquals(_preparedView, setup.View) || _preparedAnimationTime != setup.AnimationTime)
             {
-                _drawList.Prepare(scene, setup.View, _materialHasAlphaTexture);
+                _drawList.Prepare(scene, setup.View, _materialHasAlphaTexture, setup.AnimationTime);
                 _preparedView = setup.View;
+                _preparedAnimationTime = setup.AnimationTime;
                 _drawListStale = false;
             }
 

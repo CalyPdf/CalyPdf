@@ -54,6 +54,12 @@ coordinates, lines and points.
   a pan; Ctrl by default) and `ResetKey` (Home by default, null for none). A right-click without movement
   is never handled: Avalonia then raises `ContextRequested`, and a context menu of the host opens over the
   view. A right-drag zooms and raises nothing.
+- **Animations play on the control's own clock.** A scene with `Animations` sets `HasAnimation`; it plays at
+  once if its source asks (`Scene.AutoPlayAnimations`), else after `PlayAnimation()`. `PauseAnimation()`,
+  `RestartAnimation()` and `SeekAnimation(seconds)` move the playhead, `AnimationTime` and
+  `IsAnimationPlaying` read it, `AnimationDuration` is the longest run. While it plays the control draws a
+  frame after frame (the draw list is worked out again each frame, about 100 bytes of garbage); paused, it
+  draws only when something changes. A new scene starts its animations again.
 - **A scene without geometry is reported at once**: setting one gives `NeedsScene` without waiting for
   OpenGL, so a host can decode again while the surface is still being created.
 - **`Statistics`** gives the GPU memory held (vertices, indices, textures, framebuffer), the last frame's

@@ -18,6 +18,7 @@ namespace Scene3DViewer;
 //   --transparent       no background: the view is drawn over a striped panel that must show through
 //   --zoom Z            page zoom to emulate: the view is Z times the size of its viewport (default 1)
 //   --at X,Y            the point of the view, in fractions, at the middle of the viewport (default 0.5,0.5)
+//   --time S            hold the scene's animations at S seconds
 //   --capture out.png   save what the control drew (with --poster, also the poster as out.poster.png), then exit
 //   --benchmark N       turn the model for N frames, print frame times as a table row, then exit
 //   --scenario recycle  take the control out of the window and put it back, as a recycled page does
@@ -47,6 +48,8 @@ internal sealed class Options
     public Point Centre { get; set; } = new(0.5, 0.5);
 
     public string? Capture { get; set; }
+
+    public double? AnimationTime { get; set; }
 
     public int BenchmarkFrames { get; set; }
 
@@ -93,6 +96,7 @@ internal static class Program
                     case "--poster": Options.Poster = true; break;
                     case "--transparent": Options.Transparent = true; break;
                     case "--zoom": Options.Zoom = Number(args[++i]); break;
+                    case "--time": Options.AnimationTime = Number(args[++i]); break;
                     case "--capture": Options.Capture = Path.GetFullPath(args[++i]); break;
                     case "--benchmark": Options.BenchmarkFrames = int.Parse(args[++i], CultureInfo.InvariantCulture); break;
                     case "--scenario": Options.Scenario = args[++i]; break;

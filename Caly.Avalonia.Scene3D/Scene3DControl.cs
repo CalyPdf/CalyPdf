@@ -64,6 +64,14 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
     public static readonly DirectProperty<Scene3DControl, Quaternion> CameraOrientationProperty =
         AvaloniaProperty.RegisterDirect<Scene3DControl, Quaternion>(nameof(CameraOrientation), o => o.CameraOrientation);
 
+    /// <summary>Defines the <see cref="HasAnimation"/> property.</summary>
+    public static readonly DirectProperty<Scene3DControl, bool> HasAnimationProperty =
+        AvaloniaProperty.RegisterDirect<Scene3DControl, bool>(nameof(HasAnimation), o => o.HasAnimation);
+
+    /// <summary>Defines the <see cref="IsAnimationPlaying"/> property.</summary>
+    public static readonly DirectProperty<Scene3DControl, bool> IsAnimationPlayingProperty =
+        AvaloniaProperty.RegisterDirect<Scene3DControl, bool>(nameof(IsAnimationPlaying), o => o.IsAnimationPlaying);
+
     /// <summary>Most the control's multisampled framebuffer may take before it drops samples.</summary>
     private const long FramebufferBudgetBytes = 96L << 20;
 
@@ -88,6 +96,9 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
     }
 
     private SceneRenderer? _renderer;
+    private readonly AnimationClock _animationClock = new();
+    private bool _hasAnimation;
+    private bool _isAnimationPlaying;
     private Scene3DStatus _status;
     private string? _statusMessage;
     private Quaternion _cameraOrientation = Quaternion.Identity;
@@ -170,6 +181,66 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
 
     /// <summary>The key that returns the camera to the view, or null for none. Home by default.</summary>
     public Key? ResetKey { get; set; } = Key.Home;
+
+    /// <summary>Whether the scene has animations to play.</summary>
+    public bool HasAnimation
+    {
+        get => _hasAnimation;
+        private set => SetAndRaise(HasAnimationProperty, ref _hasAnimation, value);
+    }
+
+    /// <summary>Whether the scene's animations are running.</summary>
+    public bool IsAnimationPlaying
+    {
+        get => _isAnimationPlaying;
+        private set => SetAndRaise(IsAnimationPlayingProperty, ref _isAnimationPlaying, value);
+    }
+
+    /// <summary>Seconds the scene's animations have been playing, as of now; held while paused.</summary>
+    public double AnimationTime => _animationClock.Elapsed(Stopwatch.GetTimestamp());
+
+    /// <summary>Seconds the longest animation of the scene takes to run once; 0 without animations.</summary>
+    public double AnimationDuration => Scene?.AnimationDuration ?? 0;
+
+    /// <summary>Runs the scene's animations from where they stand. Does nothing for a scene without any.</summary>
+    public void PlayAnimation()
+    {
+        if (HasAnimation)
+        {
+            _animationClock.Play(Stopwatch.GetTimestamp());
+            IsAnimationPlaying = true;
+            RequestNextFrameRendering();
+        }
+    }
+
+    /// <summary>Holds the scene's animations where they are.</summary>
+    public void PauseAnimation()
+    {
+        _animationClock.Pause(Stopwatch.GetTimestamp());
+        IsAnimationPlaying = false;
+        RequestNextFrameRendering();
+    }
+
+    /// <summary>Puts the animations' playhead at <paramref name="seconds"/>, playing or paused as it was.</summary>
+    public void SeekAnimation(double seconds)
+    {
+        if (HasAnimation)
+        {
+            _animationClock.Seek(seconds, Stopwatch.GetTimestamp());
+            RequestNextFrameRendering();
+        }
+    }
+
+    /// <summary>Plays the scene's animations from their start.</summary>
+    public void RestartAnimation()
+    {
+        if (HasAnimation)
+        {
+            _animationClock.Restart(Stopwatch.GetTimestamp());
+            IsAnimationPlaying = true;
+            RequestNextFrameRendering();
+        }
+    }
 
     /// <summary>What the control is doing.</summary>
     public Scene3DStatus Status
@@ -302,6 +373,15 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
             // A scene that has given up its geometry cannot be uploaded, and no GPU is needed to see
             // that: say so now, so that a host can decode again while OpenGL is still starting.
             Status = scene.HasGeometry ? Scene3DStatus.Uploading : Scene3DStatus.NeedsScene;
+        }
+
+        // A scene begins its animations again, playing if its source asks.
+        _animationClock.Reset();
+        HasAnimation = scene is { Animations.Count: > 0 };
+        IsAnimationPlaying = false;
+        if (HasAnimation && scene!.AutoPlayAnimations)
+        {
+            PlayAnimation();
         }
 
         ResetView();
@@ -547,7 +627,8 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
                 Background = view?.Background is { } authored
                     ? new Vector4(authored, 1)
                     : new Vector4(background.R / 255f, background.G / 255f, background.B / 255f, background.A / 255f),
-                FramebufferBudget = FramebufferBudgetBytes
+                FramebufferBudget = FramebufferBudgetBytes,
+                AnimationTime = HasAnimation ? AnimationTime : null
             };
 
             // Without a camera (no scene) or a scene on the GPU, only the background is drawn.
@@ -582,8 +663,8 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
                 renderer.TexturesFailed,
                 renderer.TexturesPending);
 
-            // Textures decoded but not yet uploaded for lack of time in this frame: another frame, soon.
-            if (renderer.MoreUploadsReady)
+            // A playing animation is a frame after frame.
+            if (renderer.MoreUploadsReady || IsAnimationPlaying)
             {
                 RequestNextFrameRendering();
             }

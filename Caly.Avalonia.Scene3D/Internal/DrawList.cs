@@ -91,7 +91,8 @@ internal sealed class DrawList
     /// Works out the draws of a scene under a view's node overrides.
     /// </summary>
     /// <param name="materialHasAlphaTexture">Per material, whether its texture has transparency; may be shorter than the material list.</param>
-    public void Prepare(Scene scene, SceneView? view, ReadOnlySpan<bool> materialHasAlphaTexture = default)
+    /// <param name="animationTime">Seconds into the scene's animations; null leaves every node where it is placed.</param>
+    public void Prepare(Scene scene, SceneView? view, ReadOnlySpan<bool> materialHasAlphaTexture = default, double? animationTime = null)
     {
         ReadOnlySpan<SceneNode> nodes = scene.Nodes;
         ReadOnlySpan<SceneMesh> meshes = scene.Meshes;
@@ -116,8 +117,35 @@ internal sealed class DrawList
 
         Matrix4x4[] world = ArrayPool<Matrix4x4>.Shared.Rent(Math.Max(nodes.Length, 1));
         float[] opacity = ArrayPool<float>.Shared.Rent(Math.Max(nodes.Length, 1));
+
+        // What the animations do to each node name at this time; identity where nothing moves it.
+        int nameCount = animationTime is not null && scene.Animations.Count > 0 ? scene.NameCount : 0;
+        Matrix4x4[]? moved = nameCount > 0 ? ArrayPool<Matrix4x4>.Shared.Rent(nameCount) : null;
+        bool[]? isMoved = nameCount > 0 ? ArrayPool<bool>.Shared.Rent(nameCount) : null;
         try
         {
+            if (moved is not null && isMoved is not null)
+            {
+                isMoved.AsSpan(0, nameCount).Clear();
+                foreach (SceneAnimation animation in scene.Animations)
+                {
+                    int target = animation.NodeName;
+                    if ((uint)target >= (uint)nameCount)
+                    {
+                        continue;
+                    }
+
+                    Matrix4x4 step = animation.Sample(animationTime!.Value);
+                    if (!IsFinite(step))
+                    {
+                        continue;
+                    }
+
+                    moved[target] = isMoved[target] ? moved[target] * step : step;
+                    isMoved[target] = true;
+                }
+            }
+
             // Parents come before children, so one pass carries transforms and opacity down the tree.
             for (int i = 0; i < nodes.Length; i++)
             {
@@ -128,6 +156,13 @@ internal sealed class DrawList
                 bool changed = overrides is not null && overrides.TryGetValue(scene.GetName(node.Name), out change);
 
                 Matrix4x4 local = changed && change.Transform is { } transform && IsFinite(transform) ? transform : node.Local;
+
+                // The motion happens in the node's own space, before its placement.
+                if (isMoved is not null && (uint)node.Name < (uint)nameCount && isMoved[node.Name])
+                {
+                    local = moved![node.Name] * local;
+                }
+
                 world[i] = hasParent ? local * world[node.Parent] : local;
 
                 float own = changed && change.Opacity is { } o && float.IsFinite(o) ? Math.Clamp(o, 0f, 1f) : 1f;
@@ -192,6 +227,11 @@ internal sealed class DrawList
         {
             ArrayPool<Matrix4x4>.Shared.Return(world);
             ArrayPool<float>.Shared.Return(opacity);
+            if (moved is not null)
+            {
+                ArrayPool<Matrix4x4>.Shared.Return(moved);
+                ArrayPool<bool>.Shared.Return(isMoved!);
+            }
         }
 
         Array.Sort(_records, 0, _recordCount, RecordOrder.Instance);

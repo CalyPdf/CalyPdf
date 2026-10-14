@@ -43,6 +43,110 @@ public class Scene3DControlTests
     }
 
     [AvaloniaFact]
+    public void ASceneWithoutAnimationsHasNoAnimationToPlay()
+    {
+        using Scene scene = TestScenes.Box();
+        (Window window, Scene3DControl control) = Show(scene);
+
+        Assert.False(control.HasAnimation);
+        Assert.False(control.IsAnimationPlaying);
+        Assert.Equal(0, control.AnimationDuration);
+
+        control.PlayAnimation();
+        Assert.False(control.IsAnimationPlaying);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void AnAnimatedSceneThatAsksToStartPlaysAtOnce()
+    {
+        using Scene scene = TestScenes.AnimatedBox(autoPlay: true);
+        (Window window, Scene3DControl control) = Show(scene);
+
+        Assert.True(control.HasAnimation);
+        Assert.True(control.IsAnimationPlaying);
+        Assert.Equal(2, control.AnimationDuration, 5);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void AnAnimatedSceneThatDoesNotAskWaitsForPlay()
+    {
+        using Scene scene = TestScenes.AnimatedBox(autoPlay: false);
+        (Window window, Scene3DControl control) = Show(scene);
+
+        Assert.True(control.HasAnimation);
+        Assert.False(control.IsAnimationPlaying);
+
+        control.PlayAnimation();
+        Assert.True(control.IsAnimationPlaying);
+
+        control.PauseAnimation();
+        Assert.False(control.IsAnimationPlaying);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void RestartingPlaysFromTheStart()
+    {
+        using Scene scene = TestScenes.AnimatedBox(autoPlay: false);
+        (Window window, Scene3DControl control) = Show(scene);
+
+        control.PlayAnimation();
+        control.PauseAnimation();
+        control.RestartAnimation();
+
+        Assert.True(control.IsAnimationPlaying);
+        Assert.True(control.AnimationTime < 0.5);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void SeekingPutsThePausedAnimationAtThatTime()
+    {
+        using Scene scene = TestScenes.AnimatedBox(autoPlay: false);
+        (Window window, Scene3DControl control) = Show(scene);
+
+        control.SeekAnimation(1.25);
+
+        Assert.False(control.IsAnimationPlaying);
+        Assert.Equal(1.25, control.AnimationTime, 6);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void SeekingKeepsAPlayingAnimationPlayingFromThere()
+    {
+        using Scene scene = TestScenes.AnimatedBox(autoPlay: true);
+        (Window window, Scene3DControl control) = Show(scene);
+
+        control.SeekAnimation(30);
+
+        Assert.True(control.IsAnimationPlaying);
+        Assert.InRange(control.AnimationTime, 30, 31);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void ANewSceneStartsItsAnimationsAgain()
+    {
+        using Scene first = TestScenes.AnimatedBox(autoPlay: true);
+        using Scene second = TestScenes.AnimatedBox(autoPlay: false);
+        (Window window, Scene3DControl control) = Show(first);
+        Assert.True(control.IsAnimationPlaying);
+
+        control.Scene = second;
+
+        Assert.True(control.HasAnimation);
+        Assert.False(control.IsAnimationPlaying);
+        Assert.Equal(0, control.AnimationTime);
+
+        control.Scene = null;
+        Assert.False(control.HasAnimation);
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void ASceneWaitsForTheGpuAndWithoutOneTheControlSaysSo()
     {
         using Scene scene = TestScenes.Box();
