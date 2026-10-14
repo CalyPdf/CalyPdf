@@ -43,6 +43,9 @@ internal sealed class SceneRenderer
     private readonly int _uModelView, _uProjection, _uNormalMatrix, _uTexTransform, _uPointSize;
     private readonly int _uFlags, _uDiffuse, _uSpecular, _uEmissive, _uOpacity, _uShininess, _uAlphaCutoff, _uTexture;
     private readonly int _uAmbientLight, _uLightCount, _uLightPosition, _uLightColor, _uLightAttenuation, _uLightSpot;
+    private readonly int _uSkinOffset, _uBones;
+    private int _boneTexture;
+    private float[] _boneTexels = [];
 
     private readonly ShaderLight[] _lights = new ShaderLight[LightRigs.MaxLights];
     private readonly float[] _lightPositions = new float[LightRigs.MaxLights * 4];
@@ -101,6 +104,8 @@ internal sealed class SceneRenderer
         _uLightColor = gl.GetUniformLocation(_program, "uLightColor");
         _uLightAttenuation = gl.GetUniformLocation(_program, "uLightAttenuation");
         _uLightSpot = gl.GetUniformLocation(_program, "uLightSpot");
+        _uSkinOffset = gl.GetUniformLocation(_program, "uSkinOffset");
+        _uBones = gl.GetUniformLocation(_program, "uBones");
     }
 
     public GlApi Gl => _gl;
@@ -310,6 +315,7 @@ internal sealed class SceneRenderer
         GlApi gl = _gl;
         _drawList.Update(view, view * projection);
         LastCulled = _drawList.Culled;
+        UploadBones();
 
         gl.Enable(GlApi.DepthTest);
         gl.DepthFunc(GlApi.LessOrEqual);
@@ -320,6 +326,8 @@ internal sealed class SceneRenderer
         gl.UniformMatrix(_uProjection, projection);
         gl.UniformMatrix(_uTexTransform, Matrix4x4.Identity);
         gl.Uniform(_uTexture, 0);
+        gl.Uniform(_uBones, Shaders.BoneTextureUnit);
+        gl.Uniform(_uSkinOffset, -1);
 
         // The points of a point set: four pixels across on a view 1080 high, never under three. OpenGL ES
         // always takes the size from the shader; desktop OpenGL has to be told to.
@@ -330,7 +338,7 @@ internal sealed class SceneRenderer
         }
         SetLights(scene, setup.View?.Lighting ?? SceneLighting.Artwork, view);
 
-        var state = new DrawState { Mesh = -1, Material = int.MinValue, Opacity = float.NaN, Orthographic = setup.Projection.Kind == SceneProjection.Orthographic };
+        var state = new DrawState { Mesh = -1, Material = int.MinValue, Opacity = float.NaN, SkinOffset = -1, Orthographic = setup.Projection.Kind == SceneProjection.Orthographic };
         foreach (ref readonly DrawItem item in _drawList.Opaque)
         {
             DrawOne(scene, item, view, ref state);
@@ -363,7 +371,47 @@ internal sealed class SceneRenderer
         public float Opacity;
         public SceneMeshFlags MeshFlags;
         public SceneTopology Topology;
+        public int SkinOffset;
         public bool Orthographic;
+    }
+
+    /// <summary>
+    /// Puts the bone matrices of the frame in the bone texture: the four rows of a matrix side by side, 256
+    /// matrices to a row of the texture, in the order of <see cref="DrawList.SkinMatrices"/>.
+    /// </summary>
+    private void UploadBones()
+    {
+        ReadOnlySpan<Matrix4x4> matrices = _drawList.SkinMatrices;
+        if (matrices.IsEmpty)
+        {
+            return;
+        }
+
+        const int perRow = Shaders.BoneTextureWidth / 4;
+        int rows = (matrices.Length + perRow - 1) / perRow;
+        int floats = rows * Shaders.BoneTextureWidth * 4;
+        if (_boneTexels.Length < floats)
+        {
+            _boneTexels = new float[floats];
+        }
+
+        // A matrix's sixteen floats are its four rows, in the order the shader reads them as texels.
+        System.Runtime.InteropServices.MemoryMarshal.Cast<Matrix4x4, float>(matrices).CopyTo(_boneTexels);
+        _boneTexels.AsSpan(matrices.Length * 16, floats - matrices.Length * 16).Clear();
+
+        if (_boneTexture == 0)
+        {
+            _boneTexture = _gl.GenTexture();
+        }
+
+        _gl.ActiveTexture(GlApi.Texture0 + Shaders.BoneTextureUnit);
+        _gl.BindTexture(GlApi.Texture2D, _boneTexture);
+        _gl.TexParameter(GlApi.TextureMinFilter, GlApi.Nearest);
+        _gl.TexParameter(GlApi.TextureMagFilter, GlApi.Nearest);
+        _gl.TexParameter(GlApi.TextureWrapS, GlApi.ClampToEdge);
+        _gl.TexParameter(GlApi.TextureWrapT, GlApi.ClampToEdge);
+        _gl.TexImage2DFloat(Shaders.BoneTextureWidth, rows, _boneTexels.AsSpan(0, floats));
+        _gl.ActiveTexture(GlApi.Texture0);
     }
 
     private void DrawOne(Scene scene, in DrawItem item, in Matrix4x4 view, ref DrawState state)
@@ -392,6 +440,14 @@ internal sealed class SceneRenderer
             state.Opacity = item.Opacity;
             state.MeshFlags = meshFlags;
             state.Topology = topology;
+        }
+
+        // A mesh whose bones the GPU has is skinned from this item's matrices; any other is drawn as it is.
+        int skinOffset = item.SkinOffset >= 0 && _resources.IsSkinned(item.Mesh) ? item.SkinOffset : -1;
+        if (skinOffset != state.SkinOffset)
+        {
+            gl.Uniform(_uSkinOffset, skinOffset);
+            state.SkinOffset = skinOffset;
         }
 
         Matrix4x4 modelView = item.World * view;
@@ -506,6 +562,8 @@ internal sealed class SceneRenderer
         _streamer.Dispose();
         _resources.Release();
         _targets.Release();
+        _gl.DeleteTexture(_boneTexture);
+        _boneTexture = 0;
         _gl.DeleteProgram(_program);
     }
 

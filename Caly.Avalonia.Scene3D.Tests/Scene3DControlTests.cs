@@ -102,6 +102,18 @@ public class Scene3DControlTests
     }
 
     [AvaloniaFact]
+    public void ASceneWhoseOnlyMotionIsThatOfASkeletonIsAnimated()
+    {
+        using Scene scene = TestScenes.SkinnedTriangle(autoPlay: true);
+        (Window window, Scene3DControl control) = Show(scene);
+
+        Assert.True(control.HasAnimation);
+        Assert.True(control.IsAnimationPlaying);
+        Assert.Equal(2, control.AnimationDuration, 5);
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void SeekingPutsThePausedAnimationAtThatTime()
     {
         using Scene scene = TestScenes.AnimatedBox(autoPlay: false);

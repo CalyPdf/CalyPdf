@@ -18,6 +18,12 @@ internal struct DrawItem
     public int Material;
     public int Node;
 
+    /// <summary>
+    /// Where this instance's bone matrices start in <see cref="DrawList.SkinMatrices"/>, or -1 for a mesh
+    /// that does not move with a skeleton.
+    /// </summary>
+    public int SkinOffset;
+
     /// <summary>Opacity the view gives the node, to be multiplied into the material's.</summary>
     public float Opacity;
 
@@ -73,10 +79,18 @@ internal sealed class DrawList
     private DrawItem[] _opaque = [];
     private DrawItem[] _transparent = [];
     private int _opaqueCount, _transparentCount;
+    private Matrix4x4[] _skinMatrices = [];
+    private int _skinMatrixCount;
 
     public ReadOnlySpan<DrawItem> Opaque => _opaque.AsSpan(0, _opaqueCount);
 
     public ReadOnlySpan<DrawItem> Transparent => _transparent.AsSpan(0, _transparentCount);
+
+    /// <summary>
+    /// The bone matrices of every skinned mesh in the draws, one skeleton after another: what moves a vertex
+    /// from the mesh's reference pose to its pose at the time prepared (<see cref="DrawItem.SkinOffset"/>).
+    /// </summary>
+    public ReadOnlySpan<Matrix4x4> SkinMatrices => _skinMatrices.AsSpan(0, _skinMatrixCount);
 
     /// <summary>Draws left out of the last <see cref="Update"/> because they are outside the view volume.</summary>
     public int Culled { get; private set; }
@@ -102,6 +116,7 @@ internal sealed class DrawList
 
         _recordCount = 0;
         _opaqueCount = _transparentCount = 0;
+        _skinMatrixCount = 0;
         Culled = 0;
         SceneBounds visibleBounds = SceneBounds.Empty;
 
@@ -122,6 +137,15 @@ internal sealed class DrawList
         int nameCount = animationTime is not null && scene.Animations.Count > 0 ? scene.NameCount : 0;
         Matrix4x4[]? moved = nameCount > 0 ? ArrayPool<Matrix4x4>.Shared.Rent(nameCount) : null;
         bool[]? isMoved = nameCount > 0 ? ArrayPool<bool>.Shared.Rent(nameCount) : null;
+
+        // Skinned meshes: where each skin's matrices start (computed when first needed), and the box
+        // around each mesh as its bones move it.
+        int skinCount = scene.Skins.Count;
+        int[]? skinOffsets = skinCount > 0 ? ArrayPool<int>.Shared.Rent(skinCount) : null;
+        SceneBounds[]? skinnedBounds = skinCount > 0 ? ArrayPool<SceneBounds>.Shared.Rent(meshes.Length) : null;
+        bool[]? skinnedBoundsDone = skinCount > 0 ? ArrayPool<bool>.Shared.Rent(meshes.Length) : null;
+        skinOffsets?.AsSpan(0, skinCount).Fill(-1);
+        skinnedBoundsDone?.AsSpan(0, meshes.Length).Clear();
         try
         {
             if (moved is not null && isMoved is not null)
@@ -177,7 +201,21 @@ internal sealed class DrawList
                 }
 
                 SceneMesh mesh = meshes[node.Mesh];
-                if (mesh.VertexCount <= 0 || mesh.Bounds.IsEmpty || !TryWorldBounds(mesh.Bounds, world[i], out Vector3 min, out Vector3 max))
+                SceneBounds localBounds = mesh.Bounds;
+                int skinOffset = -1;
+                if (skinOffsets is not null && skinnedBounds is not null && skinnedBoundsDone is not null && (uint)mesh.Skin < (uint)skinCount && scene.Skins[mesh.Skin].Motion is not null)
+                {
+                    skinOffset = skinOffsets[mesh.Skin] >= 0 ? skinOffsets[mesh.Skin] : (skinOffsets[mesh.Skin] = AddSkinMatrices(scene, scene.Skins[mesh.Skin], animationTime ?? 0));
+                    if (!skinnedBoundsDone[node.Mesh])
+                    {
+                        skinnedBounds[node.Mesh] = SkinnedBounds(mesh.Bounds, skinOffset, scene.Skeletons[scene.Skins[mesh.Skin].Skeleton].Bones.Length);
+                        skinnedBoundsDone[node.Mesh] = true;
+                    }
+
+                    localBounds = skinnedBounds[node.Mesh];
+                }
+
+                if (mesh.VertexCount <= 0 || localBounds.IsEmpty || !TryWorldBounds(localBounds, world[i], out Vector3 min, out Vector3 max))
                 {
                     continue;
                 }
@@ -212,7 +250,7 @@ internal sealed class DrawList
 
                     _records[_recordCount++] = new Record
                     {
-                        Item = new DrawItem { World = world[i], Mesh = node.Mesh, IndexStart = part.IndexStart, IndexCount = part.IndexCount, Material = material, Node = i, Opacity = opacity[i] },
+                        Item = new DrawItem { World = world[i], Mesh = node.Mesh, IndexStart = part.IndexStart, IndexCount = part.IndexCount, Material = material, Node = i, SkinOffset = skinOffset, Opacity = opacity[i] },
                         BoundsMin = min,
                         BoundsMax = max,
                         Transparent = transparent
@@ -231,6 +269,13 @@ internal sealed class DrawList
             {
                 ArrayPool<Matrix4x4>.Shared.Return(moved);
                 ArrayPool<bool>.Shared.Return(isMoved!);
+            }
+
+            if (skinOffsets is not null)
+            {
+                ArrayPool<int>.Shared.Return(skinOffsets);
+                ArrayPool<SceneBounds>.Shared.Return(skinnedBounds!);
+                ArrayPool<bool>.Shared.Return(skinnedBoundsDone!);
             }
         }
 
@@ -283,6 +328,43 @@ internal sealed class DrawList
     }
 
     /// <summary>The world-space box around a mesh's box under a transform; false if it is not finite.</summary>
+    /// <summary>Appends the bone matrices of a skin at a time, and returns where they start.</summary>
+    private int AddSkinMatrices(Scene scene, SceneSkin skin, double seconds)
+    {
+        SceneSkeleton skeleton = scene.Skeletons[skin.Skeleton];
+        int bones = skeleton.Bones.Length;
+        int start = _skinMatrixCount;
+        if (_skinMatrices.Length < start + bones)
+        {
+            Array.Resize(ref _skinMatrices, Math.Max(start + bones, Math.Max(64, _skinMatrices.Length * 2)));
+        }
+
+        skeleton.ComputeSkinMatrices(skin.Motion, seconds, _skinMatrices.AsSpan(start, bones));
+        _skinMatrixCount = start + bones;
+        return start;
+    }
+
+    /// <summary>The box around a mesh wherever any of its skeleton's bones put it: sure to hold the mesh, if looser than it.</summary>
+    private SceneBounds SkinnedBounds(in SceneBounds local, int offset, int bones)
+    {
+        SceneBounds box = SceneBounds.Empty;
+        if (local.IsEmpty)
+        {
+            return box;
+        }
+
+        for (int b = 0; b < bones; b++)
+        {
+            if (TryWorldBounds(local, _skinMatrices[offset + b], out Vector3 min, out Vector3 max))
+            {
+                box.Include(min);
+                box.Include(max);
+            }
+        }
+
+        return box.IsEmpty ? local : box;
+    }
+
     private static bool TryWorldBounds(in SceneBounds local, in Matrix4x4 world, out Vector3 min, out Vector3 max)
     {
         if (System.Runtime.Intrinsics.Vector128.IsHardwareAccelerated)

@@ -388,4 +388,121 @@ public class DrawListTests
 
         Assert.Equal(new Vector3(3, 0, 0), WorldOf(scene, list, "Hand"));
     }
+
+    // ---- skinned meshes ----
+
+    /// <summary>
+    /// A skeleton of two bones end to end along X (5 long each), and a triangle whose first vertex follows
+    /// the first bone and the other two the second. Bone 0 turns a quarter about Z at t = 1 (from 0 to 1).
+    /// </summary>
+    private static Scene BuildSkinned(bool withMotion = true, int nodes = 1)
+    {
+        using var builder = new SceneBuilder();
+        int skeleton = builder.AddSkeleton(new SceneSkeleton([new SceneBone(0, -1, 5, Vector3.Zero, Quaternion.Identity), new SceneBone(0, 0, 5, Vector3.Zero, Quaternion.Identity)]));
+
+        builder.BeginMesh(builder.AddName("Tri"), SceneMeshFlags.None);
+        new float[] { 0, 0, 0, 5, 0, 0, 5, 1, 0 }.CopyTo(builder.AllocateVertices(3).Positions);
+        new uint[] { 0, 1, 2 }.CopyTo(builder.AllocateIndices(3));
+        builder.AddPart(3, 0);
+        SceneBoneMotion? motion = withMotion
+            ? new SceneBoneMotion("turn", [[new SceneKeyFrame(0, Vector3.Zero, Quaternion.Identity, Vector3.One), new SceneKeyFrame(1, Vector3.Zero, Quaternion.CreateFromAxisAngle(Vector3.UnitZ, MathF.PI / 2), Vector3.One)], null], false, 1, 0, false)
+            : null;
+        builder.SetMeshSkin(builder.AddSkin(new SceneSkin(skeleton, motion, [SceneSkin.PackIndices(0, 0, 0, 0), SceneSkin.PackIndices(1, 0, 0, 0), SceneSkin.PackIndices(1, 0, 0, 0)], [SceneSkin.PackWeights(1, 0, 0, 0), SceneSkin.PackWeights(1, 0, 0, 0), SceneSkin.PackWeights(1, 0, 0, 0)])));
+        int mesh = builder.EndMesh();
+
+        for (int i = 0; i < nodes; i++)
+        {
+            builder.AddNode(TestScenes.Node(builder.AddName("Node" + i), -1, Matrix4x4.CreateTranslation(i * 30, 0, 0), mesh));
+        }
+
+        return builder.Build();
+    }
+
+    private static DrawList PreparedAt(Scene scene, double? time)
+    {
+        var list = new DrawList();
+        list.Prepare(scene, null, default, time);
+        (Matrix4x4 v, Matrix4x4 vp) = Camera();
+        list.Update(v, vp);
+        return list;
+    }
+
+    [Fact]
+    public void ASkinnedItemNamesItsMatricesAtTheTime()
+    {
+        using Scene scene = BuildSkinned();
+        DrawList list = PreparedAt(scene, 1.0);
+
+        DrawItem item = Assert.Single(list.Opaque.ToArray());
+        Assert.True(item.SkinOffset >= 0);
+
+        // The second bone starts at x = 5; with the first turned a quarter it starts at y = 5.
+        Matrix4x4 second = list.SkinMatrices[item.SkinOffset + 1];
+        Assert.True(Vector3.Distance(new Vector3(0, 5, 0), Vector3.Transform(new Vector3(5, 0, 0), second)) < 1e-3f);
+    }
+
+    [Fact]
+    public void WithoutATimeASkinnedMeshStandsInItsReferencePose()
+    {
+        using Scene scene = BuildSkinned();
+        DrawList list = PreparedAt(scene, null);
+
+        DrawItem item = Assert.Single(list.Opaque.ToArray());
+        Assert.True(item.SkinOffset >= 0);
+        Assert.True(Vector3.Distance(new Vector3(5, 0, 0), Vector3.Transform(new Vector3(5, 0, 0), list.SkinMatrices[item.SkinOffset + 1])) < 1e-3f);
+    }
+
+    [Fact]
+    public void ASkinWithoutAMotionIsDrawnAsAPlainMesh()
+    {
+        using Scene scene = BuildSkinned(withMotion: false);
+        DrawList list = PreparedAt(scene, 1.0);
+
+        DrawItem item = Assert.Single(list.Opaque.ToArray());
+        Assert.Equal(-1, item.SkinOffset);
+        Assert.True(list.SkinMatrices.IsEmpty);
+    }
+
+    [Fact]
+    public void TheBoundsOfASkinnedMeshFollowItsBones()
+    {
+        using Scene scene = BuildSkinned();
+
+        DrawList start = PreparedAt(scene, 0);
+        DrawList turned = PreparedAt(scene, 1.0);
+
+        // At rest the triangle spans x 0..5, y 0..1; with the second bone turned up it reaches y = 5.
+        Assert.Equal(5f, start.VisibleBounds.Max.X, 2);
+        Assert.True(turned.VisibleBounds.Max.Y >= 5f - 1e-3f, turned.VisibleBounds.Max.ToString());
+    }
+
+    [Fact]
+    public void NodesOfOneSkinShareItsMatrices()
+    {
+        using Scene scene = BuildSkinned(nodes: 3);
+        DrawList list = PreparedAt(scene, 1.0);
+
+        DrawItem[] items = list.Opaque.ToArray();
+        Assert.Equal(3, items.Length);
+        Assert.Single(items.Select(i => i.SkinOffset).Distinct());
+        Assert.Equal(2, list.SkinMatrices.Length);
+    }
+
+    [Fact]
+    public void AnimatedPreparationOfASkinnedSceneKeepsTheDrawingAllocationFree()
+    {
+        using Scene scene = BuildSkinned();
+        var list = new DrawList();
+        list.Prepare(scene, null, default, 0.5);
+        (Matrix4x4 v, Matrix4x4 vp) = Camera();
+        list.Update(v, vp);
+
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        for (int i = 0; i < 100; i++)
+        {
+            list.Update(v, vp);
+        }
+
+        Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - before);
+    }
 }

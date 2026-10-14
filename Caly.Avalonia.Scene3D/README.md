@@ -59,7 +59,11 @@ coordinates, lines and points.
   `RestartAnimation()` and `SeekAnimation(seconds)` move the playhead, `AnimationTime` and
   `IsAnimationPlaying` read it, `AnimationDuration` is the longest run. While it plays the control draws a
   frame after frame (the draw list is worked out again each frame, about 100 bytes of garbage); paused, it
-  draws only when something changes. A new scene starts its animations again.
+  draws only when something changes. A new scene starts its animations again. A scene is animated
+  (`Scene.IsAnimated`) when a node has an animation or a skinned mesh's skeleton has a motion; skinned
+  meshes are skinned on the GPU (bones and weights as vertex attributes, the frame's bone matrices in a
+  float texture), so they need OpenGL ES 3.0 or desktop 3.2 like the rest of the control, and their
+  bounds for culling and for the clip planes are the box of the mesh under every bone of its skeleton.
 - **A scene without geometry is reported at once**: setting one gives `NeedsScene` without waiting for
   OpenGL, so a host can decode again while the surface is still being created.
 - **`Statistics`** gives the GPU memory held (vertices, indices, textures, framebuffer), the last frame's

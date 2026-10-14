@@ -25,7 +25,7 @@ internal sealed unsafe class GlApi
     public const int UnpackAlignment = 0x0CF5, PackAlignment = 0x0D05;
     public const int Texture2D = 0x0DE1, Texture0 = 0x84C0;
     public const int UnsignedByte = 0x1401, UnsignedInt = 0x1405, Float = 0x1406;
-    public const int Rgba = 0x1908, Rgba8 = 0x8058, DepthComponent24 = 0x81A6;
+    public const int Rgba = 0x1908, Rgba8 = 0x8058, Rgba32F = 0x8814, DepthComponent24 = 0x81A6;
     public const int Nearest = 0x2600, Linear = 0x2601, LinearMipmapLinear = 0x2703;
     public const int TextureMagFilter = 0x2800, TextureMinFilter = 0x2801, TextureWrapS = 0x2802, TextureWrapT = 0x2803;
     public const int Repeat = 0x2901, ClampToEdge = 0x812F;
@@ -493,6 +493,16 @@ internal sealed unsafe class GlApi
         {
             _pixelStorei(UnpackAlignment, 1);
             _texImage2D(Texture2D, 0, Rgba8, width, height, 0, Rgba, UnsignedByte, rgba.IsEmpty ? null : source);
+        }
+    }
+
+    /// <summary>Makes the bound texture <paramref name="width"/> × <paramref name="height"/> texels of four 32-bit floats each.</summary>
+    public void TexImage2DFloat(int width, int height, ReadOnlySpan<float> rgba)
+    {
+        fixed (float* source = rgba)
+        {
+            _pixelStorei(UnpackAlignment, 4);
+            _texImage2D(Texture2D, 0, Rgba32F, width, height, 0, Rgba, Float, rgba.IsEmpty ? null : source);
         }
     }
 

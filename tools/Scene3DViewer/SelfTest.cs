@@ -207,6 +207,34 @@ internal sealed class SelfTest
         });
     }
 
+    /// <summary>
+    /// A square like <see cref="AddSquare"/> that follows one bone, which the motion's first key (at time 0)
+    /// moves <paramref name="shift"/> along X: where it is drawn says whether the GPU skinned it.
+    /// </summary>
+    private static void AddSkinnedSquare(SceneBuilder builder, float half, float shift, int material)
+    {
+        int skeleton = builder.AddSkeleton(new SceneSkeleton([new SceneBone(builder.AddName("bone"), -1, 1, Vector3.Zero, Quaternion.Identity)]));
+        var motion = new SceneBoneMotion("shift", [[new SceneKeyFrame(0, new Vector3(shift, 0, 0), Quaternion.Identity, Vector3.One), new SceneKeyFrame(1, new Vector3(shift, 0, 0), Quaternion.Identity, Vector3.One)]], true, 1, 0, false);
+
+        builder.BeginMesh(builder.AddName("skinned"), SceneMeshFlags.HasNormals);
+        SceneVertexSpans v = builder.AllocateVertices(4);
+        new[] { -half, -half, 0, half, -half, 0, half, half, 0, -half, half, 0 }.CopyTo(v.Positions);
+        new float[] { 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1 }.CopyTo(v.Normals);
+        new uint[] { 0, 1, 2, 0, 2, 3 }.CopyTo(builder.AllocateIndices(6));
+        builder.AddPart(6, 0);
+        uint[] bones = [0, 0, 0, 0];
+        uint[] weights = [255, 255, 255, 255];
+        builder.SetMeshSkin(builder.AddSkin(new SceneSkin(skeleton, motion, bones, weights)));
+        int mesh = builder.EndMesh();
+
+        int binding = builder.AddBinding(material);
+        builder.AddNode(new SceneNode
+        {
+            Parent = -1, Local = Matrix4x4.Identity, Kind = SceneNodeKind.Model, Mesh = mesh, Light = -1, Camera = -1,
+            FirstBinding = binding, BindingCount = 1, Name = builder.AddName("node"), Visible = true
+        });
+    }
+
     /// <summary>Line segments or points through the given positions, one index each in order.</summary>
     private static void AddPrimitives(SceneBuilder builder, SceneTopology topology, float[] positions, int material)
     {
@@ -315,6 +343,19 @@ internal sealed class SelfTest
                     checks.Colour("top right", frame.At(1 - inset - 0.05, 0.05), (0, 255, 0));
                     checks.Colour("bottom left", frame.At(inset + 0.05, 0.95), (0, 0, 255));
                     checks.Colour("bottom right", frame.At(1 - inset - 0.05, 0.95), (255, 255, 255));
+                }),
+
+            // A red square 2 units across that its bone moves 1 unit right: it covers the right of the centre only,
+            // as much of the frame as the square that stands still.
+            new Case("skinned square",
+                () => Build(b => AddSkinnedSquare(b, 1, 1, AddMaterial(b, new Vector3(1, 0, 0)))),
+                FrontView(), whole,
+                (frame, checks) =>
+                {
+                    checks.Colour("middle of the moved square", frame.At(0.5 + 0.25 * frame.Height / frame.Width, 0.5), (255, 0, 0));
+                    checks.Colour("where the square stands unmoved", frame.At(0.5 - 0.25 * frame.Height / frame.Width, 0.5), BackgroundBytes);
+                    double expected = (frame.Height / 2.0) * (frame.Height / 2.0) / ((double)frame.Width * frame.Height);
+                    checks.Near("covered fraction of the frame", frame.CoverageOver(BackgroundBytes), expected, 0.004);
                 }),
 
             // A green line 2 units long in a view 4 units high: half the height in pixels, one pixel wide,

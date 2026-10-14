@@ -377,7 +377,7 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
 
         // A scene begins its animations again, playing if its source asks.
         _animationClock.Reset();
-        HasAnimation = scene is { Animations.Count: > 0 };
+        HasAnimation = scene is { IsAnimated: true };
         IsAnimationPlaying = false;
         if (HasAnimation && scene!.AutoPlayAnimations)
         {

@@ -76,6 +76,24 @@ internal static class TestScenes
         return builder.Build();
     }
 
+    /// <summary>A triangle that follows one bone, which a motion of 2 seconds slides 10 along X; plays at once if asked.</summary>
+    public static Scene SkinnedTriangle(bool autoPlay)
+    {
+        using var builder = new SceneBuilder();
+        builder.AddMaterial(new SceneMaterial { Ambient = new Vector3(0.75f), Opacity = 1, Flags = SceneMaterialFlags.Lit, Name = builder.AddName("") });
+        int skeleton = builder.AddSkeleton(new SceneSkeleton([new SceneBone(builder.AddName("bone"), -1, 1, Vector3.Zero, Quaternion.Identity)]));
+        builder.BeginMesh(builder.AddName("tri"), SceneMeshFlags.None);
+        new float[] { 0, 0, 0, 1, 0, 0, 0, 1, 0 }.CopyTo(builder.AllocateVertices(3).Positions);
+        new uint[] { 0, 1, 2 }.CopyTo(builder.AllocateIndices(3));
+        builder.AddPart(3, 0);
+        var motion = new SceneBoneMotion("slide", [[new SceneKeyFrame(0, Vector3.Zero, Quaternion.Identity, Vector3.One), new SceneKeyFrame(2, new Vector3(10, 0, 0), Quaternion.Identity, Vector3.One)]], true, 1, 0, false);
+        builder.SetMeshSkin(builder.AddSkin(new SceneSkin(skeleton, motion, new uint[3], [255, 255, 255])));
+        int mesh = builder.EndMesh();
+        builder.AddNode(Node(builder.AddName("Mover"), mesh: mesh));
+        builder.AutoPlayAnimations = autoPlay;
+        return builder.Build();
+    }
+
     public static Scene Empty()
     {
         using var builder = new SceneBuilder();
