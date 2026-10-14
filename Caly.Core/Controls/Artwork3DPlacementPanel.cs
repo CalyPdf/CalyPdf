@@ -20,6 +20,7 @@
 
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Layout;
 using Avalonia.Media;
 using Caly.Avalonia.Scene3D;
 using System;
@@ -102,9 +103,11 @@ internal sealed class Artwork3DPlacementPanel : Panel
 
         // Companions go to the corner of what is on screen (the 3D control may be drawn beyond it).
         Point corner = artwork.TopLeft;
-        if (VisibleArea is { } visible && artwork.Intersect(visible) is { Width: > 0, Height: > 0 } onScreen)
+        Rect onScreen = artwork;
+        if (VisibleArea is { } visible && artwork.Intersect(visible) is { Width: > 0, Height: > 0 } isect)
         {
-            corner = onScreen.TopLeft;
+            corner = isect.TopLeft;
+            onScreen = isect;
         }
 
         _inverseZoom.ScaleX = _inverseZoom.ScaleY = 1 / zoom;
@@ -127,7 +130,19 @@ internal sealed class Artwork3DPlacementPanel : Panel
             }
             else
             {
-                child.Arrange(new Rect(corner, layout.IsEmpty ? default : child.DesiredSize));
+                Point origin = corner;
+                if (child.HorizontalAlignment == HorizontalAlignment.Right)
+                {
+                    double x = onScreen.Right - child.DesiredSize.Width / zoom;
+                    if (x < onScreen.Left)
+                    {
+                        x = onScreen.Left;
+                    }
+
+                    origin = new Point(x, onScreen.Top);
+                }
+
+                child.Arrange(new Rect(origin, layout.IsEmpty ? default : child.DesiredSize));
             }
         }
 

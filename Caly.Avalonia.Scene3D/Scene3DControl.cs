@@ -60,6 +60,10 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
     public static readonly DirectProperty<Scene3DControl, string?> StatusMessageProperty =
         AvaloniaProperty.RegisterDirect<Scene3DControl, string?>(nameof(StatusMessage), o => o.StatusMessage);
 
+    /// <summary>Defines the <see cref="CameraOrientation"/> property.</summary>
+    public static readonly DirectProperty<Scene3DControl, Quaternion> CameraOrientationProperty =
+        AvaloniaProperty.RegisterDirect<Scene3DControl, Quaternion>(nameof(CameraOrientation), o => o.CameraOrientation);
+
     /// <summary>Most the control's multisampled framebuffer may take before it drops samples.</summary>
     private const long FramebufferBudgetBytes = 96L << 20;
 
@@ -86,6 +90,7 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
     private SceneRenderer? _renderer;
     private Scene3DStatus _status;
     private string? _statusMessage;
+    private Quaternion _cameraOrientation = Quaternion.Identity;
     private Scene3DStatistics _statistics;
     private long _framesRendered;
     private IDisposable? _availabilityTimer;
@@ -180,6 +185,13 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
         private set => SetAndRaise(StatusMessageProperty, ref _statusMessage, value);
     }
 
+    /// <summary>The orientation of the camera in world space.</summary>
+    public Quaternion CameraOrientation
+    {
+        get => _cameraOrientation;
+        private set => SetAndRaise(CameraOrientationProperty, ref _cameraOrientation, value);
+    }
+
     /// <summary>Figures of the last frame and of the GPU memory held.</summary>
     public Scene3DStatistics Statistics => _statistics;
 
@@ -232,10 +244,12 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
         {
             _pose = ViewCamera.ResolvePose(scene, View, out _projection);
             _hasPose = true;
+            CameraOrientation = _pose.Orientation;
         }
         else
         {
             _hasPose = false;
+            CameraOrientation = Quaternion.Identity;
         }
 
         RequestNextFrameRendering();
@@ -247,6 +261,7 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
         if (_hasPose)
         {
             _pose = OrbitController.Rotate(_pose, dx, dy, (float)Bounds.Height);
+            CameraOrientation = _pose.Orientation;
             RequestNextFrameRendering();
         }
     }
@@ -257,6 +272,7 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
         if (_hasPose)
         {
             _pose = OrbitController.Pan(_pose, _projection, dx, dy, FullViewSize);
+            CameraOrientation = _pose.Orientation;
             RequestNextFrameRendering();
         }
     }
@@ -267,6 +283,7 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
         if (_hasPose)
         {
             OrbitController.Zoom(ref _pose, ref _projection, steps);
+            CameraOrientation = _pose.Orientation;
             RequestNextFrameRendering();
         }
     }

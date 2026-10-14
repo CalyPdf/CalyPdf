@@ -81,5 +81,20 @@
 			</StackPanel>
 		</Border>
 
+		<!-- 3D axis gizmo in top right -->
+		<scene3d:AxisGizmoControl Name="PART_AxisGizmo"
+		                          HorizontalAlignment="Right"
+		                          VerticalAlignment="Top"
+		                          Margin="4"
+		                          CameraOrientation="{Binding #PART_Scene3D.CameraOrientation}">
+			<scene3d:AxisGizmoControl.IsVisible>
+				<MultiBinding Converter="{x:Static BoolConverters.And}">
+					<Binding Path="!IsLoading"/>
+					<Binding Path="ShowAxisGizmo" RelativeSource="{RelativeSource AncestorType=controls:Artwork3DView}"/>
+					<Binding Path="Scene" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+				</MultiBinding>
+			</scene3d:AxisGizmoControl.IsVisible>
+		</scene3d:AxisGizmoControl>
+
 	</controls:Artwork3DPlacementPanel>
 </UserControl>

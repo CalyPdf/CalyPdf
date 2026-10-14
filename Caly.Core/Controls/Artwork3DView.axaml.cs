@@ -58,6 +58,10 @@ public sealed partial class Artwork3DView : UserControl
     public static readonly StyledProperty<ICommand?> StatusCommandProperty =
         AvaloniaProperty.Register<Artwork3DView, ICommand?>(nameof(StatusCommand));
 
+    /// <summary>Defines the <see cref="ShowAxisGizmo"/> property.</summary>
+    public static readonly StyledProperty<bool> ShowAxisGizmoProperty =
+        AvaloniaProperty.Register<Artwork3DView, bool>(nameof(ShowAxisGizmo), true);
+
     private readonly Scene3DControl _view3D;
     private readonly Artwork3DPlacementPanel _panel;
 
@@ -127,6 +131,13 @@ public sealed partial class Artwork3DView : UserControl
     {
         get => GetValue(StatusCommandProperty);
         set => SetValue(StatusCommandProperty, value);
+    }
+
+    /// <summary>Gets or sets whether the 3D axis gizmo is shown.</summary>
+    public bool ShowAxisGizmo
+    {
+        get => GetValue(ShowAxisGizmoProperty);
+        set => SetValue(ShowAxisGizmoProperty, value);
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
