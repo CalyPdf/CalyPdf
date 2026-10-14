@@ -36,9 +36,11 @@ public class AxisGizmoControl : Control
     private static readonly ImmutablePen BackgroundPen = new(BackgroundBorderBrush, 1.0);
     private static readonly ImmutablePen NegativePen = new(NegativeBrush, 1.2);
 
-    private static readonly FormattedText TextX = CreateLabel("X");
-    private static readonly FormattedText TextY = CreateLabel("Y");
-    private static readonly FormattedText TextZ = CreateLabel("Z");
+    // Per control, not per process: a FormattedText keeps the font memory of the application instance that was current
+    // when it was made, and a process that starts several (headless tests) would draw with memory already freed.
+    private readonly FormattedText _textX = CreateLabel("X");
+    private readonly FormattedText _textY = CreateLabel("Y");
+    private readonly FormattedText _textZ = CreateLabel("Z");
 
     static AxisGizmoControl()
     {
@@ -136,9 +138,9 @@ public class AxisGizmoControl : Control
         Vector3 camForward = Vector3.Transform(-Vector3.UnitZ, q);
 
         // Project X, Y, Z axes
-        AxisInfo a0 = ProjectAxis(Vector3.UnitX, XBrush, XPen, TextX, camRight, camUp, camForward, center, armLength);
-        AxisInfo a1 = ProjectAxis(Vector3.UnitY, YBrush, YPen, TextY, camRight, camUp, camForward, center, armLength);
-        AxisInfo a2 = ProjectAxis(Vector3.UnitZ, ZBrush, ZPen, TextZ, camRight, camUp, camForward, center, armLength);
+        AxisInfo a0 = ProjectAxis(Vector3.UnitX, XBrush, XPen, _textX, camRight, camUp, camForward, center, armLength);
+        AxisInfo a1 = ProjectAxis(Vector3.UnitY, YBrush, YPen, _textY, camRight, camUp, camForward, center, armLength);
+        AxisInfo a2 = ProjectAxis(Vector3.UnitZ, ZBrush, ZPen, _textZ, camRight, camUp, camForward, center, armLength);
 
         // Sort axes by depth ascending (lowest depth / furthest back drawn first)
         if (a0.Depth > a1.Depth)
