@@ -19,7 +19,7 @@ internal static class Shaders
     public const int BoneTextureUnit = 1;
 
     // Bits of uFlags.
-    public const int FlagLit = 1, FlagHasNormals = 2, FlagVertexColor = 4, FlagTexture = 8, FlagTextureReplaces = 16, FlagAlphaTest = 32, FlagOrthographic = 64;
+    public const int FlagLit = 1, FlagHasNormals = 2, FlagVertexColor = 4, FlagTexture = 8, FlagTextureReplaces = 16, FlagAlphaTest = 32, FlagOrthographic = 64, FlagCutout = 128;
 
     /// <summary>The first lines of a shader: OpenGL ES 3.0 or desktop OpenGL 3.2 core.</summary>
     public static string Header(bool embedded) => embedded ? "#version 300 es\nprecision highp float;\nprecision highp int;\nprecision highp sampler2D;\n" : "#version 150\n";
@@ -148,7 +148,18 @@ internal static class Shaders
                     modulate = texel.rgb;
                 }
 
-                alpha *= texel.a;
+                if ((uFlags & 128) != 0)
+                {
+                    // A texture whose alpha is a mask: a texel is there or it is not.
+                    if (texel.a < 0.5)
+                    {
+                        discard;
+                    }
+                }
+                else
+                {
+                    alpha *= texel.a;
+                }
             }
 
             if ((uFlags & 32) != 0 && alpha < uAlphaCutoff)

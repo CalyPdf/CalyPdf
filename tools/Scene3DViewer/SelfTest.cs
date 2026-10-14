@@ -280,6 +280,53 @@ internal sealed class SelfTest
         return new SceneTexture("quarters", 64, 64, SceneTextureChannels.Rgb, [new SceneTextureImage(SceneImageEncoding.Png, SceneTextureChannels.Rgb, png.ToArray())]);
     }
 
+    /// <summary>
+    /// An image with a transparent block in a corner (so that it has an alpha channel) and nothing in between: the left
+    /// half red, the right half blue, every alpha 0 or 255, as the packed logo texture of the Shoe sample.
+    /// </summary>
+    private static SceneTexture RedBlueWithAHole()
+    {
+        using var bitmap = new SKBitmap(new SKImageInfo(64, 64, SKColorType.Rgba8888, SKAlphaType.Unpremul));
+        for (int y = 0; y < 64; y++)
+        {
+            for (int x = 0; x < 64; x++)
+            {
+                bitmap.SetPixel(x, y, y < 8 && x < 8 ? SKColors.Transparent : (x < 32 ? SKColors.Red : SKColors.Blue));
+            }
+        }
+
+        using SKData png = bitmap.Encode(SKEncodedImageFormat.Png, 100);
+        return new SceneTexture("red blue hole", 64, 64, SceneTextureChannels.Rgb | SceneTextureChannels.Alpha, [new SceneTextureImage(SceneImageEncoding.Png, SceneTextureChannels.Rgb | SceneTextureChannels.Alpha, png.ToArray())]);
+    }
+
+    /// <summary>
+    /// One mesh of two squares, the one in front (red) listed before the one behind it (blue): drawn in index order
+    /// without depth, the blue one would cover the red.
+    /// </summary>
+    private static void AddFrontThenBack(SceneBuilder builder, int material)
+    {
+        builder.BeginMesh(builder.AddName("two squares"), SceneMeshFlags.HasNormals | SceneMeshFlags.HasTexCoords);
+        SceneVertexSpans v = builder.AllocateVertices(8);
+        new float[] { -1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1, 1, -1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0 }.CopyTo(v.Positions);
+        for (int i = 0; i < 8; i++)
+        {
+            v.Normals[i * 3 + 2] = 1;
+        }
+
+        // The front square samples the red half of the image, the one behind the blue half.
+        new float[] { 0.1f, 0.1f, 0.4f, 0.1f, 0.4f, 0.9f, 0.1f, 0.9f, 0.6f, 0.1f, 0.9f, 0.1f, 0.9f, 0.9f, 0.6f, 0.9f }.CopyTo(v.TexCoords);
+        new uint[] { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7 }.CopyTo(builder.AllocateIndices(12));
+        builder.AddPart(12, 0);
+        int mesh = builder.EndMesh();
+
+        int binding = builder.AddBinding(material);
+        builder.AddNode(new SceneNode
+        {
+            Parent = -1, Local = Matrix4x4.Identity, Kind = SceneNodeKind.Model, Mesh = mesh, Light = -1, Camera = -1,
+            FirstBinding = binding, BindingCount = 1, Name = builder.AddName("node"), Visible = true
+        });
+    }
+
     private static List<Case> BuildCases()
     {
         var whole = new Rect(0, 0, 1, 1);
@@ -324,6 +371,14 @@ internal sealed class SelfTest
                     checks.Colour("top right", frame.At(0.5 + dx, 0.375), (0, 255, 0));
                     checks.Colour("bottom left", frame.At(0.5 - dx, 0.625), (0, 0, 255));
                 }),
+
+            // A texture whose alpha is only ever 0 or 255 is a cut-out, drawn with depth like any opaque surface: of
+            // two squares in one mesh, the one in front wins whatever the order of their triangles (it was drawn
+            // as a blended surface without depth, and the one behind covered it).
+            new Case("cut-out texture keeps its depth",
+                () => Build(b => AddFrontThenBack(b, AddMaterial(b, Vector3.One, texture: b.AddTexture(RedBlueWithAHole())))),
+                FrontView(), whole,
+                (frame, checks) => checks.Colour("the square in front", frame.At(0.5, 0.5), (255, 0, 0))),
 
             // Half-transparent blue in front of opaque red: half of each.
             new Case("transparency",

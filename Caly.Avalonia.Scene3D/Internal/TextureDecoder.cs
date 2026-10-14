@@ -9,12 +9,13 @@ internal sealed class DecodedTexture : IDisposable
 {
     private byte[]? _rented;
 
-    public DecodedTexture(byte[] rented, int width, int height, bool hasAlpha)
+    public DecodedTexture(byte[] rented, int width, int height, bool hasAlpha, bool hasPartialAlpha = false)
     {
         _rented = rented;
         Width = width;
         Height = height;
         HasAlpha = hasAlpha;
+        HasPartialAlpha = hasPartialAlpha;
     }
 
     public int Width { get; }
@@ -23,6 +24,12 @@ internal sealed class DecodedTexture : IDisposable
 
     /// <summary>Whether any pixel is less than fully opaque.</summary>
     public bool HasAlpha { get; }
+
+    /// <summary>
+    /// Whether any pixel is neither fully opaque nor fully transparent. Without one the alpha is a mask: the
+    /// texture is a cut-out, which is drawn with depth like an opaque surface, not blended.
+    /// </summary>
+    public bool HasPartialAlpha { get; }
 
     public int ByteCount => Width * Height * 4;
 
@@ -163,7 +170,7 @@ internal static unsafe class TextureDecoder
                 }
             }
 
-            var result = new DecodedTexture(pixels, width, height, hasAlpha);
+            var result = new DecodedTexture(pixels, width, height, hasAlpha, hasAlpha && AnyPartial(pixels.AsSpan(0, width * height * 4)));
             pixels = null;
             return result;
         }
@@ -266,6 +273,19 @@ internal static unsafe class TextureDecoder
                 ArrayPool<byte>.Shared.Return(decoded);
             }
         }
+    }
+
+    private static bool AnyPartial(ReadOnlySpan<byte> rgba)
+    {
+        for (int i = 3; i < rgba.Length; i += 4)
+        {
+            if (rgba[i] is not (0 or 255))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool AnyTransparent(ReadOnlySpan<byte> rgba)

@@ -66,6 +66,7 @@ internal sealed class SceneRenderer
     private readonly TextureStreamer _streamer;
     private int[] _textureIds = [];
     private bool[] _materialHasAlphaTexture = [];
+    private bool[] _materialCutout = [];
     private int[] _textureOfMaterial = [], _layerOfMaterial = [];
     private byte[] _repeatOfTexture = [];
 
@@ -155,6 +156,7 @@ internal sealed class SceneRenderer
         TextureStreamer.TexturesOfMaterials(scene, out _textureOfMaterial, out _layerOfMaterial);
         _textureIds = new int[scene.Textures.Count];
         _materialHasAlphaTexture = new bool[scene.Materials.Length];
+        _materialCutout = new bool[scene.Materials.Length];
         _repeatOfTexture = new byte[scene.Textures.Count];
         var seen = new bool[scene.Textures.Count];
         for (int m = 0; m < _textureOfMaterial.Length; m++)
@@ -189,6 +191,7 @@ internal sealed class SceneRenderer
 
         _textureIds = [];
         _materialHasAlphaTexture = [];
+        _materialCutout = [];
         _textureOfMaterial = [];
         _layerOfMaterial = [];
         TextureBytes = 0;
@@ -234,15 +237,24 @@ internal sealed class SceneRenderer
                 TextureBytes += TextureStreamer.GpuBytes(pixels.Width, pixels.Height);
                 TexturesLoaded++;
 
-                // A texture with transparency moves the materials that show it to the transparent pass.
+                // A texture with transparency moves the materials that show it to the transparent pass, unless its
+                // alpha is only ever 0 or 255: a mask, which cuts the surface out and leaves it in the opaque pass,
+                // where depth keeps the triangles of one mesh in their place.
                 if (pixels.HasAlpha)
                 {
                     for (int m = 0; m < _textureOfMaterial.Length; m++)
                     {
                         if (_textureOfMaterial[m] == index)
                         {
-                            _materialHasAlphaTexture[m] = true;
-                            _drawListStale = true;
+                            if (pixels.HasPartialAlpha)
+                            {
+                                _materialHasAlphaTexture[m] = true;
+                                _drawListStale = true;
+                            }
+                            else
+                            {
+                                _materialCutout[m] = true;
+                            }
                         }
                     }
                 }
@@ -502,6 +514,7 @@ internal sealed class SceneRenderer
             gl.ActiveTexture(GlApi.Texture0);
             gl.BindTexture(GlApi.Texture2D, _textureIds[texture]);
             flags |= Shaders.FlagTexture | (layer.BlendFunction == SceneBlendFunction.Replace ? Shaders.FlagTextureReplaces : 0);
+            flags |= (uint)materialIndex < (uint)_materialCutout.Length && _materialCutout[materialIndex] ? Shaders.FlagCutout : 0;
             gl.UniformMatrix(_uTexTransform, IsFinite(layer.Transform) ? layer.Transform * FlipV : FlipV);
         }
 
