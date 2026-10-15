@@ -21,6 +21,7 @@ internal sealed unsafe class GlApi
     public const int DepthBufferBit = 0x0100, ColorBufferBit = 0x4000;
     public const int Less = 0x0201, LessOrEqual = 0x0203;
     public const int One = 1, SrcAlpha = 0x0302, OneMinusSrcAlpha = 0x0303;
+    public const int Front = 0x0404, Back = 0x0405;
     public const int CullFace = 0x0B44, DepthTest = 0x0B71, Blend = 0x0BE2, ScissorTest = 0x0C11;
     public const int UnpackAlignment = 0x0CF5, PackAlignment = 0x0D05;
     public const int Texture2D = 0x0DE1, Texture0 = 0x84C0;
@@ -48,6 +49,7 @@ internal sealed unsafe class GlApi
     private readonly delegate* unmanaged<int, void> _disable;
     private readonly delegate* unmanaged<int, void> _depthFunc;
     private readonly delegate* unmanaged<byte, void> _depthMask;
+    private readonly delegate* unmanaged<int, void> _cullFace;
     private readonly delegate* unmanaged<int, int, int, int, void> _blendFuncSeparate;
     private readonly delegate* unmanaged<int, int, void> _pixelStorei;
     private readonly delegate* unmanaged<int, int, int, int, int, int, void*, void> _readPixels;
@@ -123,6 +125,7 @@ internal sealed unsafe class GlApi
         _disable = (delegate* unmanaged<int, void>)Load(gl, "glDisable");
         _depthFunc = (delegate* unmanaged<int, void>)Load(gl, "glDepthFunc");
         _depthMask = (delegate* unmanaged<byte, void>)Load(gl, "glDepthMask");
+        _cullFace = (delegate* unmanaged<int, void>)Load(gl, "glCullFace");
         _blendFuncSeparate = (delegate* unmanaged<int, int, int, int, void>)Load(gl, "glBlendFuncSeparate");
         _pixelStorei = (delegate* unmanaged<int, int, void>)Load(gl, "glPixelStorei");
         _readPixels = (delegate* unmanaged<int, int, int, int, int, int, void*, void>)Load(gl, "glReadPixels");
@@ -225,6 +228,9 @@ internal sealed unsafe class GlApi
     public void DepthFunc(int function) => _depthFunc(function);
 
     public void DepthMask(bool write) => _depthMask(write ? (byte)1 : (byte)0);
+
+    /// <summary>Which faces are dropped while <see cref="CullFace"/> is enabled: <see cref="Front"/> or <see cref="Back"/>.</summary>
+    public void CullFaces(int faces) => _cullFace(faces);
 
     public void BlendFuncSeparate(int sourceColor, int destinationColor, int sourceAlpha, int destinationAlpha) => _blendFuncSeparate(sourceColor, destinationColor, sourceAlpha, destinationAlpha);
 

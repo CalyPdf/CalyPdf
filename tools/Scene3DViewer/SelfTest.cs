@@ -303,7 +303,7 @@ internal sealed class SelfTest
     /// One mesh of two squares, the one in front (red) listed before the one behind it (blue): drawn in index order
     /// without depth, the blue one would cover the red.
     /// </summary>
-    private static void AddFrontThenBack(SceneBuilder builder, int material)
+    private static void AddFrontThenBack(SceneBuilder builder, int material, bool backFacesAway = false)
     {
         builder.BeginMesh(builder.AddName("two squares"), SceneMeshFlags.HasNormals | SceneMeshFlags.HasTexCoords);
         SceneVertexSpans v = builder.AllocateVertices(8);
@@ -315,7 +315,8 @@ internal sealed class SelfTest
 
         // The front square samples the red half of the image, the one behind the blue half.
         new float[] { 0.1f, 0.1f, 0.4f, 0.1f, 0.4f, 0.9f, 0.1f, 0.9f, 0.6f, 0.1f, 0.9f, 0.1f, 0.9f, 0.9f, 0.6f, 0.9f }.CopyTo(v.TexCoords);
-        new uint[] { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7 }.CopyTo(builder.AllocateIndices(12));
+        // The square behind turns its back on the viewer when it is the far wall of a closed shell.
+        (backFacesAway ? new uint[] { 0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6 } : new uint[] { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7 }).CopyTo(builder.AllocateIndices(12));
         builder.AddPart(12, 0);
         int mesh = builder.EndMesh();
 
@@ -379,6 +380,13 @@ internal sealed class SelfTest
                 () => Build(b => AddFrontThenBack(b, AddMaterial(b, Vector3.One, texture: b.AddTexture(RedBlueWithAHole())))),
                 FrontView(), whole,
                 (frame, checks) => checks.Colour("the square in front", frame.At(0.5, 0.5), (255, 0, 0))),
+
+            // The two walls of a closed translucent shell, the near one listed first. Back faces are blended before
+            // front faces, whatever the index order: half red (near) over half blue (far) over the background.
+            new Case("translucent shell, far wall first",
+                () => Build(b => AddFrontThenBack(b, AddMaterial(b, Vector3.One, opacity: 0.5f, texture: b.AddTexture(RedBlueWithAHole())), backFacesAway: true)),
+                FrontView(), whole,
+                (frame, checks) => checks.Colour("near wall over far wall", frame.At(0.5, 0.5), (140, 25, 102), 4)),
 
             // Half-transparent blue in front of opaque red: half of each.
             new Case("transparency",

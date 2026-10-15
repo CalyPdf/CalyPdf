@@ -359,15 +359,28 @@ internal sealed class SceneRenderer
         if (!_drawList.Transparent.IsEmpty)
         {
             // Premultiplied colours over what is there; depth is tested but not written, so that one
-            // transparent surface does not hide another behind it.
+            // transparent surface does not hide another behind it. Within a mesh the triangles would blend in
+            // index order, so a closed shell (a bulb of glass) shows its near wall under its far wall in
+            // patches: each mesh is drawn back faces first, then front faces, and a triangle is in one of the two.
             gl.Enable(GlApi.Blend);
             gl.BlendFuncSeparate(GlApi.One, GlApi.OneMinusSrcAlpha, GlApi.One, GlApi.OneMinusSrcAlpha);
             gl.DepthMask(false);
             foreach (ref readonly DrawItem item in _drawList.Transparent)
             {
+                if (scene.Meshes[item.Mesh].Topology != SceneTopology.Triangles)
+                {
+                    DrawOne(scene, item, view, ref state);
+                    continue;
+                }
+
+                gl.Enable(GlApi.CullFace);
+                gl.CullFaces(GlApi.Front);
+                DrawOne(scene, item, view, ref state, countTriangles: false);
+                gl.CullFaces(GlApi.Back);
                 DrawOne(scene, item, view, ref state);
             }
 
+            gl.Disable(GlApi.CullFace);
             gl.DepthMask(true);
             gl.Disable(GlApi.Blend);
         }
@@ -426,7 +439,7 @@ internal sealed class SceneRenderer
         _gl.ActiveTexture(GlApi.Texture0);
     }
 
-    private void DrawOne(Scene scene, in DrawItem item, in Matrix4x4 view, ref DrawState state)
+    private void DrawOne(Scene scene, in DrawItem item, in Matrix4x4 view, ref DrawState state, bool countTriangles = true)
     {
         GlApi gl = _gl;
         bool meshChanged = item.Mesh != state.Mesh;
@@ -484,7 +497,7 @@ internal sealed class SceneRenderer
         int mode = topology switch { SceneTopology.Lines => GlApi.Lines, SceneTopology.Points => GlApi.Points, _ => GlApi.Triangles };
         gl.DrawElements(mode, item.IndexCount, GlApi.UnsignedInt, (nint)item.IndexStart * 4);
         LastDrawCalls++;
-        LastTriangles += topology == SceneTopology.Triangles ? item.IndexCount / 3 : 0;
+        LastTriangles += countTriangles && topology == SceneTopology.Triangles ? item.IndexCount / 3 : 0;
     }
 
     private void SetMaterial(Scene scene, int materialIndex, float nodeOpacity, SceneMeshFlags meshFlags, bool orthographic, bool lit = true)
