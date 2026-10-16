@@ -97,7 +97,7 @@ internal static class ModelSource
                     Views = Artwork3DSceneReader.ResolveViews(artwork.Format, scene, views),
                     DefaultView = defaultIndex,
                     AspectRatio = height > 0 ? width / height : 0,
-                    Poster = posterWidth > 0 && annotation.HasNormalAppearance() ? RenderPoster(document, page, annotation.Rectangle, posterWidth) : null,
+                    Poster = posterWidth > 0 ? RenderPoster(document, page, annotation.Rectangle, posterWidth) : null,
                     LoadMilliseconds = load
                 };
             }
@@ -146,7 +146,9 @@ internal static class ModelSource
             area.Intersect(new SKRectI(0, 0, whole.Width, whole.Height));
             if (area.Width <= 0 || area.Height <= 0)
             {
-                return null;
+                Program.Log($"poster: the page is rotated; the whole page is shown");
+                using SKData all = whole.Encode(SKEncodedImageFormat.Png, 100);
+                return new Bitmap(new MemoryStream(all.ToArray()));
             }
 
             using var cut = new SKBitmap(area.Width, area.Height);
