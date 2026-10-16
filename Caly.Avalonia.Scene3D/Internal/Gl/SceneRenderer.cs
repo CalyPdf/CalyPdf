@@ -68,6 +68,9 @@ internal sealed class SceneRenderer
     private bool[] _materialHasAlphaTexture = [];
     private bool[] _materialCutout = [];
     private int[] _textureOfMaterial = [], _layerOfMaterial = [];
+
+    // Where the surfaces of each textured material sample its texture, taken while the scene still has its geometry.
+    private TextureCoverage?[] _coverageOfMaterial = [];
     private byte[] _repeatOfTexture = [];
 
     private Scene? _scene;
@@ -158,6 +161,12 @@ internal sealed class SceneRenderer
         _materialHasAlphaTexture = new bool[scene.Materials.Length];
         _materialCutout = new bool[scene.Materials.Length];
         _repeatOfTexture = new byte[scene.Textures.Count];
+        _coverageOfMaterial = new TextureCoverage?[scene.Materials.Length];
+        for (int m = 0; m < _textureOfMaterial.Length; m++)
+        {
+            _coverageOfMaterial[m] = _textureOfMaterial[m] >= 0 ? TextureCoverage.Of(scene, m, _layerOfMaterial[m]) : null;
+        }
+
         var seen = new bool[scene.Textures.Count];
         for (int m = 0; m < _textureOfMaterial.Length; m++)
         {
@@ -192,6 +201,7 @@ internal sealed class SceneRenderer
         _textureIds = [];
         _materialHasAlphaTexture = [];
         _materialCutout = [];
+        _coverageOfMaterial = [];
         _textureOfMaterial = [];
         _layerOfMaterial = [];
         TextureBytes = 0;
@@ -246,7 +256,7 @@ internal sealed class SceneRenderer
                     {
                         if (_textureOfMaterial[m] == index)
                         {
-                            if (pixels.HasPartialAlpha)
+                            if (pixels.HasPartialAlpha && (_coverageOfMaterial[m] is not { } coverage || coverage.ShowsTransparencyOf(pixels)))
                             {
                                 _materialHasAlphaTexture[m] = true;
                                 _drawListStale = true;

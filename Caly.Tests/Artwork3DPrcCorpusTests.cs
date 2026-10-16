@@ -13,8 +13,9 @@ namespace Caly.Tests;
 /// </summary>
 public class Artwork3DPrcCorpusTests(ITestOutputHelper output)
 {
-    // Entity types of PRC: what a node name's identifier says the node is.
-    private const uint ProductOccurrence = 310, BrepModel = 232, Set = 238, PolyBrepModel = 239;
+    // Entity types of PRC (PrcType): what a node name's identifier says the node is. Wires (PRC_TYPE_RI_PolyWire, 238: the
+    // trace lines of a model), curves, points and planes are construction geometry, which the scene does not have.
+    private const uint ProductOccurrence = 310, BrepModel = 232, PolyBrepModel = 237, Set = 239;
 
     private static IReadOnlyList<string> AllDocuments()
     {
