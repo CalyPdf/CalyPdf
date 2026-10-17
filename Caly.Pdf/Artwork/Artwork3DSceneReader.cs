@@ -98,7 +98,7 @@ public static class Artwork3DSceneReader
                 {
                     if (diagnostic.Code is PrcReader.BrepDiagnostic or PrcReader.UncompressedBrepDiagnostic)
                     {
-                        detail = "Parts of this 3D model are exact geometry of a kind that cannot be shown yet.";
+                        detail = "Parts of this 3D model are exact geometry that could not be read.";
                         break;
                     }
                 }
