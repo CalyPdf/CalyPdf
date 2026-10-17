@@ -37,7 +37,7 @@ The workspace is outside git. If it is missing, the rulings are summarised in `C
 ## Known state worth checking first
 
 - Two Caly tests fail on untouched `develop` (`TextLayerActualTextTests.AnUnclosedSequenceInAFormCoversTheRestOfThePage`, `.AStrayEndInAFormEndsTheEnclosingSequence`): not 3D.
-- Open gaps: U3D vendor extensions other than `RHAdobeMeshResource` (which is decoded), PRC exact geometry (never read), PDF's own 3D animation settings, bone links/IK.
+- Open gaps: U3D vendor extensions other than `RHAdobeMeshResource` (which is decoded), PRC exact geometry that is not a compressed B-rep (uncompressed `BrepData`: phase B; the compressed NURBS interior-correction rule is not found, large nets drift by millimetres), PDF's own 3D animation settings, bone links/IK.
 - The workspace's last JOURNAL entry says what the owner wanted next.
 
 ## Which skill next

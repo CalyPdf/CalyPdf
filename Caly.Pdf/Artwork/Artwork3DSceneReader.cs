@@ -60,7 +60,7 @@ public static class Artwork3DSceneReader
     /// </summary>
     /// <param name="scene">The scene when the result is <see cref="Artwork3DReadResult.Ok"/>; the caller owns and disposes it.</param>
     /// <param name="detail">
-    /// For <see cref="Artwork3DReadResult.Malformed"/>, what was wrong; for <see cref="Artwork3DReadResult.NoGeometry"/>,
+    /// For <see cref="Artwork3DReadResult.NotYetSupported"/>, which part could not be shown when the reader knows; for <see cref="Artwork3DReadResult.Malformed"/>, what was wrong; for <see cref="Artwork3DReadResult.NoGeometry"/>,
     /// a sentence for the reader of the document saying why there is nothing to draw, when the model's reader knows.
     /// </param>
     /// <exception cref="OperationCanceledException">Cancellation was requested.</exception>
@@ -94,6 +94,14 @@ public static class Artwork3DSceneReader
             if (!PrcReader.IsComplete(read))
             {
                 result = Artwork3DReadResult.NotYetSupported;
+                foreach (SceneDiagnostic diagnostic in read.Diagnostics)
+                {
+                    if (diagnostic.Code is PrcReader.BrepDiagnostic or PrcReader.UncompressedBrepDiagnostic)
+                    {
+                        detail = "Parts of this 3D model are exact geometry of a kind that cannot be shown yet.";
+                        break;
+                    }
+                }
             }
             else if (read.Indices.IsEmpty)
             {

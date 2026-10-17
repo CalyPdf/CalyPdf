@@ -21,7 +21,8 @@ public class Artwork3DPosterSilhouetteTests(ITestOutputHelper output)
 
     // Not every document can be measured this way: a poster with white parts on a white page (the other
     // SpinFire samples), with scenery the default view hides (OfficeBuilding) or with a legend drawn
-    // into it (Trolley) covers other cells than the model does. Those were compared by eye.
+    // into it (Trolley, and the LandingGear: drawn from compressed B-rep, it matches its poster by eye, but the poster carries a page of notes)
+    // covers other cells than the model does. Those were compared by eye.
 
     [Theory]
     [InlineData("tetra4d/3dpdf-Industrial-Saw-V03042024.pdf")]
