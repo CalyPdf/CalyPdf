@@ -31,10 +31,10 @@ internal static class PageItemsControlTestHost
         return control;
     }
 
-    public static PageItemsControl Create(int pageCount, double pageHeight = 100)
-        => Create(Enumerable.Range(0, pageCount).Select(_ => new object()).ToArray(), pageCount, pageHeight);
+    public static PageItemsControl Create(int pageCount, double pageHeight = 100, bool with3DHost = false)
+        => Create(Enumerable.Range(0, pageCount).Select(_ => new object()).ToArray(), pageCount, pageHeight, with3DHost);
 
-    public static PageItemsControl Create(IList items, int pageCount, double pageHeight = 100)
+    public static PageItemsControl Create(IList items, int pageCount, double pageHeight = 100, bool with3DHost = false)
     {
         var control = new PageItemsControl
         {
@@ -72,12 +72,27 @@ internal static class PageItemsControlTestHost
             {
                 new Setter(Layoutable.UseLayoutRoundingProperty, false),
                 new Setter(TemplatedControl.TemplateProperty, new FuncControlTemplate<PageItem>((_, scope) =>
-                    InScope(new PageInteractiveLayerControl
+                {
+                    var layer = InScope(new PageInteractiveLayerControl
                     {
                         Name = "PART_PageInteractiveLayerControl",
                         Width = PageWidth,
                         Height = pageHeight
-                    }, scope)))
+                    }, scope);
+
+                    if (!with3DHost)
+                    {
+                        return layer;
+                    }
+
+                    // As in the real page: the host of the 3D view lies over the interactive layer.
+                    return new Panel
+                    {
+                        Width = PageWidth,
+                        Height = pageHeight,
+                        Children = { layer, InScope(new Panel { Name = "PART_Artwork3DHost" }, scope) }
+                    };
+                }))
             }
         });
 

@@ -1,4 +1,4 @@
-// Copyright (c) BobLd
+﻿// Copyright (c) BobLd
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -26,6 +26,7 @@ using Avalonia.Controls.Templates;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Caly.Scene3D.Avalonia;
 using Caly.Core.Models;
 using Caly.Core.Utilities;
 using System;
@@ -186,6 +187,12 @@ public sealed partial class PageItemsControl : ItemsControl
     public static readonly StyledProperty<ICommand?> ClearSelectionProperty =
         AvaloniaProperty.Register<PageItemsControl, ICommand?>(nameof(ClearSelection));
 
+    /// <summary>
+    /// Defines the <see cref="ActivateArtwork3D"/> property.
+    /// </summary>
+    public static readonly StyledProperty<ICommand?> ActivateArtwork3DProperty =
+        AvaloniaProperty.Register<PageItemsControl, ICommand?>(nameof(ActivateArtwork3D));
+
     static PageItemsControl()
     {
         ItemsPanelProperty.OverrideDefaultValue<PageItemsControl>(DefaultPanel);
@@ -217,6 +224,16 @@ public sealed partial class PageItemsControl : ItemsControl
     {
         get => GetValue(ClearSelectionProperty);
         set => SetValue(ClearSelectionProperty, value);
+    }
+
+    /// <summary>
+    /// Executed with an <see cref="Models.Artwork3DActivationRequest"/> when the user clicks 3D artwork
+    /// that is not being viewed.
+    /// </summary>
+    public ICommand? ActivateArtwork3D
+    {
+        get => GetValue(ActivateArtwork3DProperty);
+        set => SetValue(ActivateArtwork3DProperty, value);
     }
 
     public PageItemsControl()
@@ -490,6 +507,13 @@ public sealed partial class PageItemsControl : ItemsControl
     {
         if (!IsSinglePage || e.Handled || Scroll is null || e.Delta.Y == 0 ||
             e.KeyModifiers != KeyModifiers.None)
+        {
+            return;
+        }
+
+        // A 3D view that has the focus zooms its model with the wheel. This handler tunnels, so it
+        // would turn the page before the view ever saw the event.
+        if (e.Source is Scene3DControl { IsFocused: true })
         {
             return;
         }

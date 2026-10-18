@@ -36,6 +36,8 @@
 		<Setter Property="VisibleArea" Value="{Binding VisibleArea}"/>
 		<Setter Property="IsPageLoading" Value="{Binding IsPageLoading}"/>
 		<Setter Property="IsPageVisible" Value="{Binding IsPageVisible}"/>
+		<Setter Property="ZoomLevel" Value="{Binding $parent[controls:PageItemsControl].ZoomLevel}"/>
+		<Setter Property="ActiveArtwork3D" Value="{Binding ActiveArtwork3D}"/>
 
 		<!-- ContextFlyout -->
 		<Setter Property="ContextFlyout">
@@ -106,6 +108,8 @@
                                                                       VisibleArea="{Binding VisibleArea}"
                                                                       PdfTextLayer="{Binding PdfTextLayer}"
                                                                       PageNumber="{Binding PageNumber}"
+                                                                      ActiveArtwork3DIndex="{Binding ActiveArtwork3DIndex}"
+                                                                      Artwork3DRefusals="{Binding Artwork3DRefusals}"
 																	  SelectedWords="{Binding SelectedWords}"
 																	  SearchResults="{Binding SearchResults}"
                                                                       HorizontalAlignment="Stretch"
@@ -119,6 +123,10 @@
 									</FlyoutBase.AttachedFlyout>
 
 								</controls:PageInteractiveLayerControl>
+
+								<!-- Host for the view of a 3D artwork, filled in on demand by PageItem. Above the
+								     interactive layer: the view takes the pointer over its rectangle. -->
+								<Panel Name="PART_Artwork3DHost"/>
 
 							</Grid>
 						</LayoutTransformControl>

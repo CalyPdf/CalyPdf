@@ -22,6 +22,7 @@ using Avalonia.Platform.Storage;
 using Caly.Core.Models;
 using Caly.Core.Utilities;
 using Caly.Core.ViewModels;
+using Caly.Pdf.Artwork;
 using Caly.Pdf.Models;
 using SkiaSharp;
 using System;
@@ -109,6 +110,13 @@ public interface IPdfDocumentService : IAsyncDisposable
     /// does not hold up the document's other page reads.
     /// </summary>
     Task<PageTextLayerContent?> GetPageTextLayerAsync(int pageNumber, CancellationToken token);
+
+    /// <summary>
+    /// Reads the data and the authored views of 3D artwork out of the document, under the document
+    /// lock. <c>null</c> when the document is closed or the read was cancelled.
+    /// </summary>
+    /// <exception cref="Artwork3DContentException">The artwork's data could not be decoded.</exception>
+    Task<Artwork3DContent?> GetArtwork3DContentAsync(PdfArtwork3D artwork, CancellationToken token);
 
     Task<IRef<SKPicture>?> GetRenderPageAsync(int pageNumber, CancellationToken token);
 }

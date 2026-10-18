@@ -1,0 +1,208 @@
+﻿// Copyright (c) BobLd
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Caly.Scene3D.Avalonia;
+using System;
+using System.Collections.Specialized;
+
+namespace Caly.Core.Controls;
+
+/// <summary>
+/// Lays a 3D control, and whatever accompanies it, over a piece of 3D artwork on a page.
+/// <para>
+/// The panel fills the page and works in page units, under the page's zoom. Its children are arranged
+/// at the size they have on screen and drawn scaled by the inverse of the zoom: the 3D control then has
+/// one framebuffer pixel per screen pixel, and its companions (a toolbar) keep one size on screen. Which
+/// part of the artwork the 3D control covers is decided by <see cref="Artwork3DPlacement"/>.
+/// </para>
+/// </summary>
+internal sealed class Artwork3DPlacementPanel : Panel
+{
+    /// <summary>Defines the <see cref="ArtworkBounds"/> property.</summary>
+    public static readonly StyledProperty<Rect> ArtworkBoundsProperty =
+        AvaloniaProperty.Register<Artwork3DPlacementPanel, Rect>(nameof(ArtworkBounds));
+
+    /// <summary>Defines the <see cref="VisibleArea"/> property.</summary>
+    public static readonly StyledProperty<Rect?> VisibleAreaProperty =
+        AvaloniaProperty.Register<Artwork3DPlacementPanel, Rect?>(nameof(VisibleArea));
+
+    /// <summary>Defines the <see cref="ZoomLevel"/> property.</summary>
+    public static readonly StyledProperty<double> ZoomLevelProperty =
+        AvaloniaProperty.Register<Artwork3DPlacementPanel, double>(nameof(ZoomLevel), 1.0);
+
+    private readonly ScaleTransform _inverseZoom = new(1, 1);
+    private TopLevel? _topLevel;
+
+    static Artwork3DPlacementPanel()
+    {
+        AffectsArrange<Artwork3DPlacementPanel>(ArtworkBoundsProperty, VisibleAreaProperty, ZoomLevelProperty);
+    }
+
+    /// <summary>The artwork's rectangle on the page, in page units.</summary>
+    public Rect ArtworkBounds
+    {
+        get => GetValue(ArtworkBoundsProperty);
+        set => SetValue(ArtworkBoundsProperty, value);
+    }
+
+    /// <summary>The part of the page on screen, in page units; null when none is.</summary>
+    public Rect? VisibleArea
+    {
+        get => GetValue(VisibleAreaProperty);
+        set => SetValue(VisibleAreaProperty, value);
+    }
+
+    /// <summary>The page zoom.</summary>
+    public double ZoomLevel
+    {
+        get => GetValue(ZoomLevelProperty);
+        set => SetValue(ZoomLevelProperty, value);
+    }
+
+    protected override Size MeasureOverride(Size availableSize)
+    {
+        foreach (Control child in Children)
+        {
+            child.Measure(Size.Infinity);
+        }
+
+        // The page gives this panel its size; its children ask for none.
+        return default;
+    }
+
+    /// <inheritdoc/>
+    protected override void ChildrenChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        base.ChildrenChanged(sender, e);
+
+        // Every child is drawn at the inverse of the zoom from its top-left corner: set once, the
+        // arrange pass only changes the scale.
+        if (e.NewItems is not null)
+        {
+            foreach (Control child in e.NewItems)
+            {
+                child.RenderTransformOrigin = RelativePoint.TopLeft;
+                child.RenderTransform = _inverseZoom;
+            }
+        }
+    }
+
+    /// <inheritdoc/>
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+
+        // The crop is worked out in device pixels: a window moved to a screen of another scaling needs a
+        // new one, and nothing else in this panel's properties changes then.
+        _topLevel = TopLevel.GetTopLevel(this);
+        if (_topLevel is not null)
+        {
+            _topLevel.ScalingChanged += OnScalingChanged;
+        }
+    }
+
+    /// <inheritdoc/>
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        if (_topLevel is not null)
+        {
+            _topLevel.ScalingChanged -= OnScalingChanged;
+            _topLevel = null;
+        }
+
+        base.OnDetachedFromVisualTree(e);
+    }
+
+    private void OnScalingChanged(object? sender, EventArgs e) => InvalidateArrange();
+
+    protected override Size ArrangeOverride(Size finalSize)
+    {
+        double zoom = ZoomLevel;
+        if (!(zoom > 0) || double.IsInfinity(zoom))
+        {
+            zoom = 1;
+        }
+
+        Rect artwork = ArtworkBounds;
+        double scaling = _topLevel?.RenderScaling ?? 1;
+        Artwork3DLayout layout = Artwork3DPlacement.Compute(artwork, VisibleArea, zoom, scaling);
+
+        // Companions go to the corners of what is on screen (the 3D control may be drawn beyond it).
+        Rect onScreen = artwork;
+        if (VisibleArea is { } visible && artwork.Intersect(visible) is { Width: > 0, Height: > 0 } isect)
+        {
+            onScreen = isect;
+        }
+
+        _inverseZoom.ScaleX = _inverseZoom.ScaleY = 1 / zoom;
+
+        // What the companions on the left take, in page units, so that one on the right that would
+        // overlap them (a narrow artwork) goes below them instead.
+        double leftWidth = 0, leftHeight = 0;
+        foreach (Control child in Children)
+        {
+            if (child is not Scene3DControl && child.HorizontalAlignment != HorizontalAlignment.Right)
+            {
+                leftWidth = Math.Max(leftWidth, child.DesiredSize.Width / zoom);
+                leftHeight = Math.Max(leftHeight, child.DesiredSize.Height / zoom);
+            }
+        }
+
+        foreach (Control child in Children)
+        {
+            if (child is Scene3DControl view3D)
+            {
+                if (layout.IsEmpty)
+                {
+                    view3D.Arrange(new Rect(artwork.TopLeft, default(Size)));
+                }
+                else
+                {
+                    view3D.VisibleRegion = layout.VisibleRegion;
+                    view3D.Arrange(new Rect(layout.Part.TopLeft, layout.ControlSize));
+                }
+
+                continue;
+            }
+
+            Point origin = onScreen.TopLeft;
+            if (child.HorizontalAlignment == HorizontalAlignment.Right)
+            {
+                double x = onScreen.Right - child.DesiredSize.Width / zoom;
+                double y = onScreen.Top;
+                if (x < onScreen.Left + leftWidth)
+                {
+                    y += leftHeight;
+                    x = Math.Max(x, onScreen.Left);
+                }
+
+                origin = new Point(x, y);
+            }
+
+            child.Arrange(new Rect(origin, layout.IsEmpty ? default : child.DesiredSize));
+        }
+
+        return finalSize;
+    }
+}

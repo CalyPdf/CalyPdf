@@ -1,0 +1,145 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Caly.Core.ViewModels"
+             xmlns:controls="clr-namespace:Caly.Core.Controls"
+             xmlns:scene3d="clr-namespace:Caly.Scene3D.Avalonia;assembly=Caly.Scene3D.Avalonia"
+             x:Class="Caly.Core.Controls.Artwork3DView"
+             x:DataType="vm:Artwork3DViewModel"
+             x:CompileBindings="True"
+             StatusCommand="{Binding ControlStatusChangedCommand}">
+
+	<UserControl.Styles>
+		<!-- The toolbar's icon buttons. -->
+		<Style Selector="Button.tool">
+			<Setter Property="Width" Value="26"/>
+			<Setter Property="Height" Value="26"/>
+			<Setter Property="Padding" Value="0"/>
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+		</Style>
+		<Style Selector="Button.tool Path">
+			<Setter Property="Width" Value="14"/>
+			<Setter Property="Height" Value="14"/>
+			<Setter Property="StrokeThickness" Value="1.4"/>
+			<Setter Property="StrokeLineCap" Value="Round"/>
+			<Setter Property="StrokeJoin" Value="Round"/>
+			<Setter Property="Stroke" Value="{Binding $parent[Button].Foreground}"/>
+		</Style>
+		<Style Selector="Button.tool Path.filled">
+			<Setter Property="Fill" Value="{Binding $parent[Button].Foreground}"/>
+			<Setter Property="StrokeThickness" Value="1"/>
+		</Style>
+	</UserControl.Styles>
+
+	<!-- A piece of 3D artwork being viewed in place. Built by PageItem only while its page has one. -->
+	<controls:Artwork3DPlacementPanel ArtworkBounds="{Binding Bounds}"
+	                                  VisibleArea="{Binding $parent[controls:Artwork3DView].VisibleArea}"
+	                                  ZoomLevel="{Binding $parent[controls:Artwork3DView].ZoomLevel}">
+
+		<!-- Until there is a model to draw, the page (the artwork's poster) shows through. -->
+		<scene3d:Scene3DControl Name="View3D"
+		                        Scene="{Binding Scene}"
+		                        View="{Binding SelectedView}"
+		                        DefaultBackground="{Binding Scene, Converter={x:Static controls:Artwork3DView.BackgroundForScene}}"
+		                        PanModifiers="Shift"
+		                        ResetKey="{x:Null}"/>
+
+		<!-- Where the "3D" badge was. -->
+		<Border Name="Toolbar"
+		        Margin="4"
+		        Padding="3"
+		        CornerRadius="4"
+		        BorderThickness="1"
+		        BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+		        Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
+			<StackPanel Orientation="Horizontal"
+			            Spacing="3">
+
+				<TextBlock Text="Loading 3D…"
+				           FontSize="12"
+				           Margin="6,2"
+				           VerticalAlignment="Center"
+				           IsVisible="{Binding IsLoading}"/>
+
+				<ComboBox Name="ViewList"
+				          ItemsSource="{Binding ViewNames}"
+				          SelectedIndex="{Binding SelectedViewIndex}"
+				          IsVisible="{Binding !IsLoading}"
+				          DropDownClosed="OnViewListDropDownClosed"
+				          MinWidth="120"
+				          MaxWidth="260"
+				          MinHeight="26"
+				          Padding="8,2,0,2"
+				          FontSize="12"
+				          VerticalAlignment="Center"
+				          ToolTip.Tip="3D view"
+				          AutomationProperties.Name="3D view"/>
+
+				<!-- Only for a model that moves. -->
+				<Button Classes="tool"
+				        Click="OnPlayPauseClick"
+				        ToolTip.Tip="Play or pause the animation"
+				        AutomationProperties.Name="Play or pause the animation">
+					<Button.IsVisible>
+						<MultiBinding Converter="{x:Static BoolConverters.And}">
+							<Binding Path="!IsLoading"/>
+							<Binding Path="#View3D.HasAnimation"/>
+						</MultiBinding>
+					</Button.IsVisible>
+					<Panel Width="14" Height="14">
+						<Path Classes="filled"
+						      Data="M 3.5 2 L 11.5 7 L 3.5 12 Z"
+						      IsVisible="{Binding !#View3D.IsAnimationPlaying}"/>
+						<Path Data="M 4 2 L 4 12 M 10 2 L 10 12"
+						      StrokeThickness="2.2"
+						      StrokeLineCap="Flat"
+						      IsVisible="{Binding #View3D.IsAnimationPlaying}"/>
+					</Panel>
+				</Button>
+
+				<Button Classes="tool"
+				        Click="OnRestartAnimationClick"
+				        ToolTip.Tip="Play the animation from the start"
+				        AutomationProperties.Name="Play the animation from the start">
+					<Button.IsVisible>
+						<MultiBinding Converter="{x:Static BoolConverters.And}">
+							<Binding Path="!IsLoading"/>
+							<Binding Path="#View3D.HasAnimation"/>
+						</MultiBinding>
+					</Button.IsVisible>
+					<Path Data="M 3 2 L 3 12 M 12 2 L 5.5 7 L 12 12 Z"/>
+				</Button>
+
+				<Button Classes="tool"
+				        Click="OnResetClick"
+				        IsVisible="{Binding !IsLoading}"
+				        ToolTip.Tip="Reset view"
+				        AutomationProperties.Name="Reset view">
+					<Path Data="M 11.2 4.2 A 5 5 0 1 0 12 7.5 M 11.6 1 L 11.6 4.6 L 8 4.6"/>
+				</Button>
+
+				<Button Classes="tool"
+				        Command="{Binding CloseCommand}"
+				        ToolTip.Tip="Close 3D view"
+				        AutomationProperties.Name="Close 3D view">
+					<Path Data="M 3 3 L 11 11 M 11 3 L 3 11"/>
+				</Button>
+
+			</StackPanel>
+		</Border>
+
+		<!-- Axes of the world as the camera sees them, at the top right of what is on screen. -->
+		<scene3d:AxisGizmoControl HorizontalAlignment="Right"
+		                          VerticalAlignment="Top"
+		                          Margin="4"
+		                          CameraOrientation="{Binding #View3D.CameraOrientation}">
+			<scene3d:AxisGizmoControl.IsVisible>
+				<MultiBinding Converter="{x:Static BoolConverters.And}">
+					<Binding Path="!IsLoading"/>
+					<Binding Path="Scene" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+				</MultiBinding>
+			</scene3d:AxisGizmoControl.IsVisible>
+		</scene3d:AxisGizmoControl>
+
+	</controls:Artwork3DPlacementPanel>
+</UserControl>

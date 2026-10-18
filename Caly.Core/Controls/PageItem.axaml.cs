@@ -24,6 +24,7 @@ using Avalonia.Controls.Metadata;
 using Avalonia.Controls.Primitives;
 using Avalonia.Data;
 using Avalonia.Interactivity;
+using Avalonia.VisualTree;
 using Caly.Core.Utilities;
 using Caly.Core.ViewModels;
 using SkiaSharp;
@@ -36,6 +37,7 @@ namespace Caly.Core.Controls;
 /// </summary>
 [TemplatePart("PART_PageInteractiveLayerControl", typeof(PageInteractiveLayerControl))]
 [TemplatePart("PART_PageLoadingHost", typeof(Panel))]
+[TemplatePart("PART_Artwork3DHost", typeof(Panel))]
 public sealed class PageItem : ContentControl
 {
     /// <summary>
@@ -88,6 +90,18 @@ public sealed class PageItem : ContentControl
     /// </summary>
     public static readonly StyledProperty<Rect?> ContentBoundsProperty =
         AvaloniaProperty.Register<PageItem, Rect?>(nameof(ContentBounds));
+
+    /// <summary>
+    /// Defines the <see cref="ZoomLevel"/> property.
+    /// </summary>
+    public static readonly StyledProperty<double> ZoomLevelProperty =
+        AvaloniaProperty.Register<PageItem, double>(nameof(ZoomLevel), 1.0);
+
+    /// <summary>
+    /// Defines the <see cref="ActiveArtwork3D"/> property.
+    /// </summary>
+    public static readonly StyledProperty<object?> ActiveArtwork3DProperty =
+        AvaloniaProperty.Register<PageItem, object?>(nameof(ActiveArtwork3D));
 
     static PageItem()
     {
@@ -183,6 +197,26 @@ public sealed class PageItem : ContentControl
     }
 
     /// <summary>
+    /// The zoom the page is shown at. Only what is laid out against the screen rather than the page
+    /// needs it (the 3D view).
+    /// </summary>
+    public double ZoomLevel
+    {
+        get => GetValue(ZoomLevelProperty);
+        set => SetValue(ZoomLevelProperty, value);
+    }
+
+    /// <summary>
+    /// The 3D artwork of this page that is being viewed in place, as the data context of its view;
+    /// <c>null</c> when there is none, which is the case of nearly every page.
+    /// </summary>
+    public object? ActiveArtwork3D
+    {
+        get => GetValue(ActiveArtwork3DProperty);
+        set => SetValue(ActiveArtwork3DProperty, value);
+    }
+
+    /// <summary>
     /// Gets the interactive layer. Set in OnApplyTemplate.
     /// </summary>
     public PageInteractiveLayerControl? InteractiveLayer { get; private set; }
@@ -194,6 +228,13 @@ public sealed class PageItem : ContentControl
     /// </summary>
     private Panel? _pageLoadingHost;
     private PageLoadingSkeleton? _pageLoadingSkeleton;
+
+    /// <summary>
+    /// Host for the 3D view, and the view currently inside it. Like the skeleton, the view is built on
+    /// demand and dropped when this container leaves the visual tree: it holds an OpenGL surface.
+    /// </summary>
+    private Panel? _artwork3DHost;
+    private Artwork3DView? _artwork3DView;
 
     public PageItem()
     {
@@ -213,6 +254,10 @@ public sealed class PageItem : ContentControl
         // Optional: minimal templates (tests, design surfaces) need not provide the host.
         _pageLoadingHost = e.NameScope.Find<Panel>("PART_PageLoadingHost");
         SyncPageLoadingSkeleton();
+
+        DropArtwork3DView();
+        _artwork3DHost = e.NameScope.Find<Panel>("PART_Artwork3DHost");
+        SyncArtwork3DView();
     }
     
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -222,6 +267,11 @@ public sealed class PageItem : ContentControl
         if (change.Property == IsPageLoadingProperty)
         {
             SyncPageLoadingSkeleton();
+        }
+
+        if (change.Property == ActiveArtwork3DProperty)
+        {
+            SyncArtwork3DView();
         }
 
         if (change.Property == IsRotatingProperty)
@@ -244,6 +294,9 @@ public sealed class PageItem : ContentControl
         // A pooled container can come back while its page is already loading, in which
         // case there is no IsPageLoading change left to build the skeleton off.
         SyncPageLoadingSkeleton();
+
+        // Likewise a page that comes back on screen with its 3D artwork still being viewed.
+        SyncArtwork3DView();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
@@ -255,6 +308,51 @@ public sealed class PageItem : ContentControl
         // would survive reuse, but it is cheap to rebuild and holding one costs a control tree per
         // idle container, so drop it and let SyncPageLoadingSkeleton rebuild it if needed.
         DisposePageLoadingSkeleton();
+
+        // The 3D view frees its GPU memory by leaving the tree. Its artwork stays active: the view
+        // is built again when the page comes back.
+        DropArtwork3DView();
+    }
+
+    private void DropArtwork3DView()
+    {
+        if (_artwork3DView is null)
+        {
+            return;
+        }
+
+        _artwork3DHost?.Children.Remove(_artwork3DView);
+
+        // Clearing the bindings unsubscribes the view from this container, which outlives it.
+        _artwork3DView.ClearValue(Artwork3DView.VisibleAreaProperty);
+        _artwork3DView.ClearValue(Artwork3DView.ZoomLevelProperty);
+        _artwork3DView.DataContext = null;
+        _artwork3DView = null;
+    }
+
+    /// <summary>
+    /// Shows the 3D view while this page has an artwork being viewed and is on screen, and takes it
+    /// down otherwise.
+    /// </summary>
+    private void SyncArtwork3DView()
+    {
+        object? artwork = ActiveArtwork3D;
+        if (_artwork3DHost is null || artwork is null || !this.IsAttachedToVisualTree())
+        {
+            DropArtwork3DView();
+            return;
+        }
+
+        if (_artwork3DView is not null && ReferenceEquals(_artwork3DView.DataContext, artwork))
+        {
+            return;
+        }
+
+        DropArtwork3DView();
+        _artwork3DView = new Artwork3DView { DataContext = artwork };
+        _artwork3DView.Bind(Artwork3DView.VisibleAreaProperty, this.GetObservable(VisibleAreaProperty));
+        _artwork3DView.Bind(Artwork3DView.ZoomLevelProperty, this.GetObservable(ZoomLevelProperty));
+        _artwork3DHost.Children.Add(_artwork3DView);
     }
 
     private void DisposePageLoadingSkeleton()

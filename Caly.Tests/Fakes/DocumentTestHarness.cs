@@ -81,6 +81,15 @@ internal sealed class RenderingPdfDocumentService : IPdfDocumentService
     public Task<PageTextLayerContent?> GetPageTextLayerAsync(int pageNumber, CancellationToken token)
         => Task.FromResult<PageTextLayerContent?>(null);
 
+    /// <summary>
+    /// What the document gives for a piece of 3D artwork: set by tests that activate one. Called off
+    /// the UI thread, like the real service.
+    /// </summary>
+    public Func<PdfArtwork3D, CancellationToken, Task<Caly.Pdf.Artwork.Artwork3DContent?>>? Artwork3DContent { get; set; }
+
+    public Task<Caly.Pdf.Artwork.Artwork3DContent?> GetArtwork3DContentAsync(PdfArtwork3D artwork, CancellationToken token)
+        => Artwork3DContent is { } read ? read(artwork, token) : throw new NotImplementedException();
+
     public long? FileSize => throw new NotImplementedException();
     public string? LocalPath => throw new NotImplementedException();
     public bool IsPasswordProtected => throw new NotImplementedException();

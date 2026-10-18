@@ -18,12 +18,23 @@
       <BuildType Solution="Portable|*" Project="Release" />
     </Project>
   </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Scene3DViewer/Scene3DViewer.csproj">
+      <BuildType Solution="Portable|*" Project="Release" />
+    </Project>
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
   </Folder>
   <Project Path="Caly.Android/Caly.Android.csproj">
     <BuildType Solution="Portable|*" Project="Release" />
     <Deploy />
+  </Project>
+  <Project Path="Caly.Scene3D.Avalonia.Tests/Caly.Scene3D.Avalonia.Tests.csproj">
+    <BuildType Solution="Portable|*" Project="Release" />
+  </Project>
+  <Project Path="Caly.Scene3D.Avalonia/Caly.Scene3D.Avalonia.csproj">
+    <BuildType Solution="Portable|*" Project="Release" />
   </Project>
   <Project Path="Caly.Benchmarks/Caly.Benchmarks.csproj">
     <BuildType Solution="Portable|*" Project="Release" />

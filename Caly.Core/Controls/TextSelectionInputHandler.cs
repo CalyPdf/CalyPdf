@@ -21,6 +21,7 @@
 using System;
 using Avalonia;
 using Avalonia.Input;
+using Caly.Core.Models;
 using Caly.Core.Utilities;
 using Caly.Pdf.Models;
 using UglyToad.PdfPig.Actions;
@@ -50,6 +51,16 @@ internal sealed class TextSelectionInputHandler
     private bool _isMultipleClickSelection;
 
     private Point? _startPointerPressed;
+
+    /// <summary>
+    /// How far, in page units, the pointer may stray between press and release and still have
+    /// clicked a 3D artwork rather than dragged across it.
+    /// </summary>
+    private const double Artwork3DClickTolerance = 3.0;
+
+    // The artwork last hovered and the status text said for it.
+    private PdfArtwork3D? _hoveredArtwork3D;
+    private string? _hoveredArtwork3DLabel;
 
     public TextSelectionInputHandler(PageItemsControl owner)
     {
@@ -169,6 +180,7 @@ internal sealed class TextSelectionInputHandler
             return;
         }
 
+        Point? startPointerPressed = _startPointerPressed;
         _startPointerPressed = null;
 
         var pointerPoint = e.GetCurrentPoint(control);
@@ -180,10 +192,12 @@ internal sealed class TextSelectionInputHandler
 
             var point = pointerPoint.Position;
 
-            // Annotation
-            PdfAnnotation? annotation = control.PdfTextLayer.FindAnnotationOver(point.X, point.Y);
-
-            if (!HandleAnnotationAction(_owner, annotation))
+            // 3D artwork comes first, as it does when hovering: a click on it asks to view it.
+            if (TryActivateArtwork3D(control, startPointerPressed, point))
+            {
+                // Nothing else lies under a 3D artwork that a click could mean.
+            }
+            else if (!HandleAnnotationAction(_owner, control.PdfTextLayer.FindAnnotationOver(point.X, point.Y)))
             {
                 // Annotation not found or action not handled, we check for words.
                 // Words
@@ -218,6 +232,42 @@ internal sealed class TextSelectionInputHandler
         }
 
         e.PreventGestureRecognition();
+    }
+
+    /// <summary>
+    /// Asks the owner to show the 3D artwork under a click, if there is one.
+    /// </summary>
+    /// <returns><c>true</c> if the click was on 3D artwork, whether or not anything can show it.</returns>
+    private bool TryActivateArtwork3D(PageInteractiveLayerControl control, Point? pressed, Point released)
+    {
+        if (control.PdfTextLayer is not { } textLayer || !control.PageNumber.HasValue)
+        {
+            return false;
+        }
+
+        PdfArtwork3D? artwork = textLayer.FindArtwork3DOver(released.X, released.Y, out int index);
+        if (artwork is null)
+        {
+            return false;
+        }
+
+        // A press that wandered off before the release was a drag, even where there was no text to select.
+        if (!pressed.HasValue || pressed.Value.Euclidean(released) > Artwork3DClickTolerance)
+        {
+            return true;
+        }
+
+        if (_owner.ActivateArtwork3D is { } command)
+        {
+            control.HideAnnotation();
+            var request = new Artwork3DActivationRequest(control.PageNumber.Value, index, artwork);
+            if (command.CanExecute(request))
+            {
+                command.Execute(request);
+            }
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -405,6 +455,37 @@ internal sealed class TextSelectionInputHandler
     /// </summary>
     private void HandleMouseMoveOver(PageInteractiveLayerControl control, PointerPointProperties properties, Point loc)
     {
+        // 3D artwork comes first: its annotation may also carry plain contents, and the artwork's
+        // description (format, authored views) says more than those do.
+        PdfArtwork3D? artwork = control.PdfTextLayer!.FindArtwork3DOver(loc.X, loc.Y, out int artworkIndex);
+        if (artwork is not null)
+        {
+            if (!properties.IsRightButtonPressed)
+            {
+                control.ShowArtwork3D(artwork, artworkIndex);
+            }
+
+            // A hand where a click will open the model.
+            if (control.GetArtwork3DHint(artwork, artworkIndex) == Artwork3DHint.ClickToView)
+            {
+                control.SetHandCursor();
+            }
+            else
+            {
+                control.SetDefaultCursor();
+            }
+
+            // Built once per artwork, not on every pointer move over it.
+            if (!ReferenceEquals(_hoveredArtwork3D, artwork))
+            {
+                _hoveredArtwork3D = artwork;
+                _hoveredArtwork3DLabel = $"3D model ({artwork.FormatDisplayName})";
+            }
+
+            _owner.SetCurrentValue(PageItemsControl.InteractiveActionOverProperty, _hoveredArtwork3DLabel);
+            return;
+        }
+
         PdfAnnotation? annotation = control.PdfTextLayer!.FindAnnotationOver(loc.X, loc.Y);
 
         if (annotation is not null)

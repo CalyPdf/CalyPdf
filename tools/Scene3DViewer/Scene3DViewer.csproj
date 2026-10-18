@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!-- A small host for Caly.Scene3D.Avalonia: opens a .u3d or .prc file or the 3D artwork of a PDF and shows it.
+	     Also carries the control's self-test, benchmark and capture modes (see Program.cs). -->
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net10.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<LangVersion>latest</LangVersion>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<InvariantGlobalization>true</InvariantGlobalization>
+		<IsPackable>false</IsPackable>
+		<SignAssembly>True</SignAssembly>
+		<AssemblyOriginatorKeyFile>..\..\Caly.snk</AssemblyOriginatorKeyFile>
+		<AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+	</PropertyGroup>
+
+	<!-- Native AOT, to check that the control survives it:
+	       dotnet publish tools/Scene3DViewer -r win-x64 -c Release -p:ViewerAot=true
+	     (A property of its own: PublishAot given on the command line would reach the netstandard2.0
+	     projects this one references, which cannot be compiled ahead of time.) -->
+	<PropertyGroup Condition="'$(ViewerAot)' == 'true'">
+		<PublishAot>true</PublishAot>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Avalonia" Version="12.1.4" />
+		<PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
+		<PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
+		<PackageReference Include="SkiaSharp" Version="3.119.4" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\Caly.Scene3D.Avalonia\Caly.Scene3D.Avalonia.csproj" />
+		<ProjectReference Include="..\..\Caly.Pdf\Caly.Pdf.csproj" />
+		<PackageReference Include="PdfPig.Rendering.Skia" Version="0.1.17.1-alpha007" />
+		<PackageReference Include="Caly.Rendering.Scene3D.U3D" Version="1.0.0" />
+		<PackageReference Include="Caly.Rendering.Scene3D.Prc" Version="1.0.0" />
+	</ItemGroup>
+
+</Project>
