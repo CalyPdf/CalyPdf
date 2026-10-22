@@ -96,6 +96,12 @@ public sealed partial class Artwork3DViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty] private IReadOnlyList<string> _viewNames = [];
 
+    /// <summary>
+    /// The camera and animation playhead the view was left with when its page last left the screen, for
+    /// the view built when the page comes back. Opaque here; null until a view has been left.
+    /// </summary>
+    [ObservableProperty] private Scene3DCameraState? _cameraState;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SelectedView))]
     private int _selectedViewIndex = -1;

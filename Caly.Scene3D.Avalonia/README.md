@@ -44,6 +44,10 @@ coordinates, lines and points.
   (switch: `ReleaseGeometryAfterUpload`). When the control leaves the visual tree its GPU objects are
   released; back in the tree it reports `NeedsScene`, and the host must give it a scene that holds its
   geometry again (decode again). Do not dispose a scene while it is the control's `Scene`.
+- **A new scene or view resets the camera and the animations.** A host that drops the control and builds
+  another for the same scene keeps `CaptureCameraState()` (the camera as the user moved it, the
+  playhead, playing or paused; opaque) and calls `RestoreCameraState(state)` on the new control after its
+  `Scene` and `View` are set, again after each later change of either. It is ignored for another view.
 - **Zoomed pages: use `VisibleRegion`.** Avalonia sizes the control's framebuffer from its bounds, so a
   control inside a zoom transform is blurred, and one enlarged to compensate needs a framebuffer that
   grows with the zoom squared. Instead, place the control over the *visible* part of the 3D view at

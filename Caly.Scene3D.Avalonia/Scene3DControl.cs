@@ -383,6 +383,52 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
         RequestNextFrameRendering();
     }
 
+    /// <summary>
+    /// The camera and the animations' playhead as they stand, for <see cref="RestoreCameraState"/>; null
+    /// while there is no camera (no scene).
+    /// </summary>
+    public Scene3DCameraState? CaptureCameraState()
+    {
+        return _hasPose ? new Scene3DCameraState(View, _pose, _projection, AnimationTime, IsAnimationPlaying) : null;
+    }
+
+    /// <summary>
+    /// Puts back a camera and a playhead captured from a control showing the same scene. Call it once the
+    /// control has its <see cref="Scene"/> and <see cref="View"/>: setting either afterwards resets the
+    /// camera, as it always does. Ignored when the state was captured for another view.
+    /// </summary>
+    /// <returns>Whether the state was applied.</returns>
+    public bool RestoreCameraState(Scene3DCameraState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        if (!_hasPose || !ReferenceEquals(state.View, View) || !state.Pose.IsFinite || !ViewCamera.IsValid(state.Projection))
+        {
+            return false;
+        }
+
+        // The camera node, and whether an animation carries it, are the view's: ResetView set them.
+        _pose = state.Pose;
+        _projection = state.Projection;
+
+        if (HasAnimation)
+        {
+            if (state.IsAnimationPlaying)
+            {
+                PlayAnimation();
+            }
+            else
+            {
+                PauseAnimation();
+            }
+
+            SeekAnimation(state.AnimationTime);
+        }
+
+        ShowCameraOrientation();
+        RequestNextFrameRendering();
+        return true;
+    }
+
     /// <summary>Turns the camera about the orbit point as a pointer drag of this many pixels would.</summary>
     internal void RotateBy(float dx, float dy)
     {

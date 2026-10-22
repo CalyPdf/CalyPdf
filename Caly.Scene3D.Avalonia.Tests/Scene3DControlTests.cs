@@ -413,4 +413,77 @@ public class Scene3DControlTests
         Assert.True(scene.HasGeometry);
         window.Close();
     }
+
+    [AvaloniaFact]
+    public void ACapturedCameraIsGivenBackToAControlBuiltInPlace()
+    {
+        using Scene scene = TestScenes.Box();
+        var view = new SceneView { CameraToWorld = TestScenes.LookFrom(new Vector3(0, -20, 0), Vector3.Zero, Vector3.UnitZ), OrbitDistance = 20 };
+        (Window window, Scene3DControl control) = Show(scene);
+        control.View = view;
+        control.RotateBy(80, 30);
+        control.ZoomBy(2);
+        CameraPose moved = control.Pose;
+        Scene3DCameraState? state = control.CaptureCameraState();
+        window.Close();
+
+        Assert.NotNull(state);
+        (Window again, Scene3DControl rebuilt) = Show(scene);
+        rebuilt.View = view;
+        Assert.Equal(new Vector3(0, -20, 0), rebuilt.Pose.Position);
+
+        Assert.True(rebuilt.RestoreCameraState(state));
+        Assert.Equal(moved.Position, rebuilt.Pose.Position);
+        Assert.Equal(moved.Orientation, rebuilt.Pose.Orientation);
+        Assert.Equal(moved.OrbitDistance, rebuilt.Pose.OrbitDistance);
+        Assert.Equal(moved.Orientation, rebuilt.CameraOrientation);
+        again.Close();
+    }
+
+    [AvaloniaFact]
+    public void ACapturedCameraIsNotGivenToAnotherView()
+    {
+        using Scene scene = TestScenes.Box();
+        var view = new SceneView { CameraToWorld = TestScenes.LookFrom(new Vector3(0, -20, 0), Vector3.Zero, Vector3.UnitZ), OrbitDistance = 20 };
+        (Window window, Scene3DControl control) = Show(scene);
+        control.RotateBy(80, 30);
+        Scene3DCameraState state = control.CaptureCameraState()!;
+
+        control.View = view;
+        Assert.False(control.RestoreCameraState(state));
+        Assert.Equal(new Vector3(0, -20, 0), control.Pose.Position);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void ThereIsNoCameraToCaptureWithoutAScene()
+    {
+        (Window window, Scene3DControl control) = Show(null);
+        Assert.Null(control.CaptureCameraState());
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void ACapturedPlayheadIsGivenBackPausedOrPlaying()
+    {
+        using Scene scene = TestScenes.AnimatedBox(autoPlay: true);
+        (Window window, Scene3DControl control) = Show(scene);
+        control.PauseAnimation();
+        control.SeekAnimation(1.25);
+        Scene3DCameraState paused = control.CaptureCameraState()!;
+        control.PlayAnimation();
+        Scene3DCameraState playing = control.CaptureCameraState()!;
+        window.Close();
+
+        (Window again, Scene3DControl rebuilt) = Show(scene);
+        Assert.True(rebuilt.IsAnimationPlaying);
+        Assert.True(rebuilt.RestoreCameraState(paused));
+        Assert.False(rebuilt.IsAnimationPlaying);
+        Assert.Equal(1.25, rebuilt.AnimationTime, 5);
+
+        Assert.True(rebuilt.RestoreCameraState(playing));
+        Assert.True(rebuilt.IsAnimationPlaying);
+        Assert.True(rebuilt.AnimationTime >= 1.25);
+        again.Close();
+    }
 }

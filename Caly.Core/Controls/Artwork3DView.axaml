@@ -6,7 +6,8 @@
              x:Class="Caly.Core.Controls.Artwork3DView"
              x:DataType="vm:Artwork3DViewModel"
              x:CompileBindings="True"
-             StatusCommand="{Binding ControlStatusChangedCommand}">
+             StatusCommand="{Binding ControlStatusChangedCommand}"
+             CameraState="{Binding CameraState, Mode=TwoWay}">
 
 	<UserControl.Styles>
 		<!-- The toolbar's icon buttons. -->

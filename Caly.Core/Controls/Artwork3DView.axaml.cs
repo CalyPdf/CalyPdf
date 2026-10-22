@@ -20,6 +20,7 @@
 
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Data;
 using Avalonia.Data.Converters;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -61,6 +62,10 @@ public sealed partial class Artwork3DView : UserControl
     public static readonly StyledProperty<ICommand?> StatusCommandProperty =
         AvaloniaProperty.Register<Artwork3DView, ICommand?>(nameof(StatusCommand));
 
+    /// <summary>Defines the <see cref="CameraState"/> property.</summary>
+    public static readonly StyledProperty<Scene3DCameraState?> CameraStateProperty =
+        AvaloniaProperty.Register<Artwork3DView, Scene3DCameraState?>(nameof(CameraState), defaultBindingMode: BindingMode.TwoWay);
+
     /// <summary>
     /// The 3D control's background for its scene: transparent while there is none, so that the page (the
     /// artwork's poster) shows through until the model is read; white once there is one.
@@ -70,6 +75,10 @@ public sealed partial class Artwork3DView : UserControl
 
     // Only with the render-timings debug setting on: when this view was built, until its model shows.
     private long _builtAt;
+
+    // The camera the previous view of this artwork was left with, until this one has drawn with it.
+    private Scene3DCameraState? _cameraToRestore;
+    private bool _isLeaving;
 
     public Artwork3DView()
     {
@@ -82,6 +91,15 @@ public sealed partial class Artwork3DView : UserControl
 
         View3D.GetPropertyChangedObservable(Scene3DControl.StatusProperty)
             .Subscribe(new AnonymousObserver<AvaloniaPropertyChangedEventArgs>(_ => OnStatusChanged()));
+
+        // A new scene or view resets the control's camera (its own handler runs first). While this view is
+        // being built the scene comes twice (the one whose geometry went to the previous control, then
+        // the one read again) and the view may come after it: each time, the camera is put back.
+        View3D.GetPropertyChangedObservable(Scene3DControl.SceneProperty)
+            .Subscribe(new AnonymousObserver<AvaloniaPropertyChangedEventArgs>(_ => RestoreCamera()));
+        View3D.GetPropertyChangedObservable(Scene3DControl.ViewProperty)
+            .Subscribe(new AnonymousObserver<AvaloniaPropertyChangedEventArgs>(_ => RestoreCamera()));
+        View3D.FrameRendered += OnFirstFramesRendered;
 
         if (RenderTimings.IsEnabled)
         {
@@ -114,12 +132,56 @@ public sealed partial class Artwork3DView : UserControl
         set => SetValue(StatusCommandProperty, value);
     }
 
+    /// <summary>
+    /// The camera and animation playhead the user left the view with; written when this view leaves the
+    /// page, read by the view built when the page comes back (a tab switch, a scroll away and back).
+    /// </summary>
+    public Scene3DCameraState? CameraState
+    {
+        get => GetValue(CameraStateProperty);
+        set => SetValue(CameraStateProperty, value);
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == CameraStateProperty && !_isLeaving)
+        {
+            // Given by the binding as this view is built: to be put back once the control has its scene.
+            _cameraToRestore = CameraState;
+            RestoreCamera();
+        }
+    }
+
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
+        // The next view of this artwork starts where this one is left; or, if this one never drew with
+        // the camera it was given, from that camera.
+        _isLeaving = true;
+        SetCurrentValue(CameraStateProperty, _cameraToRestore ?? View3D.CaptureCameraState());
+
         // What the control said while on the page no longer stands; and what it says now that it is off
         // (it loses its GPU objects) concerns nobody.
         Execute(Artwork3DControlStatus.LeftPage);
         base.OnDetachedFromVisualTree(e);
+    }
+
+    private void RestoreCamera()
+    {
+        if (_cameraToRestore is { } state)
+        {
+            View3D.RestoreCameraState(state);
+        }
+    }
+
+    private void OnFirstFramesRendered(object? sender, EventArgs e)
+    {
+        // Once the model is drawn the camera is the user's again: a view chosen from now on starts afresh.
+        if (View3D.Status == Scene3DStatus.Ready)
+        {
+            _cameraToRestore = null;
+            View3D.FrameRendered -= OnFirstFramesRendered;
+        }
     }
 
     private void OnStatusChanged()

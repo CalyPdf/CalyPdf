@@ -1,3 +1,4 @@
+using System.Numerics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
@@ -196,6 +197,39 @@ public class Artwork3DViewTests
         Assert.True(artwork.Scene!.HasGeometry);
         Assert.Same(artwork.Scene, control.Scene);
         window.Close();
+    }
+
+    /// <summary>
+    /// A tab switch, or a scroll away and back: the view is dropped and built again, and the model is
+    /// read again. The camera is where the user left it, not back at the view's.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task AViewThatComesBackKeepsTheCameraItWasLeftWith()
+    {
+        await using var f = new Artwork3DFixture();
+        Artwork3DViewModel artwork = await ReadyArtwork(f);
+        Scene old = artwork.Scene!;
+
+        (Window window, Artwork3DView view, Scene3DControl control) = Show(artwork);
+        control.RotateBy(80, 30);
+        control.ZoomBy(2);
+        Vector3 moved = control.Pose.Position;
+        Quaternion turned = control.Pose.Orientation;
+
+        // The page leaves the screen, taking the view with it, after the geometry went to the GPU.
+        ((Panel)view.Parent!).Children.Remove(view);
+        old.ReleaseGeometry();
+        window.Close();
+        Assert.NotNull(artwork.CameraState);
+
+        (Window again, _, Scene3DControl rebuilt) = Show(artwork);
+        Assert.True(await WaitUntil(() => artwork.Scene is not null && !ReferenceEquals(artwork.Scene, old)));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Same(artwork.Scene, rebuilt.Scene);
+        Assert.Equal(moved, rebuilt.Pose.Position);
+        Assert.Equal(turned, rebuilt.Pose.Orientation);
+        again.Close();
     }
 
     [AvaloniaFact]
