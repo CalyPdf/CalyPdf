@@ -35,8 +35,8 @@
 		<ProjectReference Include="..\..\Caly.Scene3D.Avalonia\Caly.Scene3D.Avalonia.csproj" />
 		<ProjectReference Include="..\..\Caly.Pdf\Caly.Pdf.csproj" />
 		<PackageReference Include="PdfPig.Rendering.Skia" Version="0.1.17.1-alpha007" />
-		<PackageReference Include="Caly.Rendering.Scene3D.U3D" Version="1.0.0" />
-		<PackageReference Include="Caly.Rendering.Scene3D.Prc" Version="1.0.0" />
+		<PackageReference Include="Caly.Rendering.Scene3D.U3D" Version="1.1.0" />
+		<PackageReference Include="Caly.Rendering.Scene3D.Prc" Version="1.1.0" />
 	</ItemGroup>
 
 </Project>
