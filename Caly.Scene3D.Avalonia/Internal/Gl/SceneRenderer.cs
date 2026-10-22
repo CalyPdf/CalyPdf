@@ -546,7 +546,7 @@ internal sealed class SceneRenderer
         gl.Uniform(_uSpecular, Sanitize(material.Specular));
         gl.Uniform(_uEmissive, Sanitize(material.Emissive));
         gl.Uniform(_uOpacity, Unit(material.Opacity, 1) * nodeOpacity);
-        gl.Uniform(_uShininess, 1 + 127 * Unit(material.Reflectivity, 0));
+        gl.Uniform(_uShininess, Highlight.Exponent(material.Reflectivity));
         gl.Uniform(_uAlphaCutoff, Unit(material.AlphaReference, 0.5f));
     }
 
