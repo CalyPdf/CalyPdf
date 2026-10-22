@@ -2,8 +2,10 @@ using System.Numerics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
+using Avalonia.Automation;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.LogicalTree;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -65,6 +67,37 @@ public class Artwork3DViewTests
         artwork.SelectedViewIndex = 0;
         Assert.Equal(0, views.SelectedIndex);
         Assert.Same(artwork.SelectedView, control.View);
+        window.Close();
+    }
+
+    /// <summary>The lighting panel's sliders reach the 3D control as they move, and Reset gives the file's values back.</summary>
+    [AvaloniaFact]
+    public async Task TheLightingPanelChangesHowTheModelIsShaded()
+    {
+        await using var f = new Artwork3DFixture();
+        Artwork3DViewModel artwork = await ReadyArtwork(f);
+        (Window window, Artwork3DView view, Scene3DControl control) = Show(artwork);
+        Assert.Equal(Scene3DShading.AsAuthored, control.Shading);
+
+        Button lighting = view.GetVisualDescendants().OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Lighting");
+        var flyout = (Flyout)lighting.Flyout!;
+        flyout.ShowAt(lighting);
+        Dispatcher.UIThread.RunJobs();
+        var panel = (Control)flyout.Content!;
+        Slider brightness = panel.GetLogicalDescendants().OfType<Slider>().Single(s => AutomationProperties.GetName(s) == "Brightness");
+        Slider shine = panel.GetLogicalDescendants().OfType<Slider>().Single(s => AutomationProperties.GetName(s) == "Shine");
+        Assert.Equal(1, brightness.Value);
+
+        brightness.Value = 1.5;
+        shine.Value = 2;
+        Assert.Equal(new Scene3DShading { LightIntensity = 1.5f, SpecularIntensity = 2 }, control.Shading);
+
+        Button reset = panel.GetLogicalDescendants().OfType<Button>().Single(b => Equals(b.Content, "Reset"));
+        reset.Command!.Execute(null);
+        Assert.Equal(Scene3DShading.AsAuthored, control.Shading);
+        Assert.Equal(1, brightness.Value);
+
+        flyout.Hide();
         window.Close();
     }
 

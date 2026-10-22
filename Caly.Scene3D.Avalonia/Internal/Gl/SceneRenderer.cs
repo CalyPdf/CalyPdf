@@ -19,6 +19,9 @@ internal struct FrameSetup
     /// <summary>Lighting and node overrides; null for the scene as it is.</summary>
     public SceneView? View;
 
+    /// <summary>The viewer's changes to lights and materials; null for none.</summary>
+    public Scene3DShading? Shading;
+
     /// <summary>Background colour, not premultiplied; alpha 0 leaves what is behind the control visible.</summary>
     public Vector4 Background;
 
@@ -46,6 +49,9 @@ internal sealed class SceneRenderer
     private readonly int _uSkinOffset, _uBones;
     private int _boneTexture;
     private float[] _boneTexels = [];
+
+    // The viewer's changes to lights and materials, for the frame being drawn.
+    private Scene3DShading _shading = Scene3DShading.AsAuthored;
 
     private readonly ShaderLight[] _lights = new ShaderLight[LightRigs.MaxLights];
     private readonly float[] _lightPositions = new float[LightRigs.MaxLights * 4];
@@ -358,6 +364,7 @@ internal sealed class SceneRenderer
         {
             gl.Enable(GlApi.ProgramPointSize);
         }
+        _shading = setup.Shading ?? Scene3DShading.AsAuthored;
         SetLights(scene, setup.View?.Lighting ?? SceneLighting.Artwork, view);
 
         var state = new DrawState { Mesh = -1, Material = int.MinValue, Opacity = float.NaN, SkinOffset = -1, Orthographic = setup.Projection.Kind == SceneProjection.Orthographic };
@@ -521,7 +528,7 @@ internal sealed class SceneRenderer
 
         // What light picks out is the diffuse colour. A material with none (the format's default has only
         // an ambient colour) would be black under any light; its ambient colour stands in.
-        Vector3 diffuse = material.Diffuse == Vector3.Zero ? material.Ambient : material.Diffuse;
+        Vector3 diffuse = _shading.Diffuse(material.Diffuse == Vector3.Zero ? material.Ambient : material.Diffuse);
 
         int flags = orthographic ? Shaders.FlagOrthographic : 0;
         flags |= lit && (material.Flags & SceneMaterialFlags.Lit) != 0 ? Shaders.FlagLit : 0;
@@ -543,10 +550,10 @@ internal sealed class SceneRenderer
 
         gl.Uniform(_uFlags, flags);
         gl.Uniform(_uDiffuse, Sanitize(diffuse));
-        gl.Uniform(_uSpecular, Sanitize(material.Specular));
+        gl.Uniform(_uSpecular, Sanitize(_shading.Specular(material.Specular)));
         gl.Uniform(_uEmissive, Sanitize(material.Emissive));
         gl.Uniform(_uOpacity, Unit(material.Opacity, 1) * nodeOpacity);
-        gl.Uniform(_uShininess, Highlight.Exponent(material.Reflectivity));
+        gl.Uniform(_uShininess, _shading.Exponent(material.Reflectivity));
         gl.Uniform(_uAlphaCutoff, Unit(material.AlphaReference, 0.5f));
     }
 
@@ -557,13 +564,13 @@ internal sealed class SceneRenderer
         {
             ShaderLight light = _lights[i];
             light.Position.CopyTo(_lightPositions, i * 4);
-            light.Color.CopyTo(_lightColors, i * 3);
+            _shading.LightColor(light.Color).CopyTo(_lightColors, i * 3);
             light.Attenuation.CopyTo(_lightAttenuations, i * 3);
             light.SpotDirection.CopyTo(_lightSpots, i * 4);
             _lightSpots[i * 4 + 3] = light.SpotCosine;
         }
 
-        _gl.Uniform(_uAmbientLight, ambient);
+        _gl.Uniform(_uAmbientLight, _shading.Ambient(ambient));
         _gl.Uniform(_uLightCount, count);
         if (count > 0)
         {

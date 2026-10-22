@@ -30,6 +30,19 @@
 			<Setter Property="Fill" Value="{Binding $parent[Button].Foreground}"/>
 			<Setter Property="StrokeThickness" Value="1"/>
 		</Style>
+
+		<!-- The lighting panel's rows: a name, a slider, its value. -->
+		<Style Selector="Grid.shading TextBlock">
+			<Setter Property="FontSize" Value="12"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+		</Style>
+		<Style Selector="Grid.shading Slider">
+			<Setter Property="Width" Value="150"/>
+			<Setter Property="Height" Value="32"/>
+			<Setter Property="MinHeight" Value="0"/>
+			<Setter Property="Margin" Value="10,0"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+		</Style>
 	</UserControl.Styles>
 
 	<!-- A piece of 3D artwork being viewed in place. Built by PageItem only while its page has one. -->
@@ -41,6 +54,7 @@
 		<scene3d:Scene3DControl Name="View3D"
 		                        Scene="{Binding Scene}"
 		                        View="{Binding SelectedView}"
+		                        Shading="{Binding Shading}"
 		                        DefaultBackground="{Binding Scene, Converter={x:Static controls:Artwork3DView.BackgroundForScene}}"
 		                        PanModifiers="Shift"
 		                        ResetKey="{x:Null}"/>
@@ -117,6 +131,57 @@
 				        ToolTip.Tip="Reset view"
 				        AutomationProperties.Name="Reset view">
 					<Path Data="M 11.2 4.2 A 5 5 0 1 0 12 7.5 M 11.6 1 L 11.6 4.6 L 8 4.6"/>
+				</Button>
+
+				<!-- Lights and materials, changed by the reader; the file's values each time an artwork is opened. -->
+				<Button Classes="tool"
+				        IsVisible="{Binding !IsLoading}"
+				        ToolTip.Tip="Lighting"
+				        AutomationProperties.Name="Lighting">
+					<Path Data="M 9.5 7 A 2.5 2.5 0 1 1 4.5 7 A 2.5 2.5 0 1 1 9.5 7 Z M 7 0.8 L 7 2.4 M 7 11.6 L 7 13.2 M 0.8 7 L 2.4 7 M 11.6 7 L 13.2 7 M 2.6 2.6 L 3.7 3.7 M 10.3 10.3 L 11.4 11.4 M 2.6 11.4 L 3.7 10.3 M 10.3 3.7 L 11.4 2.6"/>
+					<Button.Flyout>
+						<!-- Above the toolbar, off the model, so that the model can be watched while a slider moves. -->
+						<Flyout Placement="TopEdgeAlignedLeft">
+							<StackPanel Spacing="6">
+								<Grid Classes="shading"
+								      ColumnDefinitions="Auto,Auto,48"
+								      RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+
+									<TextBlock Grid.Row="0" Text="Brightness"/>
+									<Slider Grid.Row="0" Grid.Column="1" Minimum="0" Maximum="2" SmallChange="0.05" LargeChange="0.25"
+									        Value="{Binding LightIntensity}" AutomationProperties.Name="Brightness"/>
+									<TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding LightIntensity, StringFormat={}{0:P0}}"/>
+
+									<TextBlock Grid.Row="1" Text="Ambient"/>
+									<Slider Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="1" SmallChange="0.02" LargeChange="0.1"
+									        Value="{Binding AddedAmbient}" AutomationProperties.Name="Ambient"/>
+									<TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding AddedAmbient, StringFormat=+{0:P0}}"/>
+
+									<TextBlock Grid.Row="2" Text="Shine"/>
+									<Slider Grid.Row="2" Grid.Column="1" Minimum="0" Maximum="3" SmallChange="0.05" LargeChange="0.25"
+									        Value="{Binding SpecularIntensity}" AutomationProperties.Name="Shine"/>
+									<TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding SpecularIntensity, StringFormat={}{0:P0}}"/>
+
+									<TextBlock Grid.Row="3" Text="Highlight size"/>
+									<Slider Grid.Row="3" Grid.Column="1" Minimum="-2" Maximum="2" SmallChange="0.1" LargeChange="0.5"
+									        Value="{Binding HighlightSizeSteps}" AutomationProperties.Name="Highlight size"
+									        ToolTip.Tip="Left: tight highlights. Right: broad ones."/>
+									<TextBlock Grid.Row="3" Grid.Column="2" Text="{Binding HighlightSize, StringFormat=×{0:0.##}}"/>
+
+									<TextBlock Grid.Row="4" Text="Colour"/>
+									<Slider Grid.Row="4" Grid.Column="1" Minimum="0" Maximum="1.5" SmallChange="0.05" LargeChange="0.25"
+									        Value="{Binding DiffuseIntensity}" AutomationProperties.Name="Colour"/>
+									<TextBlock Grid.Row="4" Grid.Column="2" Text="{Binding DiffuseIntensity, StringFormat={}{0:P0}}"/>
+								</Grid>
+
+								<Button Content="Reset"
+								        Command="{Binding ResetShadingCommand}"
+								        HorizontalAlignment="Right"
+								        FontSize="12"
+								        ToolTip.Tip="Lights and materials as the file has them"/>
+							</StackPanel>
+						</Flyout>
+					</Button.Flyout>
 				</Button>
 
 				<Button Classes="tool"

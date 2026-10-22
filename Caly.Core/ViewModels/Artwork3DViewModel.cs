@@ -106,6 +106,48 @@ public sealed partial class Artwork3DViewModel : ViewModelBase, IDisposable
     [NotifyPropertyChangedFor(nameof(SelectedView))]
     private int _selectedViewIndex = -1;
 
+    // The reader's changes to how the model is lit and shaded (the lighting panel's sliders). They start
+    // from the file's values for each artwork and are not saved.
+
+    /// <summary>Strength of the lights, 1 as the file has them.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Shading))]
+    private double _lightIntensity = 1;
+
+    /// <summary>Grey light added to the ambient light, 0 to 1.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Shading))]
+    private double _addedAmbient;
+
+    /// <summary>Brightness of the highlights, 1 as the file has them.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Shading))]
+    private double _specularIntensity = 1;
+
+    /// <summary>Size of the highlights in steps of two: 0 as the file has them, above 0 broader, below tighter.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Shading))]
+    [NotifyPropertyChangedFor(nameof(HighlightSize))]
+    private double _highlightSizeSteps;
+
+    /// <summary>How many times broader the highlights are than the file has them.</summary>
+    public double HighlightSize => Math.Pow(2, HighlightSizeSteps);
+
+    /// <summary>How much of their own colour surfaces show, 1 as the file has it.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Shading))]
+    private double _diffuseIntensity = 1;
+
+    /// <summary>What the sliders make of the file's lights and materials, for the 3D control.</summary>
+    public Scene3DShading Shading => new()
+    {
+        LightIntensity = (float)LightIntensity,
+        AddedAmbient = (float)AddedAmbient,
+        SpecularIntensity = (float)SpecularIntensity,
+        HighlightSharpness = (float)(1 / HighlightSize),
+        DiffuseIntensity = (float)DiffuseIntensity
+    };
+
     /// <param name="close">
     /// Closes this view: called with a message for the user when the view cannot go on, with
     /// <c>null</c> when it simply ends.
@@ -322,6 +364,17 @@ public sealed partial class Artwork3DViewModel : ViewModelBase, IDisposable
     private static string CouldNotBeRead(string? detail)
     {
         return string.IsNullOrEmpty(detail) ? "This 3D model could not be read." : "This 3D model could not be read: " + detail;
+    }
+
+    /// <summary>Puts the lights and materials back as the file has them.</summary>
+    [RelayCommand]
+    private void ResetShading()
+    {
+        LightIntensity = 1;
+        AddedAmbient = 0;
+        SpecularIntensity = 1;
+        HighlightSizeSteps = 0;
+        DiffuseIntensity = 1;
     }
 
     [RelayCommand]

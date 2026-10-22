@@ -53,6 +53,9 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
     /// <summary>Defines the <see cref="DefaultBackground"/> property.</summary>
     public static readonly StyledProperty<Color> DefaultBackgroundProperty = AvaloniaProperty.Register<Scene3DControl, Color>(nameof(DefaultBackground), Colors.White);
 
+    /// <summary>Defines the <see cref="Shading"/> property.</summary>
+    public static readonly StyledProperty<Scene3DShading?> ShadingProperty = AvaloniaProperty.Register<Scene3DControl, Scene3DShading?>(nameof(Shading));
+
     /// <summary>Defines the <see cref="ReservedModifiers"/> property.</summary>
     public static readonly StyledProperty<KeyModifiers> ReservedModifiersProperty =
         AvaloniaProperty.Register<Scene3DControl, KeyModifiers>(nameof(ReservedModifiers));
@@ -147,6 +150,7 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
         ViewProperty.Changed.AddClassHandler<Scene3DControl>((control, _) => control.ResetView());
         VisibleRegionProperty.Changed.AddClassHandler<Scene3DControl>((control, _) => control.RequestNextFrameRendering());
         DefaultBackgroundProperty.Changed.AddClassHandler<Scene3DControl>((control, _) => control.RequestNextFrameRendering());
+        ShadingProperty.Changed.AddClassHandler<Scene3DControl>((control, _) => control.RequestNextFrameRendering());
     }
 
     /// <summary>The scene to draw. The control does not dispose it.</summary>
@@ -179,6 +183,17 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
     {
         get => GetValue(DefaultBackgroundProperty);
         set => SetValue(DefaultBackgroundProperty, value);
+    }
+
+    /// <summary>
+    /// The viewer's changes to how the scene is lit and shaded (brighter lights, stronger highlights…);
+    /// null or <see cref="Scene3DShading.AsAuthored"/> for the scene as its file has it. Applied from the
+    /// next frame; it is kept across a new scene or view.
+    /// </summary>
+    public Scene3DShading? Shading
+    {
+        get => GetValue(ShadingProperty);
+        set => SetValue(ShadingProperty, value);
     }
 
     /// <summary>
@@ -766,6 +781,7 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
                 FullViewSize = FullViewSize,
                 Region = new ViewRegion((float)region.X, (float)region.Y, (float)region.Right, (float)region.Bottom),
                 View = view,
+                Shading = Shading,
                 Background = view?.Background is { } authored
                     ? new Vector4(authored, 1)
                     : new Vector4(background.R / 255f, background.G / 255f, background.B / 255f, background.A / 255f),

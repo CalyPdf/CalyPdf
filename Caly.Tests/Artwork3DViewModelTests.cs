@@ -146,6 +146,36 @@ public class Artwork3DViewModelTests
         Assert.NotNull(artwork.Scene);
     }
 
+    /// <summary>
+    /// The lighting panel's sliders start from the file's values, go back to them on reset, and start
+    /// from them again for the next artwork: nothing is kept.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task ShadingStartsFromTheFileForEachArtwork()
+    {
+        await using var f = new Artwork3DFixture();
+        Artwork3DViewModel first = f.Activate(page: 1);
+        Assert.Equal(Scene3DShading.AsAuthored, first.Shading);
+
+        var changed = new List<string?>();
+        first.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+        first.LightIntensity = 1.5;
+        first.AddedAmbient = 0.2;
+        first.SpecularIntensity = 2;
+        first.HighlightSizeSteps = 1;    // twice as broad: half the sharpness
+        first.DiffuseIntensity = 0.5;
+
+        Assert.Equal(new Scene3DShading { LightIntensity = 1.5f, AddedAmbient = 0.2f, SpecularIntensity = 2, HighlightSharpness = 0.5f, DiffuseIntensity = 0.5f }, first.Shading);
+        Assert.Equal(5, changed.Count(name => name == nameof(Artwork3DViewModel.Shading)));
+
+        first.ResetShadingCommand.Execute(null);
+        Assert.Equal(Scene3DShading.AsAuthored, first.Shading);
+
+        first.SpecularIntensity = 3;
+        Artwork3DViewModel second = f.Activate(page: 2);
+        Assert.Equal(Scene3DShading.AsAuthored, second.Shading);
+    }
+
     [AvaloniaFact]
     public async Task ASecondActivationClosesTheFirst()
     {
