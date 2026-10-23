@@ -55,7 +55,14 @@ public class Artwork3DViewTests
         Assert.Same(artwork.SelectedView, control.View);
         Assert.Equal(Colors.White, control.DefaultBackground);
 
-        ComboBox views = view.GetVisualDescendants().OfType<ComboBox>().Single();
+        // The box's views are solid: its edges are not looked for.
+        Assert.False(artwork.HasEdgeViews);
+        Assert.False(control.PrepareEdges);
+        artwork.HasEdgeViews = true;
+        Assert.True(control.PrepareEdges);
+        artwork.HasEdgeViews = false;
+
+        ComboBox views = view.GetVisualDescendants().OfType<ComboBox>().Single(c => AutomationProperties.GetName(c) == "3D view");
         Assert.Equal(2, views.ItemCount);
         Assert.Equal(0, views.SelectedIndex);
         Assert.True(views.IsVisible);
@@ -98,6 +105,30 @@ public class Artwork3DViewTests
         Assert.Equal(1, brightness.Value);
 
         flyout.Hide();
+        window.Close();
+    }
+
+    /// <summary>The toolbar's choice of render mode shows the view's and reaches the 3D control.</summary>
+    [AvaloniaFact]
+    public async Task TheRenderModeListDrivesTheControl()
+    {
+        await using var f = new Artwork3DFixture();
+        Artwork3DViewModel artwork = await ReadyArtwork(f);
+        (Window window, Artwork3DView view, Scene3DControl control) = Show(artwork);
+
+        ComboBox modes = view.GetVisualDescendants().OfType<ComboBox>().Single(c => AutomationProperties.GetName(c) == "Render mode");
+        Assert.Equal(15, modes.ItemCount);
+        Assert.Equal((int)SceneRenderMode.Solid, modes.SelectedIndex);
+        Assert.Equal(SceneRenderMode.Solid, control.RenderMode);
+
+        modes.SelectedIndex = (int)SceneRenderMode.Illustration;
+        Assert.Equal(SceneRenderMode.Illustration, artwork.RenderMode);
+        Assert.Equal(SceneRenderMode.Illustration, control.RenderMode);
+
+        // Another view is drawn as the document asks.
+        artwork.SelectedViewIndex = 1;
+        Assert.Equal((int)SceneRenderMode.Solid, modes.SelectedIndex);
+        Assert.Equal(SceneRenderMode.Solid, control.RenderMode);
         window.Close();
     }
 
@@ -201,7 +232,7 @@ public class Artwork3DViewTests
 
         Assert.Null(control.Scene);
         Assert.Equal(Colors.Transparent, control.DefaultBackground);
-        Assert.False(view.GetVisualDescendants().OfType<ComboBox>().Single().IsVisible);
+        Assert.False(view.GetVisualDescendants().OfType<ComboBox>().Single(c => AutomationProperties.GetName(c) == "3D view").IsVisible);
         Assert.Contains(view.GetVisualDescendants().OfType<TextBlock>(), t => t.IsVisible && t.Text == "Loading 3D…");
 
         gate.SetResult();
@@ -210,7 +241,7 @@ public class Artwork3DViewTests
 
         Assert.Same(artwork.Scene, control.Scene);
         Assert.Equal(Colors.White, control.DefaultBackground);
-        Assert.Equal(0, view.GetVisualDescendants().OfType<ComboBox>().Single().SelectedIndex);
+        Assert.Equal(0, view.GetVisualDescendants().OfType<ComboBox>().Single(c => AutomationProperties.GetName(c) == "3D view").SelectedIndex);
         window.Close();
     }
 

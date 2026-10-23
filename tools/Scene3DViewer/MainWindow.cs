@@ -17,6 +17,10 @@ internal sealed class MainWindow : Window
     private readonly Scene3DControl _view3D = new();
     private readonly ZoomedViewHost _host = new();
     private readonly ComboBox _views = new() { MinWidth = 220, VerticalAlignment = VerticalAlignment.Center };
+
+    // The render mode: the view's, until another is chosen (or given with --render-mode).
+    private readonly ComboBox _renderModes = new() { MinWidth = 180, VerticalAlignment = VerticalAlignment.Center, ItemsSource = Enum.GetNames<SceneRenderMode>() };
+    private bool _settingRenderMode;
     private readonly TextBlock _statistics = new() { VerticalAlignment = VerticalAlignment.Center, Foreground = Brushes.Gainsboro, FontFamily = new FontFamily("Consolas, monospace") };
     private LoadedModel? _model;
     private bool _captureRequested, _firstFrameLogged, _texturesLogged, _scenarioStarted;
@@ -77,8 +81,15 @@ internal sealed class MainWindow : Window
 
         var zoom = new Slider { Minimum = 1, Maximum = 8, Value = options.Zoom, Width = 160, VerticalAlignment = VerticalAlignment.Center };
         zoom.ValueChanged += (_, e) => _host.Zoom = e.NewValue;
+        // The lighting panel of Caly's 3D view: the file's lights and materials, scaled as the sliders move.
+        var shading = new ShadingPanel();
+        shading.Changed += value => _view3D.Shading = value;
+        var lighting = new Button { Content = "lighting", VerticalAlignment = VerticalAlignment.Center, Flyout = new Flyout { Content = shading, Placement = PlacementMode.TopEdgeAlignedLeft } };
+
         var bar = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, Margin = new Thickness(8) };
         bar.Children.Add(_views);
+        bar.Children.Add(lighting);
+        bar.Children.Add(_renderModes);
         bar.Children.Add(new TextBlock { Text = "page zoom", VerticalAlignment = VerticalAlignment.Center, Foreground = Brushes.Gainsboro });
         bar.Children.Add(zoom);
         bar.Children.Add(_statistics);
@@ -99,8 +110,21 @@ internal sealed class MainWindow : Window
         int viewIndex = options.View ?? _model.DefaultView;
         _views.SelectedIndex = (uint)viewIndex < (uint)_model.Views.Count ? viewIndex : _model.Views.Count;
         _views.SelectionChanged += (_, _) => ApplyView();
+        _renderModes.SelectionChanged += (_, _) =>
+        {
+            if (!_settingRenderMode && _renderModes.SelectedIndex >= 0)
+            {
+                _view3D.RenderModeOverride = (SceneRenderMode)_renderModes.SelectedIndex;
+                Program.Log($"render mode: {_view3D.RenderModeOverride}");
+            }
+        };
 
         ApplyView();
+        if (options.RenderMode is { } mode)
+        {
+            _renderModes.SelectedIndex = (int)mode;
+        }
+        _view3D.PrepareEdges = _model.Views.Any(v => Scene3DControl.DrawsEdges(v.RenderMode));
         _view3D.Scene = _model.Scene;
         if (_model.Scene.Animations.Count > 0)
         {
@@ -151,9 +175,16 @@ internal sealed class MainWindow : Window
             view = new SceneView
             {
                 Name = view.Name, CameraToWorld = view.CameraToWorld, CameraNodePath = view.CameraNodePath, OrbitDistance = view.OrbitDistance,
-                Projection = view.Projection, Lighting = view.Lighting, NodeOverrides = view.NodeOverrides
+                Projection = view.Projection, Lighting = view.Lighting, NodeOverrides = view.NodeOverrides,
+                RenderMode = view.RenderMode, EdgeColor = view.EdgeColor, CreaseAngle = view.CreaseAngle, FaceColor = view.FaceColor, Opacity = view.Opacity
             };
         }
+
+        // A view is drawn as the document asks.
+        _settingRenderMode = true;
+        _view3D.RenderModeOverride = null;
+        _renderModes.SelectedIndex = (int)(view?.RenderMode ?? SceneRenderMode.Solid);
+        _settingRenderMode = false;
 
         Program.Log(view is null ? "view: whole scene" : $"view {index}: '{view.Name}', lighting {view.Lighting}, {view.NodeOverrides.Count} node overrides, camera {(view.CameraNodePath.Count > 0 ? "node " + string.Join('/', view.CameraNodePath) : view.CameraToWorld is null ? "none" : "matrix")}");
         _view3D.View = view;
@@ -208,6 +239,12 @@ internal sealed class MainWindow : Window
             _texturesLogged = true;
             Program.Log(string.Create(CultureInfo.InvariantCulture,
                 $"textures: {s.TexturesLoaded} loaded, {s.TexturesFailed} failed, {s.TextureBytes / 1048576.0:F1} MB, complete {System.Diagnostics.Stopwatch.GetElapsedTime(_readyAt).TotalMilliseconds:F0} ms after the first frame; frame {s.FramesRendered}"));
+        }
+
+        // So do edges, found off the UI thread for the render modes that draw them.
+        if (_view3D.IsFindingEdges)
+        {
+            return;
         }
 
         if (_options.BenchmarkFrames > 0)

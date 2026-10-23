@@ -10,6 +10,9 @@ internal struct DrawItem
     public Matrix4x4 World;
     public int Mesh;
 
+    /// <summary>Index into the scene's parts: the run of the mesh's indices this item draws.</summary>
+    public int Part;
+
     /// <summary>First index and index count in the scene's index buffer.</summary>
     public int IndexStart;
     public int IndexCount;
@@ -272,7 +275,7 @@ internal sealed class DrawList
 
                     _records[_recordCount++] = new Record
                     {
-                        Item = new DrawItem { World = world[i], Mesh = node.Mesh, IndexStart = part.IndexStart, IndexCount = part.IndexCount, Material = material, Node = i, SkinOffset = skinOffset, Opacity = opacity[i] },
+                        Item = new DrawItem { World = world[i], Mesh = node.Mesh, Part = mesh.FirstPart + p, IndexStart = part.IndexStart, IndexCount = part.IndexCount, Material = material, Node = i, SkinOffset = skinOffset, Opacity = opacity[i] },
                         BoundsMin = min,
                         BoundsMax = max,
                         Transparent = transparent

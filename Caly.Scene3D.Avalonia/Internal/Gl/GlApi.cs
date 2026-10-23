@@ -25,7 +25,8 @@ internal sealed unsafe class GlApi
     public const int CullFace = 0x0B44, DepthTest = 0x0B71, Blend = 0x0BE2, ScissorTest = 0x0C11;
     public const int UnpackAlignment = 0x0CF5, PackAlignment = 0x0D05;
     public const int Texture2D = 0x0DE1, Texture0 = 0x84C0;
-    public const int UnsignedByte = 0x1401, UnsignedInt = 0x1405, Float = 0x1406;
+    public const int UnsignedByte = 0x1401, UnsignedInt = 0x1405, Float = 0x1406, Int2101010Rev = 0x8D9F;
+    public const int PolygonOffsetFill = 0x8037;
     public const int Rgba = 0x1908, Rgba8 = 0x8058, Rgba32F = 0x8814, DepthComponent24 = 0x81A6;
     public const int Nearest = 0x2600, Linear = 0x2601, LinearMipmapLinear = 0x2703;
     public const int TextureMagFilter = 0x2800, TextureMinFilter = 0x2801, TextureWrapS = 0x2802, TextureWrapT = 0x2803;
@@ -89,6 +90,9 @@ internal sealed unsafe class GlApi
     private readonly delegate* unmanaged<int, int, byte, float*, void> _uniformMatrix3fv;
     private readonly delegate* unmanaged<int, int, byte, float*, void> _uniformMatrix4fv;
     private readonly delegate* unmanaged<int, int, int, nint, void> _drawElements;
+    private readonly delegate* unmanaged<int, int, int, void> _drawArrays;
+    private readonly delegate* unmanaged<float, float, void> _polygonOffset;
+    private readonly delegate* unmanaged<byte, byte, byte, byte, void> _colorMask;
 
     private readonly delegate* unmanaged<int, int*, void> _genTextures;
     private readonly delegate* unmanaged<int, int*, void> _deleteTextures;
@@ -165,6 +169,9 @@ internal sealed unsafe class GlApi
         _uniformMatrix3fv = (delegate* unmanaged<int, int, byte, float*, void>)Load(gl, "glUniformMatrix3fv");
         _uniformMatrix4fv = (delegate* unmanaged<int, int, byte, float*, void>)Load(gl, "glUniformMatrix4fv");
         _drawElements = (delegate* unmanaged<int, int, int, nint, void>)Load(gl, "glDrawElements");
+        _drawArrays = (delegate* unmanaged<int, int, int, void>)Load(gl, "glDrawArrays");
+        _polygonOffset = (delegate* unmanaged<float, float, void>)Load(gl, "glPolygonOffset");
+        _colorMask = (delegate* unmanaged<byte, byte, byte, byte, void>)Load(gl, "glColorMask");
 
         _genTextures = (delegate* unmanaged<int, int*, void>)Load(gl, "glGenTextures");
         _deleteTextures = (delegate* unmanaged<int, int*, void>)Load(gl, "glDeleteTextures");
@@ -312,6 +319,18 @@ internal sealed unsafe class GlApi
     public void VertexAttrib4(int index, float x, float y, float z, float w) => _vertexAttrib4f(index, x, y, z, w);
 
     public void DrawElements(int mode, int count, int type, nint offset) => _drawElements(mode, count, type, offset);
+
+    public void DrawArrays(int mode, int first, int count) => _drawArrays(mode, first, count);
+
+    /// <summary>Moves the depth of the polygons drawn from now on (with <see cref="PolygonOffsetFill"/> enabled).</summary>
+    public void PolygonOffset(float factor, float units) => _polygonOffset(factor, units);
+
+    /// <summary>Whether drawing writes colour at all (false: depth only).</summary>
+    public void ColorMask(bool write)
+    {
+        byte b = write ? (byte)1 : (byte)0;
+        _colorMask(b, b, b, b);
+    }
 
     // ---- programs ----
 

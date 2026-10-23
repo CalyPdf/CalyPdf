@@ -154,6 +154,55 @@ public class Artwork3DViewConverterTests
         Assert.Equal(expected, Artwork3DViewConverter.ToLighting(style));
     }
 
+    [Theory]
+    [InlineData(Artwork3DRenderModeType.Unknown, SceneRenderMode.Solid)]
+    [InlineData(Artwork3DRenderModeType.Solid, SceneRenderMode.Solid)]
+    [InlineData(Artwork3DRenderModeType.SolidWireframe, SceneRenderMode.SolidWireframe)]
+    [InlineData(Artwork3DRenderModeType.Transparent, SceneRenderMode.Transparent)]
+    [InlineData(Artwork3DRenderModeType.TransparentWireframe, SceneRenderMode.TransparentWireframe)]
+    [InlineData(Artwork3DRenderModeType.BoundingBox, SceneRenderMode.BoundingBox)]
+    [InlineData(Artwork3DRenderModeType.TransparentBoundingBox, SceneRenderMode.TransparentBoundingBox)]
+    [InlineData(Artwork3DRenderModeType.TransparentBoundingBoxOutline, SceneRenderMode.TransparentBoundingBoxOutline)]
+    [InlineData(Artwork3DRenderModeType.Wireframe, SceneRenderMode.Wireframe)]
+    [InlineData(Artwork3DRenderModeType.ShadedWireframe, SceneRenderMode.ShadedWireframe)]
+    [InlineData(Artwork3DRenderModeType.HiddenWireframe, SceneRenderMode.HiddenWireframe)]
+    [InlineData(Artwork3DRenderModeType.Vertices, SceneRenderMode.Vertices)]
+    [InlineData(Artwork3DRenderModeType.ShadedVertices, SceneRenderMode.ShadedVertices)]
+    [InlineData(Artwork3DRenderModeType.Illustration, SceneRenderMode.Illustration)]
+    [InlineData(Artwork3DRenderModeType.SolidOutline, SceneRenderMode.SolidOutline)]
+    [InlineData(Artwork3DRenderModeType.ShadedIllustration, SceneRenderMode.ShadedIllustration)]
+    public void EveryRenderModeHasItsMode(Artwork3DRenderModeType type, SceneRenderMode expected)
+    {
+        Assert.Equal(expected, Artwork3DViewConverter.ToRenderMode(type));
+    }
+
+    /// <summary>
+    /// The Suspension's default view draws silhouette edges at a crease value of 10 degrees; the Turbine's is
+    /// solid. Black edges, the default, as neither gives an auxiliary colour.
+    /// </summary>
+    [Theory]
+    [InlineData("tetra4d/3dpdf-Auto-Suspension-V03042024.pdf", SceneRenderMode.SolidOutline, 10f)]
+    [InlineData("tetra4d/3dpdf-Aero-Turbine-V03042024.pdf", SceneRenderMode.Solid, 45f)]
+    public void ADocumentsRenderModeReachesItsView(string document, SceneRenderMode mode, float creaseAngle)
+    {
+        string? samples = Environment.GetEnvironmentVariable("CALY_3D_SAMPLES");
+        string path = string.IsNullOrEmpty(samples) ? "" : Path.Combine(samples, document);
+        if (!File.Exists(path))
+        {
+            Assert.Skip("Set CALY_3D_SAMPLES to the folder of sample 3D PDFs.");
+        }
+
+        using Artwork3DTestDocument test = Artwork3DTestDocument.Open(path);
+        Artwork3DContent content = Artwork3DContentReader.Read(test.Artworks[0]);
+        SceneView view = content.Views[content.DefaultViewIndex];
+
+        Assert.Equal(mode, view.RenderMode);
+        Assert.Equal(creaseAngle, view.CreaseAngle);
+        Assert.Equal(Vector3.Zero, view.EdgeColor);
+        Assert.Null(view.FaceColor);            // the background, as neither gives one
+        Assert.Equal(0.5f, view.Opacity);
+    }
+
     /// <summary>The whole conversion, on the view of a real document.</summary>
     [Fact]
     public void AViewOfARealDocumentConverts()

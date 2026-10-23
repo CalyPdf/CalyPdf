@@ -176,6 +176,32 @@ public class Artwork3DViewModelTests
         Assert.Equal(Scene3DShading.AsAuthored, second.Shading);
     }
 
+    /// <summary>
+    /// The render mode is the selected view's (the box's is solid) until the reader chooses another; choosing
+    /// a view gives that view's again.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task TheRenderModeIsTheViewsUntilAnotherIsChosen()
+    {
+        await using var f = new Artwork3DFixture();
+        Artwork3DViewModel artwork = f.Activate();
+        Assert.True(await WaitUntil(() => artwork.State == Artwork3DState.Ready));
+
+        Assert.Equal(SceneRenderMode.Solid, artwork.RenderMode);
+        Assert.False(artwork.HasEdgeViews);
+        Assert.Equal(15, Artwork3DViewModel.RenderModeNames.Count);
+
+        artwork.RenderModeIndex = (int)SceneRenderMode.Wireframe;
+        Assert.Equal(SceneRenderMode.Wireframe, artwork.RenderMode);
+        Assert.Equal("Wireframe", Artwork3DViewModel.RenderModeNames[artwork.RenderModeIndex]);
+
+        artwork.RenderModeIndex = 99;
+        Assert.Equal(SceneRenderMode.Wireframe, artwork.RenderMode);
+
+        artwork.SelectedViewIndex = 1;
+        Assert.Equal(SceneRenderMode.Solid, artwork.RenderMode);
+    }
+
     [AvaloniaFact]
     public async Task ASecondActivationClosesTheFirst()
     {

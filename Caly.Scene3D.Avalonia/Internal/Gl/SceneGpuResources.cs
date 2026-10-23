@@ -12,6 +12,11 @@ internal sealed class SceneGpuResources
     private int _positions, _normals, _texCoords, _colors, _indices, _boneIndices, _boneWeights;
     private int[] _vertexArrays = [];
     private bool[] _skinned = [];
+    private int[] _skinStart = [];
+
+    // Every edge of the triangles, for the wireframe render modes: one index buffer, a vertex array per mesh.
+    private int _wireIndices;
+    private int[] _wireArrays = [];
 
     public SceneGpuResources(GlApi gl)
     {
@@ -51,6 +56,7 @@ internal sealed class SceneGpuResources
 
             ReadOnlySpan<SceneMesh> meshes = scene.Meshes;
             int[] skinStart = UploadSkins(scene, meshes);
+            _skinStart = skinStart;
             _vertexArrays = new int[meshes.Length];
             for (int i = 0; i < meshes.Length; i++)
             {
@@ -63,15 +69,7 @@ internal sealed class SceneGpuResources
                 int vertexArray = _gl.GenVertexArray();
                 _vertexArrays[i] = vertexArray;
                 _gl.BindVertexArray(vertexArray);
-
-                Attribute(Shaders.AttributePosition, _positions, 3, GlApi.Float, false, 12, mesh.VertexStart);
-                Attribute(Shaders.AttributeNormal, _normals, 3, GlApi.Float, false, 12, mesh.NormalStart);
-                Attribute(Shaders.AttributeTexCoord, _texCoords, 2, GlApi.Float, false, 8, mesh.TexCoordStart);
-                Attribute(Shaders.AttributeColor, _colors, 4, GlApi.UnsignedByte, true, 4, mesh.ColorStart);
-
-                // Bones are numbers in bytes, weights fractions of 255; a mesh that is not skinned has none of either.
-                Attribute(Shaders.AttributeBoneIndices, _boneIndices, 4, GlApi.UnsignedByte, false, 4, skinStart[i], 0);
-                Attribute(Shaders.AttributeBoneWeights, _boneWeights, 4, GlApi.UnsignedByte, true, 4, skinStart[i], 0);
+                BindMeshAttributes(mesh, skinStart[i]);
 
                 // The index buffer binding belongs to the vertex array, so each one needs it; the data is
                 // uploaded once, below, through the last binding.
@@ -172,6 +170,92 @@ internal sealed class SceneGpuResources
         return buffer;
     }
 
+    /// <summary>Points the attributes of the bound vertex array at a mesh's ranges of the vertex streams.</summary>
+    private void BindMeshAttributes(in SceneMesh mesh, int skinStart)
+    {
+        Attribute(Shaders.AttributePosition, _positions, 3, GlApi.Float, false, 12, mesh.VertexStart);
+        Attribute(Shaders.AttributeNormal, _normals, 3, GlApi.Float, false, 12, mesh.NormalStart);
+        Attribute(Shaders.AttributeTexCoord, _texCoords, 2, GlApi.Float, false, 8, mesh.TexCoordStart);
+        Attribute(Shaders.AttributeColor, _colors, 4, GlApi.UnsignedByte, true, 4, mesh.ColorStart);
+
+        // Bones are numbers in bytes, weights fractions of 255; a mesh that is not skinned has none of either.
+        Attribute(Shaders.AttributeBoneIndices, _boneIndices, 4, GlApi.UnsignedByte, false, 4, skinStart, 0);
+        Attribute(Shaders.AttributeBoneWeights, _boneWeights, 4, GlApi.UnsignedByte, true, 4, skinStart, 0);
+    }
+
+    /// <summary>Bytes of edge indices held on the GPU.</summary>
+    public long WireBytes { get; private set; }
+
+    /// <summary>The vertex array that draws a mesh's edges (<see cref="WireEdges"/>), or 0 for none.</summary>
+    public int WireArray(int mesh) => (uint)mesh < (uint)_wireArrays.Length ? _wireArrays[mesh] : 0;
+
+    /// <summary>
+    /// Uploads every edge of the triangles: a vertex array per mesh over the mesh's vertex streams, with the
+    /// edges as its indices. The vertex streams must be on the GPU (<see cref="Upload"/>); the scene need not
+    /// hold its geometry any more.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The GPU refused the memory; no edges are left.</exception>
+    public void UploadWires(Scene scene, WireEdges wires)
+    {
+        ReleaseWires();
+        ReadOnlySpan<SceneMesh> meshes = scene.Meshes;
+        if (wires.Indices.IsEmpty || _vertexArrays.Length != meshes.Length)
+        {
+            return;
+        }
+
+        _gl.DrainErrors();
+        _wireIndices = _gl.GenBuffer();
+        _wireArrays = new int[meshes.Length];
+        for (int i = 0; i < meshes.Length; i++)
+        {
+            if (_vertexArrays[i] == 0 || meshes[i].Topology != SceneTopology.Triangles)
+            {
+                continue;
+            }
+
+            _wireArrays[i] = _gl.GenVertexArray();
+            _gl.BindVertexArray(_wireArrays[i]);
+            BindMeshAttributes(meshes[i], (uint)i < (uint)_skinStart.Length ? _skinStart[i] : -1);
+            _gl.BindBuffer(GlApi.ElementArrayBuffer, _wireIndices);
+        }
+
+        _gl.BufferData(GlApi.ElementArrayBuffer, wires.Indices);
+        WireBytes = wires.Indices.Length * 4L;
+        _gl.BindVertexArray(0);
+        _gl.BindBuffer(GlApi.ArrayBuffer, 0);
+
+        int error = _gl.DrainErrors();
+        if (error != GlApi.NoError)
+        {
+            ReleaseWires();
+            throw new InvalidOperationException(error == GlApi.OutOfMemory
+                ? "The GPU has no memory for the model's edges."
+                : $"Uploading the model's edges failed (OpenGL error 0x{error:X}).");
+        }
+    }
+
+    public void ReleaseWires()
+    {
+        _gl.BindVertexArray(0);
+        foreach (int vertexArray in _wireArrays)
+        {
+            if (vertexArray != 0)
+            {
+                _gl.DeleteVertexArray(vertexArray);
+            }
+        }
+
+        _wireArrays = [];
+        if (_wireIndices != 0)
+        {
+            _gl.DeleteBuffer(_wireIndices);
+        }
+
+        _wireIndices = 0;
+        WireBytes = 0;
+    }
+
     /// <summary>Points an attribute of the bound vertex array at a mesh's range of a stream, or switches it off.</summary>
     private void Attribute(int index, int buffer, int size, int type, bool normalized, int stride, int firstVertex, float absent = 1)
     {
@@ -190,6 +274,7 @@ internal sealed class SceneGpuResources
 
     public void Release()
     {
+        ReleaseWires();
         _gl.BindVertexArray(0);
         foreach (int vertexArray in _vertexArrays)
         {
@@ -205,6 +290,7 @@ internal sealed class SceneGpuResources
         _gl.DeleteBuffer(_boneIndices);
         _gl.DeleteBuffer(_boneWeights);
         _skinned = [];
+        _skinStart = [];
         _positions = _normals = _texCoords = _colors = _indices = _boneIndices = _boneWeights = 0;
         VertexBytes = IndexBytes = 0;
     }

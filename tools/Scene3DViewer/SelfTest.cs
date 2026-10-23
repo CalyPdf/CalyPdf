@@ -46,6 +46,34 @@ internal sealed class SelfTest
             return covered / (double)(width * height);
         }
 
+        /// <summary>Number of pixels whose colour passes a test in a part of the frame given in fractions of it.</summary>
+        public int CountWhereIn(double x0, double y0, double x1, double y1, Func<int, int, int, bool> test)
+        {
+            int count = 0;
+            for (int y = (int)(y0 * height); y < Math.Min(height, (int)(y1 * height)); y++)
+            {
+                for (int x = (int)(x0 * width); x < Math.Min(width, (int)(x1 * width)); x++)
+                {
+                    int at = (y * width + x) * 4;
+                    count += test(pixels[at], pixels[at + 1], pixels[at + 2]) ? 1 : 0;
+                }
+            }
+
+            return count;
+        }
+
+        /// <summary>Number of the frame's pixels whose colour passes a test.</summary>
+        public int CountWhere(Func<int, int, int, bool> test)
+        {
+            int count = 0;
+            for (int i = 0; i < pixels.Length; i += 4)
+            {
+                count += test(pixels[i], pixels[i + 1], pixels[i + 2]) ? 1 : 0;
+            }
+
+            return count;
+        }
+
         /// <summary>Number of the frame's pixels that are the given colour, to within a few levels.</summary>
         public int Count((int R, int G, int B) colour)
         {
@@ -126,7 +154,7 @@ internal sealed class SelfTest
 
     private void OnFrameRendered(object? sender, EventArgs e)
     {
-        if (_index < 0 || _index >= _cases.Count || _captureRequested || _control.Status != Scene3DStatus.Ready || _control.Statistics.TexturesPending > 0)
+        if (_index < 0 || _index >= _cases.Count || _captureRequested || _control.Status != Scene3DStatus.Ready || _control.Statistics.TexturesPending > 0 || _control.IsFindingEdges)
         {
             return;
         }
@@ -171,6 +199,29 @@ internal sealed class SelfTest
         Background = Background,
         Lighting = SceneLighting.Headlamp
     };
+
+    /// <summary><see cref="FrontView"/> drawing in a render mode with an edge colour.</summary>
+    private static SceneView OutlineView(Vector3 edgeColor, SceneRenderMode mode = SceneRenderMode.SolidOutline, Vector3? faceColor = null) => new()
+    {
+        Name = "front, outlined",
+        CameraToWorld = Matrix4x4.CreateTranslation(0, 0, 10),
+        OrbitDistance = 10,
+        Projection = new SceneViewProjection(SceneProjection.Orthographic, 0, SceneViewBinding.Height, 0.25f, null, null),
+        Background = Background,
+        Lighting = SceneLighting.Headlamp,
+        RenderMode = mode,
+        EdgeColor = edgeColor,
+        FaceColor = faceColor
+    };
+
+    private static bool Green(int r, int g, int b) => g >= 96 && g > r + 48 && g > b + 48;
+
+    /// <summary>Green pixels around the left side of the small square (x = −0.5) in "behind" scenes, away from both diagonals.</summary>
+    private static int BehindLeftSide(Frame frame)
+    {
+        double x = 0.5 - 0.125 * frame.Height / frame.Width, dx = 0.01 * frame.Height / frame.Width;
+        return frame.CountWhereIn(x - dx, 0.42, x + dx, 0.46, Green);
+    }
 
     private static int AddMaterial(SceneBuilder builder, Vector3 colour, float opacity = 1, bool lit = false, int texture = -1, Vector3 emissive = default)
     {
@@ -457,7 +508,91 @@ internal sealed class SelfTest
                     double size = Math.Max(3.0, frame.Height / 270.0);
                     checks.Near("white pixels of three points", frame.Count((255, 255, 255)), 3 * size * size, 3 * size * size * 0.7);
                     checks.Colour("between the points is background", frame.At(0.5, 0.3), BackgroundBytes);
-                })
+                }),
+
+            // A red square 2 units across in a view that draws silhouette edges in green: its four sides, the
+            // rim of an open sheet, are edges (about twice the frame's height in pixels); the diagonal between
+            // its two triangles, which lie in one plane, is not, and the centre it crosses stays red.
+            new Case("outline",
+                () => Build(b => AddSquare(b, 1, 0, AddMaterial(b, new Vector3(1, 0, 0)))),
+                OutlineView(new Vector3(0, 1, 0)), whole,
+                (frame, checks) =>
+                {
+                    int greenish = frame.CountWhere((r, g, b) => g >= 96 && g > r + 48 && g > b + 48);
+                    checks.Near("greenish pixels along the four sides", greenish, frame.Height * 2.0, frame.Height * 1.0);
+                    checks.Colour("the centre, on the diagonal", frame.At(0.5, 0.5), (255, 0, 0));
+                    checks.Colour("inside the square, off its sides", frame.At(0.5, 0.4), (255, 0, 0));
+                }),
+
+            // Wireframe: the square's four sides and its diagonal in green, nothing of its surface.
+            new Case("wireframe",
+                () => Build(b => AddSquare(b, 1, 0, AddMaterial(b, new Vector3(1, 0, 0)))),
+                OutlineView(new Vector3(0, 1, 0), SceneRenderMode.Wireframe), whole,
+                (frame, checks) =>
+                {
+                    double dx = 0.02 * frame.Height / frame.Width;
+                    checks.Report(frame.CountWhereIn(0.5 - dx, 0.48, 0.5 + dx, 0.52, Green) > 0, "the diagonal crosses the centre");
+                    checks.Colour("inside the square, off its edges", frame.At(0.5 - 0.1 * frame.Height / frame.Width, 0.4), BackgroundBytes);
+                    checks.Report(frame.CountWhere((r, _, _) => r > 128) == 0, "no red: the surface is not drawn");
+                }),
+
+            // A small square behind a big one: every edge in a wireframe, the small one's hidden in a hidden wireframe.
+            new Case("wireframe shows what is behind",
+                () => Build(b => { AddSquare(b, 1, 1, AddMaterial(b, new Vector3(1, 0, 0))); AddSquare(b, 0.5f, 0, AddMaterial(b, new Vector3(1, 0, 0))); }),
+                OutlineView(new Vector3(0, 1, 0), SceneRenderMode.Wireframe), whole,
+                (frame, checks) => checks.Report(BehindLeftSide(frame) > 0, "the small square's left side shows")),
+            new Case("hidden wireframe hides what is behind",
+                () => Build(b => { AddSquare(b, 1, 1, AddMaterial(b, new Vector3(1, 0, 0))); AddSquare(b, 0.5f, 0, AddMaterial(b, new Vector3(1, 0, 0))); }),
+                OutlineView(new Vector3(0, 1, 0), SceneRenderMode.HiddenWireframe), whole,
+                (frame, checks) =>
+                {
+                    checks.Report(BehindLeftSide(frame) == 0, "the small square's left side is hidden");
+                    checks.Colour("the big square's surface writes no colour", frame.At(0.5 - 0.1 * frame.Height / frame.Width, 0.4), BackgroundBytes);
+                }),
+
+            // Vertices: the square's four corners, a few pixels each, and nothing between them.
+            new Case("vertices",
+                () => Build(b => AddSquare(b, 0.9f, 0, AddMaterial(b, new Vector3(1, 0, 0)))),
+                OutlineView(new Vector3(0, 1, 0), SceneRenderMode.Vertices), whole,
+                (frame, checks) =>
+                {
+                    double size = Math.Max(2.0, frame.Height / 540.0);
+                    checks.Near("green pixels of four points", frame.CountWhere(Green), 4 * size * size, 4 * size * size * 0.8);
+                    checks.Colour("the centre", frame.At(0.5, 0.5), BackgroundBytes);
+                }),
+
+            // The box of a flat square is the square: its rim in green, its inside empty.
+            new Case("bounding box",
+                () => Build(b => AddSquare(b, 1, 0, AddMaterial(b, new Vector3(1, 0, 0)))),
+                OutlineView(new Vector3(0, 1, 0), SceneRenderMode.BoundingBox), whole,
+                (frame, checks) =>
+                {
+                    checks.Near("green pixels along the four sides", frame.CountWhere(Green), frame.Height * 2.0, frame.Height * 1.0);
+                    checks.Colour("the centre", frame.At(0.5, 0.5), BackgroundBytes);
+                }),
+
+            // Transparent: the opaque red square at the added opacity of 0.5, over the background.
+            new Case("transparent",
+                () => Build(b => AddSquare(b, 1, 0, AddMaterial(b, new Vector3(1, 0, 0)))),
+                OutlineView(new Vector3(0, 1, 0), SceneRenderMode.Transparent), whole,
+                (frame, checks) => checks.Colour("red half over the background", frame.At(0.5, 0.4), ((255 + BackgroundBytes.Item1) / 2, BackgroundBytes.Item2 / 2, BackgroundBytes.Item3 / 2), 3)),
+
+            // Illustration: the surface all in the face colour, unlit, its rim in the edge colour.
+            new Case("illustration",
+                () => Build(b => AddSquare(b, 1, 0, AddMaterial(b, new Vector3(1, 0, 0), lit: true))),
+                OutlineView(new Vector3(0, 1, 0), SceneRenderMode.Illustration, new Vector3(1, 1, 0)), whole,
+                (frame, checks) =>
+                {
+                    checks.Colour("the face colour", frame.At(0.5, 0.4), (255, 255, 0));
+                    // Over yellow, a pixel the edge half covers is still greenish: only the edge's own pixels are counted.
+                    checks.Near("green pixels along the four sides", frame.CountWhere((r, g, _) => r < 64 && g > 192), frame.Height * 2.0, frame.Height * 1.0);
+                }),
+
+            // The same square and edge colour in a solid view: no edges.
+            new Case("no outline when solid",
+                () => Build(b => AddSquare(b, 1, 0, AddMaterial(b, new Vector3(1, 0, 0)))),
+                OutlineView(new Vector3(0, 1, 0), SceneRenderMode.Solid), whole,
+                (frame, checks) => checks.Report(frame.CountWhere((r, g, b) => g >= 96 && g > r + 48 && g > b + 48) == 0, "no green pixel"))
         ];
     }
 }

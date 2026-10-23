@@ -22,6 +22,9 @@ internal struct FrameSetup
     /// <summary>The viewer's changes to lights and materials; null for none.</summary>
     public Scene3DShading? Shading;
 
+    /// <summary>The render mode to draw in (the view's, or the host's choice).</summary>
+    public SceneRenderMode RenderMode;
+
     /// <summary>Background colour, not premultiplied; alpha 0 leaves what is behind the control visible.</summary>
     public Vector4 Background;
 
@@ -59,6 +62,57 @@ internal sealed class SceneRenderer
     private readonly float[] _lightAttenuations = new float[LightRigs.MaxLights * 3];
     private readonly float[] _lightSpots = new float[LightRigs.MaxLights * 4];
     private readonly float[] _normalMatrix = new float[9];
+
+    // The silhouette edges of the render modes that draw them, and the program that draws them.
+    private readonly OutlineGpuResources _outlines;
+    private readonly int _outlineProgram;
+    private readonly int _uOutlineModelView, _uOutlineProjection, _uOutlineNormalMatrix, _uOutlineCrease, _uOutlineOrthographic, _uOutlineColor;
+
+    // Which nodes' edges (or boxes) a pass has drawn: a node's mesh has several draw items, one per material.
+    private int[] _outlineDrawnInFrame = [];
+    private int _outlineFrame;
+
+    // Every edge of each part, for the wireframe render modes: where each part's begin in the edge indices.
+    private int[] _wireFirst = [], _wireCount = [];
+
+    // A unit cube, for the bounding-box render modes: its edges and its faces.
+    private readonly int _boxVertices, _boxLineIndices, _boxFaceIndices, _boxLines, _boxFaces;
+
+    // What a render mode changes in the materials for the pass being drawn.
+    private MaterialOverride _override = MaterialOverride.None;
+
+    private struct MaterialOverride
+    {
+        /// <summary>Paint everything in <see cref="Color"/>, untextured; unlit unless <see cref="ColorLit"/>.</summary>
+        public bool UseColor;
+        public Vector3 Color;
+
+        /// <summary>Light the one colour, shading each face by how it turns to the lights.</summary>
+        public bool ColorLit;
+
+        /// <summary>Multiplies every opacity.</summary>
+        public float OpacityFactor;
+
+        /// <summary>A share of each surface's colour added as emitted light.</summary>
+        public float AddedEmissive;
+
+        /// <summary>Light line segments and points as surfaces are (the shaded wireframe and vertices).</summary>
+        public bool LightMarks;
+
+        public static MaterialOverride None => new() { OpacityFactor = 1 };
+    }
+
+    private enum Shape
+    {
+        /// <summary>The item's own primitives: triangles, line segments or points.</summary>
+        Primitives,
+
+        /// <summary>Every edge of the item's triangles.</summary>
+        Edges,
+
+        /// <summary>The item's vertices.</summary>
+        Points
+    }
 
     /// <summary>
     /// Texture rows are stored top first, and the formats measure V from the bottom of the image: V is
@@ -116,6 +170,69 @@ internal sealed class SceneRenderer
         _uLightSpot = gl.GetUniformLocation(_program, "uLightSpot");
         _uSkinOffset = gl.GetUniformLocation(_program, "uSkinOffset");
         _uBones = gl.GetUniformLocation(_program, "uBones");
+
+        _outlines = new OutlineGpuResources(gl);
+        _outlineProgram = gl.CreateProgram(header + Shaders.OutlineVertex, header + Shaders.OutlineFragment, Shaders.OutlineAttributes);
+        _uOutlineModelView = gl.GetUniformLocation(_outlineProgram, "uModelView");
+        _uOutlineProjection = gl.GetUniformLocation(_outlineProgram, "uProjection");
+        _uOutlineNormalMatrix = gl.GetUniformLocation(_outlineProgram, "uNormalMatrix");
+        _uOutlineCrease = gl.GetUniformLocation(_outlineProgram, "uCreaseCosine");
+        _uOutlineOrthographic = gl.GetUniformLocation(_outlineProgram, "uOrthographic");
+        _uOutlineColor = gl.GetUniformLocation(_outlineProgram, "uColor");
+
+        // The unit cube of the bounding-box render modes, drawn with the main program: positions only.
+        _boxVertices = gl.GenBuffer();
+        gl.BindBuffer(GlApi.ArrayBuffer, _boxVertices);
+        gl.BufferData(GlApi.ArrayBuffer, (ReadOnlySpan<float>)[0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1]);
+        _boxLineIndices = gl.GenBuffer();
+        _boxFaceIndices = gl.GenBuffer();
+        _boxLines = BoxArray(_boxLineIndices, [0, 1, 1, 2, 2, 3, 3, 0, 4, 5, 5, 6, 6, 7, 7, 4, 0, 4, 1, 5, 2, 6, 3, 7]);
+        _boxFaces = BoxArray(_boxFaceIndices, [0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 2, 3, 7, 2, 7, 6, 1, 2, 6, 1, 6, 5, 3, 0, 4, 3, 4, 7]);
+        gl.BindBuffer(GlApi.ArrayBuffer, 0);
+
+        int BoxArray(int indexBuffer, ReadOnlySpan<uint> indices)
+        {
+            int vertexArray = gl.GenVertexArray();
+            gl.BindVertexArray(vertexArray);
+            gl.BindBuffer(GlApi.ArrayBuffer, _boxVertices);
+            gl.VertexAttribPointer(Shaders.AttributePosition, 3, GlApi.Float, false, 12, 0);
+            gl.EnableVertexAttribArray(Shaders.AttributePosition);
+            for (int attribute = 1; attribute < Shaders.Attributes.Length; attribute++)
+            {
+                gl.DisableVertexAttribArray(attribute);
+            }
+
+            gl.BindBuffer(GlApi.ElementArrayBuffer, indexBuffer);
+            gl.BufferData(GlApi.ElementArrayBuffer, indices);
+            gl.BindVertexArray(0);
+            return vertexArray;
+        }
+    }
+
+    /// <summary>Whether the scene's edges are on the GPU, for the render modes that draw them.</summary>
+    public bool HasEdges => _outlines.IsLoaded || _resources.WireBytes > 0;
+
+    /// <summary>Bytes of edges on the GPU: silhouette edges and every edge.</summary>
+    public long EdgeBytes => _outlines.Bytes + _resources.WireBytes;
+
+    /// <summary>Uploads the edges of the scene being drawn: silhouette edges and every edge.</summary>
+    /// <exception cref="InvalidOperationException">The GPU refused the memory; there are no edges.</exception>
+    public void SetEdges(OutlineEdges outlines, WireEdges wires)
+    {
+        if (_scene is not { } scene)
+        {
+            return;
+        }
+
+        _outlines.Upload(outlines, scene.Meshes.Length);
+        _resources.UploadWires(scene, wires);
+        _wireFirst = new int[scene.Parts.Length];
+        _wireCount = new int[scene.Parts.Length];
+        for (int part = 0; part < _wireFirst.Length; part++)
+        {
+            _wireFirst[part] = wires.First(part);
+            _wireCount[part] = wires.Count(part);
+        }
     }
 
     public GlApi Gl => _gl;
@@ -157,6 +274,8 @@ internal sealed class SceneRenderer
     {
         _scene = null;
         ReleaseTextures();
+        _outlines.Release();
+        _wireFirst = _wireCount = [];
         _resources.Upload(scene);
         _scene = scene;
         _drawListStale = true;
@@ -193,6 +312,8 @@ internal sealed class SceneRenderer
         _scene = null;
         ReleaseTextures();
         _resources.Release();
+        _outlines.Release();
+        _wireFirst = _wireCount = [];
         _drawListStale = true;
     }
 
@@ -367,48 +488,325 @@ internal sealed class SceneRenderer
         _shading = setup.Shading ?? Scene3DShading.AsAuthored;
         SetLights(scene, setup.View?.Lighting ?? SceneLighting.Artwork, view);
 
-        var state = new DrawState { Mesh = -1, Material = int.MinValue, Opacity = float.NaN, SkinOffset = -1, Orthographic = setup.Projection.Kind == SceneProjection.Orthographic };
-        foreach (ref readonly DrawItem item in _drawList.Opaque)
+        var state = new DrawState { VertexArray = -1, Material = int.MinValue, Opacity = float.NaN, SkinOffset = -1, Orthographic = setup.Projection.Kind == SceneProjection.Orthographic };
+
+        RenderModePlan plan = RenderModePlan.For(setup.RenderMode);
+        Vector3 edgeColor = Sanitize(setup.View?.EdgeColor ?? Vector3.Zero);
+        Vector3 faceColor = Sanitize(setup.View?.FaceColor ?? new Vector3(setup.Background.X, setup.Background.Y, setup.Background.Z));
+        float addedOpacity = Unit(setup.View?.Opacity ?? 0.5f, 0.5f);
+        bool silhouettes = plan.Silhouettes && _outlines.IsLoaded;
+        bool edges = plan.Edges != MarkPass.None && _resources.WireBytes > 0;
+
+        // Edges lie on the surfaces they bound: the surfaces are pushed back a little in depth, so that the
+        // edges drawn after them are not half hidden by them.
+        bool offset = plan.Surfaces != SurfacePass.None && (silhouettes || edges);
+        if (offset)
         {
-            DrawOne(scene, item, view, ref state);
+            gl.Enable(GlApi.PolygonOffsetFill);
+            gl.PolygonOffset(1, 1);
         }
 
-        if (!_drawList.Transparent.IsEmpty)
+        switch (plan.Surfaces)
         {
-            // Premultiplied colours over what is there; depth is tested but not written, so that one
-            // transparent surface does not hide another behind it. Within a mesh the triangles would blend in
-            // index order, so a closed shell (a bulb of glass) shows its near wall under its far wall in
-            // patches: each mesh is drawn back faces first, then front faces, and a triangle is in one of the two.
+            case SurfacePass.Lit:
+                _override = MaterialOverride.None with { AddedEmissive = plan.AddedEmissive };
+                DrawSurfaces(scene, view, ref state, allTransparent: false);
+                break;
+            case SurfacePass.Transparent:
+                _override = MaterialOverride.None with { OpacityFactor = addedOpacity };
+                DrawSurfaces(scene, view, ref state, allTransparent: true);
+                break;
+            case SurfacePass.Flat:
+                _override = MaterialOverride.None with { UseColor = true, Color = faceColor };
+                DrawSurfaces(scene, view, ref state, allTransparent: false);
+                break;
+            case SurfacePass.DepthOnly:
+                // Only to hide what is behind: no colour is written.
+                _override = MaterialOverride.None;
+                gl.ColorMask(false);
+                DrawSurfaces(scene, view, ref state, allTransparent: false, depthOnly: true);
+                gl.ColorMask(true);
+                break;
+        }
+
+        if (offset)
+        {
+            gl.Disable(GlApi.PolygonOffsetFill);
+        }
+
+        if (edges)
+        {
+            _override = plan.Edges == MarkPass.Flat ? MaterialOverride.None with { UseColor = true, Color = edgeColor } : MaterialOverride.None with { LightMarks = true };
+            state.Material = int.MinValue;
+            DrawMarks(scene, view, ref state, Shape.Edges);
+        }
+
+        if (plan.Points != MarkPass.None)
+        {
+            _override = plan.Points == MarkPass.Flat ? MaterialOverride.None with { UseColor = true, Color = edgeColor } : MaterialOverride.None with { LightMarks = true };
+            state.Material = int.MinValue;
+
+            // Every vertex of a model is many more points than a point set has: half their size.
+            gl.Uniform(_uPointSize, MathF.Max(2f, pixelHeight / 540f));
+            DrawMarks(scene, view, ref state, Shape.Points);
+            gl.Uniform(_uPointSize, MathF.Max(3f, pixelHeight / 270f));
+        }
+
+        if (plan.BoxFaces)
+        {
+            // Lit, so that faces in the background colour (the default) still show as the box they make.
+            _override = MaterialOverride.None with { UseColor = true, Color = faceColor, ColorLit = true, OpacityFactor = addedOpacity };
+            state.Material = int.MinValue;
             gl.Enable(GlApi.Blend);
             gl.BlendFuncSeparate(GlApi.One, GlApi.OneMinusSrcAlpha, GlApi.One, GlApi.OneMinusSrcAlpha);
             gl.DepthMask(false);
-            foreach (ref readonly DrawItem item in _drawList.Transparent)
-            {
-                if (scene.Meshes[item.Mesh].Topology != SceneTopology.Triangles)
-                {
-                    DrawOne(scene, item, view, ref state);
-                    continue;
-                }
-
-                gl.Enable(GlApi.CullFace);
-                gl.CullFaces(GlApi.Front);
-                DrawOne(scene, item, view, ref state, countTriangles: false);
-                gl.CullFaces(GlApi.Back);
-                DrawOne(scene, item, view, ref state);
-            }
-
-            gl.Disable(GlApi.CullFace);
+            DrawBoxes(scene, view, ref state, faces: true);
             gl.DepthMask(true);
             gl.Disable(GlApi.Blend);
+        }
+
+        if (plan.BoxEdges)
+        {
+            _override = MaterialOverride.None with { UseColor = true, Color = edgeColor };
+            state.Material = int.MinValue;
+            DrawBoxes(scene, view, ref state, faces: false);
+        }
+
+        _override = MaterialOverride.None;
+        if (silhouettes)
+        {
+            DrawOutlines(scene, setup, view, projection);
         }
 
         gl.BindVertexArray(0);
         gl.UseProgram(0);
     }
 
+    /// <summary>
+    /// The silhouette edges of every node drawn, over the surfaces, hidden where surfaces are in front:
+    /// each node's once, though its mesh has a draw item per material.
+    /// </summary>
+    private void DrawOutlines(Scene scene, in FrameSetup setup, in Matrix4x4 view, in Matrix4x4 projection)
+    {
+        GlApi gl = _gl;
+        gl.UseProgram(_outlineProgram);
+        gl.UniformMatrix(_uOutlineProjection, projection);
+        gl.Uniform(_uOutlineCrease, OutlineEdges.CreaseCosine(setup.View?.CreaseAngle ?? 45));
+        gl.Uniform(_uOutlineOrthographic, setup.Projection.Kind == SceneProjection.Orthographic ? 1 : 0);
+        gl.Uniform(_uOutlineColor, Sanitize(setup.View?.EdgeColor ?? Vector3.Zero));
+
+        StartNodePass(scene);
+        DrawOutlinesOf(_drawList.Opaque, view);
+        DrawOutlinesOf(_drawList.Transparent, view);
+    }
+
+    private void DrawOutlinesOf(ReadOnlySpan<DrawItem> items, in Matrix4x4 view)
+    {
+        GlApi gl = _gl;
+        foreach (ref readonly DrawItem item in items)
+        {
+            int vertexArray = _outlines.VertexArray(item.Mesh);
+            if (vertexArray == 0)
+            {
+                continue;
+            }
+
+            if (!FirstOfNode(item.Node))
+            {
+                continue;
+            }
+
+            Matrix4x4 modelView = item.World * view;
+            gl.UniformMatrix(_uOutlineModelView, modelView);
+            NormalMatrix(modelView, _normalMatrix);
+            gl.UniformMatrix3(_uOutlineNormalMatrix, _normalMatrix);
+            gl.BindVertexArray(vertexArray);
+            gl.DrawArrays(GlApi.Lines, 0, _outlines.Count(item.Mesh));
+            LastDrawCalls++;
+        }
+    }
+
+    /// <summary>The matrix normals go by: the inverse transpose, which differs from the matrix itself under uneven scaling.</summary>
+    private static void NormalMatrix(in Matrix4x4 modelView, Span<float> n)
+    {
+        if (Matrix4x4.Invert(modelView, out Matrix4x4 inverse))
+        {
+            n[0] = inverse.M11; n[1] = inverse.M21; n[2] = inverse.M31;
+            n[3] = inverse.M12; n[4] = inverse.M22; n[5] = inverse.M32;
+            n[6] = inverse.M13; n[7] = inverse.M23; n[8] = inverse.M33;
+        }
+        else
+        {
+            n[0] = modelView.M11; n[1] = modelView.M12; n[2] = modelView.M13;
+            n[3] = modelView.M21; n[4] = modelView.M22; n[5] = modelView.M23;
+            n[6] = modelView.M31; n[7] = modelView.M32; n[8] = modelView.M33;
+        }
+    }
+
+    /// <summary>
+    /// The surfaces: opaque items, then transparent ones blended back to front. With
+    /// <paramref name="allTransparent"/> every item is blended (the transparent render modes); with
+    /// <paramref name="depthOnly"/> nothing is blended, as no colour is written.
+    /// </summary>
+    private void DrawSurfaces(Scene scene, in Matrix4x4 view, ref DrawState state, bool allTransparent, bool depthOnly = false)
+    {
+        GlApi gl = _gl;
+        state.Material = int.MinValue;
+        if (!allTransparent)
+        {
+            foreach (ref readonly DrawItem item in _drawList.Opaque)
+            {
+                DrawOne(scene, item, view, ref state);
+            }
+        }
+
+        if (_drawList.Transparent.IsEmpty && !allTransparent)
+        {
+            return;
+        }
+
+        // Premultiplied colours over what is there; depth is tested but not written, so that one
+        // transparent surface does not hide another behind it. Within a mesh the triangles would blend in
+        // index order, so a closed shell (a bulb of glass) shows its near wall under its far wall in
+        // patches: each mesh is drawn back faces first, then front faces, and a triangle is in one of the two.
+        if (!depthOnly)
+        {
+            gl.Enable(GlApi.Blend);
+            gl.BlendFuncSeparate(GlApi.One, GlApi.OneMinusSrcAlpha, GlApi.One, GlApi.OneMinusSrcAlpha);
+            gl.DepthMask(false);
+        }
+
+        if (allTransparent)
+        {
+            DrawBlended(scene, _drawList.Opaque, view, ref state);
+        }
+
+        DrawBlended(scene, _drawList.Transparent, view, ref state);
+        gl.Disable(GlApi.CullFace);
+        gl.DepthMask(true);
+        gl.Disable(GlApi.Blend);
+    }
+
+    private void DrawBlended(Scene scene, ReadOnlySpan<DrawItem> items, in Matrix4x4 view, ref DrawState state)
+    {
+        GlApi gl = _gl;
+        foreach (ref readonly DrawItem item in items)
+        {
+            if (scene.Meshes[item.Mesh].Topology != SceneTopology.Triangles)
+            {
+                gl.Disable(GlApi.CullFace);
+                DrawOne(scene, item, view, ref state);
+                continue;
+            }
+
+            gl.Enable(GlApi.CullFace);
+            gl.CullFaces(GlApi.Front);
+            DrawOne(scene, item, view, ref state, countTriangles: false);
+            gl.CullFaces(GlApi.Back);
+            DrawOne(scene, item, view, ref state);
+        }
+    }
+
+    /// <summary>Every edge, or every vertex, of every item; line segments and points are drawn as they are.</summary>
+    private void DrawMarks(Scene scene, in Matrix4x4 view, ref DrawState state, Shape shape)
+    {
+        foreach (ref readonly DrawItem item in _drawList.Opaque)
+        {
+            DrawOne(scene, item, view, ref state, shape: shape);
+        }
+
+        foreach (ref readonly DrawItem item in _drawList.Transparent)
+        {
+            DrawOne(scene, item, view, ref state, shape: shape);
+        }
+    }
+
+    /// <summary>The box of each node drawn, around its mesh as the mesh's own coordinates bound it: edges or faces.</summary>
+    private void DrawBoxes(Scene scene, in Matrix4x4 view, ref DrawState state, bool faces)
+    {
+        GlApi gl = _gl;
+        gl.BindVertexArray(faces ? _boxFaces : _boxLines);
+        state.VertexArray = -1;
+        if (state.SkinOffset != -1)
+        {
+            gl.Uniform(_uSkinOffset, -1);
+            state.SkinOffset = -1;
+        }
+
+        StartNodePass(scene);
+        DrawBoxesOf(scene, _drawList.Opaque, view, ref state, faces);
+        DrawBoxesOf(scene, _drawList.Transparent, view, ref state, faces);
+    }
+
+    private void DrawBoxesOf(Scene scene, ReadOnlySpan<DrawItem> items, in Matrix4x4 view, ref DrawState state, bool faces)
+    {
+        GlApi gl = _gl;
+        foreach (ref readonly DrawItem item in items)
+        {
+            if (!FirstOfNode(item.Node))
+            {
+                continue;
+            }
+
+            SceneBounds bounds = scene.Meshes[item.Mesh].Bounds;
+            if (bounds.IsEmpty)
+            {
+                continue;
+            }
+
+            if (item.Material != state.Material)
+            {
+                SetMaterial(scene, item.Material, item.Opacity, SceneMeshFlags.None, state.Orthographic, lit: false);
+                state.Material = item.Material;
+                state.Opacity = item.Opacity;
+            }
+
+            // A flat box (a sheet) still gets a little depth, so that its faces and edges are drawn.
+            Vector3 size = Vector3.Max(bounds.Max - bounds.Min, new Vector3(1e-6f));
+            Matrix4x4 modelView = Matrix4x4.CreateScale(size) * Matrix4x4.CreateTranslation(bounds.Min) * item.World * view;
+            gl.UniformMatrix(_uModelView, modelView);
+            NormalMatrix(modelView, _normalMatrix);
+            gl.UniformMatrix3(_uNormalMatrix, _normalMatrix);
+            gl.DrawElements(faces ? GlApi.Triangles : GlApi.Lines, faces ? 36 : 24, GlApi.UnsignedInt, 0);
+            LastDrawCalls++;
+        }
+    }
+
+    /// <summary>Starts a pass that draws something once per node.</summary>
+    private void StartNodePass(Scene scene)
+    {
+        if (_outlineDrawnInFrame.Length < scene.Nodes.Length)
+        {
+            _outlineDrawnInFrame = new int[scene.Nodes.Length];
+        }
+
+        if (++_outlineFrame == int.MaxValue)
+        {
+            Array.Clear(_outlineDrawnInFrame);
+            _outlineFrame = 1;
+        }
+    }
+
+    /// <summary>Whether this is the pass's first item of its node, and marks the node done.</summary>
+    private bool FirstOfNode(int node)
+    {
+        if ((uint)node >= (uint)_outlineDrawnInFrame.Length)
+        {
+            return true;
+        }
+
+        if (_outlineDrawnInFrame[node] == _outlineFrame)
+        {
+            return false;
+        }
+
+        _outlineDrawnInFrame[node] = _outlineFrame;
+        return true;
+    }
+
     private struct DrawState
     {
-        public int Mesh;
+        public int VertexArray;
         public int Material;
         public float Opacity;
         public SceneMeshFlags MeshFlags;
@@ -456,28 +854,45 @@ internal sealed class SceneRenderer
         _gl.ActiveTexture(GlApi.Texture0);
     }
 
-    private void DrawOne(Scene scene, in DrawItem item, in Matrix4x4 view, ref DrawState state, bool countTriangles = true)
+    private void DrawOne(Scene scene, in DrawItem item, in Matrix4x4 view, ref DrawState state, bool countTriangles = true, Shape shape = Shape.Primitives)
     {
         GlApi gl = _gl;
-        bool meshChanged = item.Mesh != state.Mesh;
-        if (meshChanged)
-        {
-            int vertexArray = _resources.VertexArray(item.Mesh);
-            if (vertexArray == 0)
-            {
-                return;
-            }
+        SceneTopology topology = scene.Meshes[item.Mesh].Topology;
 
+        // Every edge of a mesh of line segments or points is the mesh itself.
+        if (shape == Shape.Edges && topology != SceneTopology.Triangles)
+        {
+            shape = Shape.Primitives;
+        }
+
+        int vertexArray = shape == Shape.Edges ? _resources.WireArray(item.Mesh) : _resources.VertexArray(item.Mesh);
+        int first = item.IndexStart, count = item.IndexCount;
+        if (shape == Shape.Edges)
+        {
+            first = (uint)item.Part < (uint)_wireFirst.Length ? _wireFirst[item.Part] : 0;
+            count = (uint)item.Part < (uint)_wireCount.Length ? _wireCount[item.Part] : 0;
+        }
+
+        if (vertexArray == 0 || count == 0)
+        {
+            return;
+        }
+
+        if (vertexArray != state.VertexArray)
+        {
             gl.BindVertexArray(vertexArray);
-            state.Mesh = item.Mesh;
+            state.VertexArray = vertexArray;
         }
 
         SceneMeshFlags meshFlags = scene.Meshes[item.Mesh].Flags;
-        SceneTopology topology = scene.Meshes[item.Mesh].Topology;
-        if (item.Material != state.Material || item.Opacity != state.Opacity || meshFlags != state.MeshFlags || topology != state.Topology)
+        SceneTopology drawn = shape switch { Shape.Edges => SceneTopology.Lines, Shape.Points => SceneTopology.Points, _ => topology };
+        if (item.Material != state.Material || item.Opacity != state.Opacity || meshFlags != state.MeshFlags || drawn != state.Topology)
         {
-            // Line segments and points have no surface for light to fall on: they are drawn in their colour.
-            SetMaterial(scene, item.Material, item.Opacity, meshFlags, state.Orthographic, lit: topology == SceneTopology.Triangles);
+            // Line segments and points have no surface for light to fall on: they are drawn in their colour,
+            // unless the render mode lights them as the surfaces they come from (shaded wireframe and vertices).
+            bool lit = drawn == SceneTopology.Triangles || (_override.LightMarks && topology == SceneTopology.Triangles);
+            topology = drawn;
+            SetMaterial(scene, item.Material, item.Opacity, meshFlags, state.Orthographic, lit: lit);
             state.Material = item.Material;
             state.Opacity = item.Opacity;
             state.MeshFlags = meshFlags;
@@ -495,26 +910,12 @@ internal sealed class SceneRenderer
         Matrix4x4 modelView = item.World * view;
         gl.UniformMatrix(_uModelView, modelView);
 
-        // Normals go by the inverse transpose, which differs from the matrix itself under uneven scaling.
-        Span<float> n = _normalMatrix;
-        if (Matrix4x4.Invert(modelView, out Matrix4x4 inverse))
-        {
-            n[0] = inverse.M11; n[1] = inverse.M21; n[2] = inverse.M31;
-            n[3] = inverse.M12; n[4] = inverse.M22; n[5] = inverse.M32;
-            n[6] = inverse.M13; n[7] = inverse.M23; n[8] = inverse.M33;
-        }
-        else
-        {
-            n[0] = modelView.M11; n[1] = modelView.M12; n[2] = modelView.M13;
-            n[3] = modelView.M21; n[4] = modelView.M22; n[5] = modelView.M23;
-            n[6] = modelView.M31; n[7] = modelView.M32; n[8] = modelView.M33;
-        }
-
-        gl.UniformMatrix3(_uNormalMatrix, n);
-        int mode = topology switch { SceneTopology.Lines => GlApi.Lines, SceneTopology.Points => GlApi.Points, _ => GlApi.Triangles };
-        gl.DrawElements(mode, item.IndexCount, GlApi.UnsignedInt, (nint)item.IndexStart * 4);
+        NormalMatrix(modelView, _normalMatrix);
+        gl.UniformMatrix3(_uNormalMatrix, _normalMatrix);
+        int mode = drawn switch { SceneTopology.Lines => GlApi.Lines, SceneTopology.Points => GlApi.Points, _ => GlApi.Triangles };
+        gl.DrawElements(mode, count, GlApi.UnsignedInt, (nint)first * 4);
         LastDrawCalls++;
-        LastTriangles += countTriangles && topology == SceneTopology.Triangles ? item.IndexCount / 3 : 0;
+        LastTriangles += countTriangles && drawn == SceneTopology.Triangles ? count / 3 : 0;
     }
 
     private void SetMaterial(Scene scene, int materialIndex, float nodeOpacity, SceneMeshFlags meshFlags, bool orthographic, bool lit = true)
@@ -529,6 +930,20 @@ internal sealed class SceneRenderer
         // What light picks out is the diffuse colour. A material with none (the format's default has only
         // an ambient colour) would be black under any light; its ambient colour stands in.
         Vector3 diffuse = _shading.Diffuse(material.Diffuse == Vector3.Zero ? material.Ambient : material.Diffuse);
+        float opacity = Unit(material.Opacity, 1) * nodeOpacity * Unit(_override.OpacityFactor, 1);
+
+        // A render mode that paints in one colour (edges, points, boxes, illustrated surfaces): unlit, untextured.
+        if (_override.UseColor)
+        {
+            gl.Uniform(_uFlags, (orthographic ? Shaders.FlagOrthographic : 0) | (_override.ColorLit ? Shaders.FlagLit : 0));
+            gl.Uniform(_uDiffuse, _override.Color);
+            gl.Uniform(_uSpecular, Vector3.Zero);
+            gl.Uniform(_uEmissive, Vector3.Zero);
+            gl.Uniform(_uOpacity, opacity);
+            gl.Uniform(_uShininess, 1f);
+            gl.Uniform(_uAlphaCutoff, 0.5f);
+            return;
+        }
 
         int flags = orthographic ? Shaders.FlagOrthographic : 0;
         flags |= lit && (material.Flags & SceneMaterialFlags.Lit) != 0 ? Shaders.FlagLit : 0;
@@ -551,8 +966,8 @@ internal sealed class SceneRenderer
         gl.Uniform(_uFlags, flags);
         gl.Uniform(_uDiffuse, Sanitize(diffuse));
         gl.Uniform(_uSpecular, Sanitize(_shading.Specular(material.Specular)));
-        gl.Uniform(_uEmissive, Sanitize(material.Emissive));
-        gl.Uniform(_uOpacity, Unit(material.Opacity, 1) * nodeOpacity);
+        gl.Uniform(_uEmissive, Sanitize(material.Emissive + diffuse * _override.AddedEmissive));
+        gl.Uniform(_uOpacity, opacity);
         gl.Uniform(_uShininess, _shading.Exponent(material.Reflectivity));
         gl.Uniform(_uAlphaCutoff, Unit(material.AlphaReference, 0.5f));
     }
@@ -604,10 +1019,17 @@ internal sealed class SceneRenderer
         ReleaseTextures();
         _streamer.Dispose();
         _resources.Release();
+        _outlines.Release();
         _targets.Release();
         _gl.DeleteTexture(_boneTexture);
         _boneTexture = 0;
         _gl.DeleteProgram(_program);
+        _gl.DeleteProgram(_outlineProgram);
+        _gl.DeleteVertexArray(_boxLines);
+        _gl.DeleteVertexArray(_boxFaces);
+        _gl.DeleteBuffer(_boxVertices);
+        _gl.DeleteBuffer(_boxLineIndices);
+        _gl.DeleteBuffer(_boxFaceIndices);
     }
 
     /// <summary>

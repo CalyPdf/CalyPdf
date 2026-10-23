@@ -88,9 +88,34 @@ public static class Artwork3DViewConverter
             Projection = projection,
             Background = view.Background is { } background ? new Vector3((float)background.Color.R, (float)background.Color.G, (float)background.Color.B) : null,
             Lighting = ToLighting(view.LightingScheme?.Style ?? Artwork3DLightingStyle.Artwork),
+            RenderMode = ToRenderMode(view.RenderMode?.Type ?? Artwork3DRenderModeType.Solid),
+            EdgeColor = view.RenderMode?.AuxiliaryColor is { } edge ? new Vector3((float)edge.R, (float)edge.G, (float)edge.B) : Vector3.Zero,
+            CreaseAngle = view.RenderMode?.CreaseValue is { } crease && double.IsFinite(crease) ? (float)crease : 45,
+            FaceColor = view.RenderMode is { FaceColorIsBackground: false, FaceColor: { } face } ? new Vector3((float)face.R, (float)face.G, (float)face.B) : null,
+            Opacity = view.RenderMode?.Opacity is { } opacity && double.IsFinite(opacity) ? (float)Math.Clamp(opacity, 0, 1) : 0.5f,
             NodeOverrides = overrides
         };
     }
+
+    /// <summary>The render mode a PDF render mode names; one PDF does not know (or none) is solid.</summary>
+    public static SceneRenderMode ToRenderMode(Artwork3DRenderModeType type) => type switch
+    {
+        Artwork3DRenderModeType.SolidWireframe => SceneRenderMode.SolidWireframe,
+        Artwork3DRenderModeType.Transparent => SceneRenderMode.Transparent,
+        Artwork3DRenderModeType.TransparentWireframe => SceneRenderMode.TransparentWireframe,
+        Artwork3DRenderModeType.BoundingBox => SceneRenderMode.BoundingBox,
+        Artwork3DRenderModeType.TransparentBoundingBox => SceneRenderMode.TransparentBoundingBox,
+        Artwork3DRenderModeType.TransparentBoundingBoxOutline => SceneRenderMode.TransparentBoundingBoxOutline,
+        Artwork3DRenderModeType.Wireframe => SceneRenderMode.Wireframe,
+        Artwork3DRenderModeType.ShadedWireframe => SceneRenderMode.ShadedWireframe,
+        Artwork3DRenderModeType.HiddenWireframe => SceneRenderMode.HiddenWireframe,
+        Artwork3DRenderModeType.Vertices => SceneRenderMode.Vertices,
+        Artwork3DRenderModeType.ShadedVertices => SceneRenderMode.ShadedVertices,
+        Artwork3DRenderModeType.Illustration => SceneRenderMode.Illustration,
+        Artwork3DRenderModeType.SolidOutline => SceneRenderMode.SolidOutline,
+        Artwork3DRenderModeType.ShadedIllustration => SceneRenderMode.ShadedIllustration,
+        _ => SceneRenderMode.Solid
+    };
 
     /// <summary>
     /// A camera-to-world matrix as a scene camera pose.

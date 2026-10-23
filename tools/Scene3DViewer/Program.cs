@@ -26,6 +26,7 @@ namespace Scene3DViewer;
 //   --selftest          draw built-in scenes, read them back and check them; exit code 0 when all pass
 //   --software          start Avalonia with its software renderer (the control must report "Unavailable")
 //   --log file          also write the log lines to a file
+//   --render-mode M     draw in render mode M (Solid, Wireframe, SolidOutline…) instead of the view's
 
 internal sealed class Options
 {
@@ -60,6 +61,9 @@ internal sealed class Options
     public bool Software { get; set; }
 
     public bool SelfTest { get; set; }
+
+    /// <summary>A render mode to draw in instead of the view's.</summary>
+    public Caly.Rendering.Scene3D.SceneRenderMode? RenderMode { get; set; }
 }
 
 internal static class Program
@@ -103,6 +107,7 @@ internal static class Program
                     case "--exit-after": Options.ExitAfterSeconds = Number(args[++i]); break;
                     case "--software": Options.Software = true; break;
                     case "--selftest": Options.SelfTest = true; break;
+                case "--render-mode": Options.RenderMode = Enum.Parse<Caly.Rendering.Scene3D.SceneRenderMode>(args[++i], ignoreCase: true); break;
                     case "--log": _log = new StreamWriter(args[++i]); break;
                     case "--size":
                         string[] size = args[++i].Split('x');

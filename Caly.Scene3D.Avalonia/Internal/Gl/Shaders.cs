@@ -96,6 +96,51 @@ internal static class Shaders
         }
         """;
 
+    public const int OutlineAttributePosition = 0, OutlineAttributeMiddle = 1, OutlineAttributeNormalA = 2, OutlineAttributeNormalB = 3;
+
+    public static readonly string[] OutlineAttributes = ["aPosition", "aMiddle", "aNormalA", "aNormalB"];
+
+    /// <summary>
+    /// The edges of the render modes that draw silhouettes (<see cref="OutlineEdges"/>): an edge is kept when
+    /// one of its faces turns towards the viewer and the other away, or when they meet at the crease angle
+    /// or more, and is otherwise moved outside the view. Both ends decide alike, from the edge's midpoint.
+    /// </summary>
+    public const string OutlineVertex = """
+        uniform mat4 uModelView;
+        uniform mat4 uProjection;
+        uniform mat3 uNormalMatrix;
+        uniform float uCreaseCosine;
+        uniform int uOrthographic;
+
+        in vec3 aPosition;
+        in vec3 aMiddle;
+        in vec4 aNormalA;
+        in vec4 aNormalB;
+
+        void main()
+        {
+            vec3 middle = (uModelView * vec4(aMiddle, 1.0)).xyz;
+            vec3 toViewer = uOrthographic != 0 ? vec3(0.0, 0.0, 1.0) : -middle;
+            vec3 a = normalize(uNormalMatrix * aNormalA.xyz);
+            vec3 b = normalize(uNormalMatrix * aNormalB.xyz);
+            // W of normal A is 1 for an edge on a smooth surface: never a crease.
+            bool crease = aNormalA.w < 0.5 && dot(a, b) <= uCreaseCosine;
+            bool kept = (dot(a, toViewer) > 0.0) != (dot(b, toViewer) > 0.0) || crease;
+            gl_Position = kept ? uProjection * (uModelView * vec4(aPosition, 1.0)) : vec4(0.0, 0.0, 2.0, 1.0);
+        }
+        """;
+
+    public const string OutlineFragment = """
+        uniform vec3 uColor;
+
+        out vec4 oColor;
+
+        void main()
+        {
+            oColor = vec4(uColor, 1.0);
+        }
+        """;
+
     public const string Fragment = """
         const int MAX_LIGHTS = 8;
 

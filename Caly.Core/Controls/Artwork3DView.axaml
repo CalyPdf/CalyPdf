@@ -55,6 +55,8 @@
 		                        Scene="{Binding Scene}"
 		                        View="{Binding SelectedView}"
 		                        Shading="{Binding Shading}"
+		                        PrepareEdges="{Binding HasEdgeViews}"
+		                        RenderModeOverride="{Binding RenderMode}"
 		                        DefaultBackground="{Binding Scene, Converter={x:Static controls:Artwork3DView.BackgroundForScene}}"
 		                        PanModifiers="Shift"
 		                        ResetKey="{x:Null}"/>
@@ -89,6 +91,21 @@
 				          VerticalAlignment="Center"
 				          ToolTip.Tip="3D view"
 				          AutomationProperties.Name="3D view"/>
+
+				<!-- The render mode: the view's, as the document asks, until the reader chooses another. -->
+				<ComboBox Name="RenderModeList"
+				          ItemsSource="{x:Static vm:Artwork3DViewModel.RenderModeNames}"
+				          SelectedIndex="{Binding RenderModeIndex}"
+				          IsVisible="{Binding !IsLoading}"
+				          DropDownClosed="OnViewListDropDownClosed"
+				          MinWidth="110"
+				          MaxDropDownHeight="420"
+				          MinHeight="26"
+				          Padding="8,2,0,2"
+				          FontSize="12"
+				          VerticalAlignment="Center"
+				          ToolTip.Tip="Render mode"
+				          AutomationProperties.Name="Render mode"/>
 
 				<!-- Only for a model that moves. -->
 				<Button Classes="tool"

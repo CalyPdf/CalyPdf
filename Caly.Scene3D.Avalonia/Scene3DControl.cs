@@ -39,7 +39,7 @@ namespace Caly.Scene3D.Avalonia;
 /// it stays empty and reports <see cref="Scene3DStatus.Unavailable"/>.
 /// </para>
 /// </summary>
-public class Scene3DControl : OpenGlControlBase, ICustomHitTest
+public partial class Scene3DControl : OpenGlControlBase, ICustomHitTest
 {
     /// <summary>Defines the <see cref="Scene"/> property.</summary>
     public static readonly StyledProperty<Scene?> SceneProperty = AvaloniaProperty.Register<Scene3DControl, Scene?>(nameof(Scene));
@@ -147,7 +147,17 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
     {
         FocusableProperty.OverrideDefaultValue<Scene3DControl>(true);
         SceneProperty.Changed.AddClassHandler<Scene3DControl>((control, _) => control.OnSceneChanged());
-        ViewProperty.Changed.AddClassHandler<Scene3DControl>((control, _) => control.ResetView());
+        ViewProperty.Changed.AddClassHandler<Scene3DControl>((control, _) =>
+        {
+            control.ResetView();
+            control.StartEdges();
+        });
+        PrepareEdgesProperty.Changed.AddClassHandler<Scene3DControl>((control, _) => control.StartEdges());
+        RenderModeOverrideProperty.Changed.AddClassHandler<Scene3DControl>((control, _) =>
+        {
+            control.StartEdges();
+            control.RequestNextFrameRendering();
+        });
         VisibleRegionProperty.Changed.AddClassHandler<Scene3DControl>((control, _) => control.RequestNextFrameRendering());
         DefaultBackgroundProperty.Changed.AddClassHandler<Scene3DControl>((control, _) => control.RequestNextFrameRendering());
         ShadingProperty.Changed.AddClassHandler<Scene3DControl>((control, _) => control.RequestNextFrameRendering());
@@ -479,6 +489,7 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
 
     private void OnSceneChanged()
     {
+        CancelEdges();
         Scene? scene = Scene;
         _scenePending = scene is not null;
         if (scene is null)
@@ -503,6 +514,8 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
         }
 
         ResetView();
+        RestoreKeptCamera();
+        StartEdges();
     }
 
     // ---- pointer and keyboard ----
@@ -740,6 +753,7 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
     {
         _renderer = null;
         _uploadedScene = null;
+        ForgetEdges();
         if (Scene is { } scene && Status != Scene3DStatus.Failed)
         {
             _scenePending = true;
@@ -760,6 +774,7 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
         try
         {
             UploadPendingScene(renderer);
+            UploadPendingEdges(renderer);
 
             double scaling = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1;
             int pixelWidth = Math.Max(1, (int)(Bounds.Width * scaling)), pixelHeight = Math.Max(1, (int)(Bounds.Height * scaling));
@@ -782,6 +797,7 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
                 Region = new ViewRegion((float)region.X, (float)region.Y, (float)region.Right, (float)region.Bottom),
                 View = view,
                 Shading = Shading,
+                RenderMode = RenderMode,
                 Background = view?.Background is { } authored
                     ? new Vector4(authored, 1)
                     : new Vector4(background.R / 255f, background.G / 255f, background.B / 255f, background.A / 255f),
@@ -806,7 +822,7 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
 
             _framesRendered++;
             _statistics = new Scene3DStatistics(
-                renderer.Resources.VertexBytes,
+                renderer.Resources.VertexBytes + renderer.EdgeBytes,
                 renderer.Resources.IndexBytes,
                 renderer.TextureBytes,
                 renderer.Targets.Bytes,
@@ -854,6 +870,9 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
             return;
         }
 
+        // Back from losing the GPU with a scene that still holds its geometry: its edges are found again.
+        StartEdges();
+
         if (!scene.HasGeometry)
         {
             renderer.ClearScene();
@@ -875,7 +894,7 @@ public class Scene3DControl : OpenGlControlBase, ICustomHitTest
         }
 
         _uploadedScene = scene;
-        if (ReleaseGeometryAfterUpload)
+        if (ReleaseGeometryAfterUpload && MayReleaseGeometry(scene))
         {
             scene.ReleaseGeometry();
         }

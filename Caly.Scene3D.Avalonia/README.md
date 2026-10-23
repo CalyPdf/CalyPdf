@@ -22,13 +22,14 @@ var view3D = new Scene3DControl
 | Views | Camera (a pose or a camera node of the scene), perspective or orthographic projection, background colour, lighting scheme, per-node visibility, opacity and transform |
 | Lighting | The schemes of ISO 32000-2 Table 321 with its colours and directions, or the scene's own lights; two-sided |
 | Materials | Diffuse, specular, emissive, opacity, alpha test, vertex colours; the highlight's exponent is 32 × reflectivity, at least 1 (a quarter of OpenGL's range: broad highlights, as in the pictures the exporters drew of their models); a texture modulates the whole lit colour (emissive included) and the specular highlight is added after it; a texture whose alpha is only ever 0 or 255 cuts the surface out and stays in the opaque pass (depth keeps its triangles in order), a texture with partial alpha puts its material in the transparent pass: drawn last, back to front |
+| Render modes | All fifteen of ISO 32000-2 Table 319, the view's or `RenderModeOverride`: Solid; the wireframes (every edge of every triangle in the edge colour `AC`, or shaded, or with hidden ones removed by a depth-only pass of the surfaces), over lit surfaces or transparent ones; Transparent (opacity × `O`, 0.5); bounding boxes of each node (edges in `AC`, faces lit in the face colour `FC`, the background by default, at opacity `O`); Vertices (points at half the size of a point set) and ShadedVertices; SolidOutline, Illustration (surfaces flat in `FC`) and ShadedIllustration (a third of each surface's colour added as emissive, the standard giving no number) with silhouette edges: drawn where its faces turn opposite ways to the viewer, or meet at the crease angle or more unless the vertex normals run on unchanged across the edge (a smooth surface cut in facets); rims of open sheets always. Edges (both kinds) are found off the UI thread (50 – 200 ms for 150 – 650 k triangles) only when the render mode draws them or `PrepareEdges` is set, and take 64 + 8 bytes each on the GPU |
 | Textures | The base-colour texture of each material (JPEG or PNG, with a separate alpha image if any), decoded off the UI thread after the first frame |
 | Pointer | Left-drag rotates about the view's orbit point; right-drag or the wheel (while focused) zooms; Ctrl + left-drag or middle-drag pans; double-click or Home returns to the view |
 | Anti-aliasing | 4 samples per pixel in the control's own framebuffer, fewer when that would exceed 96 MB |
 
 It draws only when something changed: an idle view costs no GPU time.
 
-Not drawn: render modes other than solid, cross sections, further texture layers, generated texture
+Not drawn: per-node render modes, cross sections, further texture layers, generated texture
 coordinates, lines and points.
 
 ## Things a host must know
@@ -48,6 +49,11 @@ coordinates, lines and points.
   another for the same scene keeps `CaptureCameraState()` (the camera as the user moved it, the
   playhead, playing or paused; opaque) and calls `RestoreCameraState(state)` on the new control after its
   `Scene` and `View` are set, again after each later change of either. It is ignored for another view.
+- **Edges need the geometry.** The silhouette edges and the wireframes' edges are found from the scene's geometry,
+  so the control keeps the geometry until they are found. Set `PrepareEdges` when any view the host
+  may show draws edges (Caly and the viewer set it from the document's views), so that they are found
+  at once; a render mode that draws edges chosen after the geometry was given away makes the control report
+  `NeedsScene`, and the camera and playhead it had are given to the scene set in answer. `IsFindingEdges` says whether edges are still on their way (captures wait for it).
 - **A viewer can change the shading: `Shading`** (a `Scene3DShading`: light intensity, added ambient light,
   specular intensity, highlight sharpness, diffuse intensity). Each factor scales the scene's own values,
   so parts keep their differences; null or `Scene3DShading.AsAuthored` is the scene as its file has it. It

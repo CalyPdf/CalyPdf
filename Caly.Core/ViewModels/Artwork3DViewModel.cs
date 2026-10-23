@@ -102,6 +102,42 @@ public sealed partial class Artwork3DViewModel : ViewModelBase, IDisposable
     /// </summary>
     [ObservableProperty] private Scene3DCameraState? _cameraState;
 
+    /// <summary>
+    /// Whether one of the artwork's views draws edges found from the geometry (silhouettes or every edge): the
+    /// control finds them while it still holds the geometry. A render mode chosen later that draws them has the
+    /// model read again.
+    /// </summary>
+    [ObservableProperty] private bool _hasEdgeViews;
+
+    /// <summary>The render mode the model is drawn in: the selected view's, until the reader chooses another.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RenderModeIndex))]
+    private SceneRenderMode _renderMode;
+
+    /// <summary>The names of the render modes, in the order of <see cref="SceneRenderMode"/>, for the choice of one.</summary>
+    public static IReadOnlyList<string> RenderModeNames { get; } =
+    [
+        "Solid", "Solid wireframe", "Transparent", "Transparent wireframe", "Bounding box", "Transparent bounding box",
+        "Transparent bounding box outline", "Wireframe", "Shaded wireframe", "Hidden wireframe", "Vertices",
+        "Shaded vertices", "Illustration", "Solid outline", "Shaded illustration"
+    ];
+
+    /// <summary><see cref="RenderMode"/> as an index into <see cref="RenderModeNames"/>.</summary>
+    public int RenderModeIndex
+    {
+        get => (int)RenderMode;
+        set
+        {
+            if ((uint)value < (uint)RenderModeNames.Count)
+            {
+                RenderMode = (SceneRenderMode)value;
+            }
+        }
+    }
+
+    // Choosing a view draws it as the document asks.
+    partial void OnSelectedViewIndexChanged(int value) => RenderMode = SelectedView?.RenderMode ?? SceneRenderMode.Solid;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SelectedView))]
     private int _selectedViewIndex = -1;
@@ -279,6 +315,15 @@ public sealed partial class Artwork3DViewModel : ViewModelBase, IDisposable
             SelectedViewIndex = (uint)content.DefaultViewIndex < (uint)_views.Count ? content.DefaultViewIndex : _views.Count;
             OnPropertyChanged(nameof(SelectedView));
 
+            // Before the scene: the control finds its outlines while it still holds its geometry.
+            bool hasEdgeViews = false;
+            foreach (SceneView view in _views)
+            {
+                hasEdgeViews |= Scene3DControl.DrawsEdges(view.RenderMode);
+            }
+
+            HasEdgeViews = hasEdgeViews;
+            RenderMode = SelectedView?.RenderMode ?? SceneRenderMode.Solid;
             Scene = scene;
             State = Artwork3DState.Ready;
         });
