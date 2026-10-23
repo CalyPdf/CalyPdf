@@ -11,6 +11,15 @@ namespace Caly.Scene3D.Avalonia.Internal.Gl;
 /// Objects are created and deleted only through here, so <see cref="LiveObjects"/> can tell whether
 /// everything created was released.
 /// </para>
+/// <para>
+/// For later: Silk.NET (Silk.NET.OpenGLES / Silk.NET.OpenGL) could replace this class, loaded from the
+/// same context with <c>GL.GetApi(name =&gt; gl.GetProcAddress(name))</c>; the renderer, shaders and
+/// GPU resources would stay. It pays off once many more GL features are needed (debug output, queries,
+/// compute) or desktop GL is set up for Linux and macOS. Before switching, check that it publishes under
+/// Native AOT without trim warnings and is strong-named (Caly signs every assembly with Caly.snk); pick
+/// the GLES binding for ANGLE and desktop GL elsewhere; keep <see cref="LiveObjects"/> (the self-test
+/// relies on it) by wrapping the create and delete calls.
+/// </para>
 /// </summary>
 internal sealed unsafe class GlApi
 {
