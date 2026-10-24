@@ -5,6 +5,14 @@
     <BuildType Name="Release" />
   </Configurations>
   <Folder Name="/external/" />
+  <Folder Name="/external/Caly.PdfPig.Fonts/">
+    <Project Path="external/Caly.PdfPig.Fonts/Caly.PdfPig.Fonts.Tests/Caly.PdfPig.Fonts.Tests.csproj">
+      <BuildType Solution="AOT|*" Project="Debug" />
+    </Project>
+    <Project Path="external/Caly.PdfPig.Fonts/Caly.PdfPig.Fonts/Caly.PdfPig.Fonts.csproj">
+      <BuildType Solution="AOT|*" Project="Debug" />
+    </Project>
+  </Folder>
   <Folder Name="/external/PdfPig.Filters.Dct.JpegLibrary/">
     <Project Path="external/UglyToad.PdfPig.Filters.Dct.JpegLibrary/UglyToad.PdfPig.Filters.Dct.JpegLibrary/UglyToad.PdfPig.Filters.Dct.JpegLibrary.csproj">
       <BuildType Solution="AOT|*" Project="Debug" />
