@@ -32,7 +32,6 @@ using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform.Storage;
 using Avalonia.Styling;
-using Avalonia.Threading;
 using Caly.Core.Models;
 using Caly.Core.Services;
 using Caly.Core.Services.Interfaces;

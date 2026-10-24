@@ -27,6 +27,7 @@ using Caly.Core.ViewModels;
 using Caly.Pdf;
 using Caly.Pdf.Models;
 using Caly.Pdf.PageFactories;
+using Caly.PdfPig.Fonts;
 using CommunityToolkit.Mvvm.Messaging;
 using SkiaSharp;
 using System;
@@ -94,6 +95,12 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
     /// The application PPI is currently set to 144. We should make that configurable.
     /// </remarks>
     public double PpiScale => 144.0 / 72.0; // 72 should be document dependant, i.e. use PdfPig's UserSpaceUnit.
+
+    static PdfPigDocumentService()
+    {
+        // Process-wide, before any document is opened
+        StandardFontSubstitutes.Register();
+    }
 
     public PdfPigDocumentService(ISettingsService settingsService)
     {
