@@ -36,6 +36,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\Caly.Pdf\Caly.Pdf.csproj" />
+		<ProjectReference Include="..\external\Caly.PdfPig.Fonts\Caly.PdfPig.Fonts\Caly.PdfPig.Fonts.csproj" />
 		<ProjectReference Include="..\external\PdfPig.Rendering.Skia\UglyToad.PdfPig.Rendering.Skia\UglyToad.PdfPig.Rendering.Skia.csproj" />
 		<ProjectReference Include="..\external\Tabalonia\Tabalonia\Tabalonia.csproj" />
 	</ItemGroup>

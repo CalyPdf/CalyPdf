@@ -22,3 +22,7 @@
 	path = external/UglyToad.PdfPig.Filters.Jpx.OpenJpeg
 	url = https://github.com/BobLd/UglyToad.PdfPig.Filters.Jpx.OpenJpeg.git
 	branch = develop-caly
+[submodule "external/Caly.PdfPig.Fonts"]
+	path = external/Caly.PdfPig.Fonts
+	url = https://github.com/CalyPdf/Caly.PdfPig.Fonts.git
+	branch = caly-develop
