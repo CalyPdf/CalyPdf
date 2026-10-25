@@ -39,14 +39,6 @@ namespace Caly.Pdf.PageFactories
         private readonly double _ppiScale = 1;
         private readonly TransformationMatrix _scale;
 
-        private static readonly AsyncLocal<CancellationToken> _currentToken = new();
-
-        internal static CancellationToken CurrentToken
-        {
-            get => _currentToken.Value;
-            set => _currentToken.Value = value;
-        }
-
         public TextLayerFactory(IPdfTokenScanner pdfScanner,
             IResourceStore resourceStore,
             ILookupFilterProvider filterProvider,
@@ -75,7 +67,7 @@ namespace Caly.Pdf.PageFactories
             NamedDestinations namedDestinations, MediaBox mediaBox,
             CropBox cropBox, UserSpaceUnit userSpaceUnit, PageRotationDegrees rotation,
             TransformationMatrix initialMatrix,
-            IReadOnlyList<IGraphicsStateOperation> operations)
+            IReadOnlyList<IGraphicsStateOperation> operations, CancellationToken token)
         {
             // Scale to desired PPI
             var effectiveCropBox = _scale.Transform(cropBox.GetVisibleBounds(rotation));
@@ -90,7 +82,7 @@ namespace Caly.Pdf.PageFactories
             var context = new TextLayerStreamProcessor(pageNumber, ResourceStore, PdfScanner, PageContentParser,
                 FilterProvider, cropBox, userSpaceUnit, rotation, initialMatrix,
                 effectiveCropBox.Width, effectiveCropBox.Height, _ppiScale,
-                annotationProvider, ParsingOptions, CurrentToken);
+                annotationProvider, ParsingOptions, token);
 
             return context.Process(pageNumber, operations);
         }

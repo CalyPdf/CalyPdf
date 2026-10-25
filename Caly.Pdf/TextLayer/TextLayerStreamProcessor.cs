@@ -93,7 +93,7 @@ namespace Caly.Pdf.TextLayer
             ParsingOptions parsingOptions,
             CancellationToken token)
             : base(pageNumber, resourceStore, pdfScanner, pageContentParser, filterProvider, cropBox, userSpaceUnit,
-                rotation, initialMatrix, null, parsingOptions)
+                rotation, initialMatrix, null, parsingOptions, token)
         {
             _token = token;
 

@@ -366,7 +366,7 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
             }
 
             return await ExecuteWithLockAsync(
-                _ => document.GetPage<PdfPageSize>(pageNumber),
+                lockCt => document.GetPage<PdfPageSize>(pageNumber, lockCt),
                 guardCt);
         }, token);
     }
@@ -390,7 +390,7 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
                         try
                         {
                             linkedCts.CancelAfter(PageTimeOut);
-                            return document.GetPageTextLayerContent(pageNumber, linkedCts.Token);
+                            return document.GetPage<PageTextLayerContent>(pageNumber, linkedCts.Token);
                         }
                         catch (Exception e) when (e is OperationCanceledException || linkedCts.IsCancellationRequested)
                         {
@@ -402,7 +402,7 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
                                     $"Error in page {pageNumber}",
                                     $"Could not get text after {PageTimeOut.TotalSeconds} seconds."));
                             }
-                            
+
                             return null;
                         }
                     }, guardCt)
