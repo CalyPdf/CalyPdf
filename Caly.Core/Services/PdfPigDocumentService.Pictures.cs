@@ -67,11 +67,14 @@ internal sealed partial class PdfPigDocumentService
 
                         return picture;
                     }
-                    catch (Exception e) when (e is OperationCanceledException || linkedCts.IsCancellationRequested)
+                    catch (Exception) when (linkedCts.IsCancellationRequested)
                     {
-                        // Also any other exception once cancelled: PdfPig wraps everything a page of an
-                        // encrypted document throws, the cancellation included, in a
-                        // PdfDocumentEncryptedException. It must not become a cached error picture.
+                        // Cancelled by the caller or by the timeout. Also any other exception once
+                        // cancelled: PdfPig wraps everything a page of an encrypted document throws,
+                        // the cancellation included, in a PdfDocumentEncryptedException. It must not
+                        // become a cached error picture.
+                        // An OperationCanceledException while neither token is cancelled is not a
+                        // timeout: it is an error, handled below.
                         if (!lockCt.IsCancellationRequested)
                         {
                             App.Messenger.Send(new ShowNotificationMessage(NotificationType.Error,
