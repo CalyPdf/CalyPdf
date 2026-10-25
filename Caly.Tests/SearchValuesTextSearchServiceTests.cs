@@ -156,8 +156,7 @@ public class SearchValuesTextSearchServiceTests
         document.Advanced.ReplaceIndirectObject(CalyPdfHelper.FakePpiReference, new NumericToken(1));
         document.AddPageFactory<PageTextLayerContent, TextLayerFactory>();
 
-        var textLayer = PdfTextLayerHelper.GetTextLayer(
-            document.GetPageTextLayerContent(1, CancellationToken.None), CancellationToken.None);
+        var textLayer = PdfTextLayerHelper.GetTextLayer(document.GetPage<PageTextLayerContent>(1, CancellationToken.None), CancellationToken.None);
         var words = textLayer.Select(w => w.Value).ToArray();
 
         // Page 1 title: "Tackling the Poor Assumptions of Naive Bayes Text Classifiers".

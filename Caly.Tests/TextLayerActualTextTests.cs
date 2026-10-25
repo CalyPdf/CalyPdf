@@ -252,7 +252,7 @@ public class TextLayerActualTextTests
         document.Advanced.ReplaceIndirectObject(CalyPdfHelper.FakePpiReference, new NumericToken(1));
         document.AddPageFactory<PageTextLayerContent, TextLayerFactory>();
 
-        var content = document.GetPageTextLayerContent(1, CancellationToken.None);
+        var content = document.GetPage<PageTextLayerContent>(1, CancellationToken.None);
 
         return string.Concat(content.Letters.Select(l => l.Value));
     }

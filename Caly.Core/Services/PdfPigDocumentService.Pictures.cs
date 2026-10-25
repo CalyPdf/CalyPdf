@@ -118,7 +118,7 @@ internal sealed partial class PdfPigDocumentService
 
             try
             {
-                info = document.GetPage<PdfPageSize>(pageNumber);
+                info = document.GetPage<PdfPageSize>(pageNumber, token);
             }
             catch (Exception)
             {
