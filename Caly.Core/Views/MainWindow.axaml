@@ -8,7 +8,6 @@
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:DataType="vm:MainViewModel"
         x:Class="Caly.Core.Views.MainWindow"
-        Icon="/Assets/caly-logo.ico"
         Title="{Binding AppName}"
         MinWidth="250"
         Width="250"
