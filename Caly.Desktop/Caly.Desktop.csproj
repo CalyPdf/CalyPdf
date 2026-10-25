@@ -23,7 +23,7 @@
 		<PublishAot>true</PublishAot>
 		<Optimize>True</Optimize>
 		<OptimizationPreference>Speed</OptimizationPreference>
-		<IlcGenerateStackTraceData>false</IlcGenerateStackTraceData>
+		<StackTraceSupport>false</StackTraceSupport>
 		<IlcTrimMetadata>true</IlcTrimMetadata>
 
 		<InvariantGlobalization>true</InvariantGlobalization>
