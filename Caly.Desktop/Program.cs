@@ -240,9 +240,14 @@ namespace Caly.Desktop
 
                 if (software)
                 {
-                    builder = builder
-                        .With(new Win32PlatformOptions { RenderingMode = [Win32RenderingMode.Software] })
-                        .With(new AvaloniaNativePlatformOptions { RenderingMode = [AvaloniaNativeRenderingMode.Software] });
+                    if (OperatingSystem.IsWindows())
+                    {
+                        builder = builder.With(new Win32PlatformOptions { RenderingMode = [Win32RenderingMode.Software] });
+                    }
+                    else if (OperatingSystem.IsMacOS())
+                    {
+                        builder = builder.With(new AvaloniaNativePlatformOptions { RenderingMode = [AvaloniaNativeRenderingMode.Software] });
+                    }
                 }
 
                 return builder.LogToTrace();
