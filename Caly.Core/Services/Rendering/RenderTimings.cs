@@ -186,8 +186,8 @@ public static class RenderTimings
 
         try
         {
-            Directory.CreateDirectory(JsonSettingsService.LogFilePath);
-            string path = Path.Combine(JsonSettingsService.LogFilePath,
+            Directory.CreateDirectory(Debug.LogDirectory);
+            string path = Path.Combine(Debug.LogDirectory,
                 $"render_timings_{DateTime.UtcNow:yyyyMMdd_HHmmss}.txt");
             File.WriteAllText(path, sb.ToString());
         }
