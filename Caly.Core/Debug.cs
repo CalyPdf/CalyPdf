@@ -52,12 +52,20 @@ public static class Debug
         }
     }
 
+    /// <summary>
+    /// Where exception and render-timing logs are written. Defaults to the user's Caly logs
+    /// folder; the test assemblies point it at a temp folder so that exceptions the tests
+    /// raise on purpose do not end up in the real logs.
+    /// </summary>
+    internal static string LogDirectory { get; set; } = JsonSettingsService.LogFilePath;
+
     //[Conditional("DEBUG")]
     public static void WriteExceptionToFile(Exception? exception)
     {
-        Directory.CreateDirectory(JsonSettingsService.LogFilePath);
+        string logDirectory = LogDirectory;
+        Directory.CreateDirectory(logDirectory);
 
-        string logFile = Path.Combine(JsonSettingsService.LogFilePath, $"{DateTime.UtcNow:yyyyMMdd_HHmmss_fff}_{Guid.NewGuid()}.txt");
+        string logFile = Path.Combine(logDirectory, $"{DateTime.UtcNow:yyyyMMdd_HHmmss_fff}_{Guid.NewGuid()}.txt");
         if (exception is null)
         {
             File.WriteAllText(logFile, "Received null exception");
