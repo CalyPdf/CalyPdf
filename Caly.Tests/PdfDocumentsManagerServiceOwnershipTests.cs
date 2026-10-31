@@ -720,4 +720,20 @@ public class PdfDocumentsManagerServiceOwnershipTests
         Assert.Equal(0, detached.SelectedDocumentIndex);
         Assert.Empty(primary.PdfDocuments);
     }
+
+    /// <summary>
+    /// Windows and macOS file systems ignore case, so a path typed in another case is the same
+    /// file and must not open a second tab. Linux paths that differ in case are different files.
+    /// </summary>
+    [AvaloniaFact]
+    public void SamePathInAnotherCase_IsTheSameOpenFile_WhereTheFileSystemIgnoresCase()
+    {
+        var registry = new CalyWindowRegistry();
+        using var service = NewService(registry);
+
+        Assert.True(service.TryAddRecord(@"C:\Docs\Report.pdf", NewDocument(), NewScope()));
+
+        bool ignoresCase = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS();
+        Assert.Equal(!ignoresCase, service.TryAddRecord(@"c:\docs\REPORT.PDF", NewDocument(), NewScope()));
+    }
 }
