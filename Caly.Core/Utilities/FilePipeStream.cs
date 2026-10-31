@@ -53,7 +53,8 @@ public sealed class FilePipeStream : IDisposable, IAsyncDisposable
     private static readonly TimeSpan ReceiveTimeout = TimeSpan.FromSeconds(5);
 
     private readonly MemoryPool<byte> _memoryPool = MemoryPool<byte>.Shared;
-    private readonly NamedPipeServerStream _pipeServer;
+    private readonly string _pipeName;
+    private NamedPipeServerStream _pipeServer;
     private readonly TimeSpan _receiveTimeout;
 
     public FilePipeStream() : this(PipeName)
@@ -80,8 +81,12 @@ public sealed class FilePipeStream : IDisposable, IAsyncDisposable
         System.Diagnostics.Debug.Assert(pipeName.Length <= 44);
 
         _receiveTimeout = receiveTimeout ?? ReceiveTimeout;
-        _pipeServer = new(pipeName, PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.CurrentUserOnly);
+        _pipeName = pipeName;
+        _pipeServer = CreateServer(pipeName);
     }
+
+    private static NamedPipeServerStream CreateServer(string pipeName) =>
+        new(pipeName, PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.CurrentUserOnly);
 
     public async IAsyncEnumerable<string?> ReceivePathAsync([EnumeratorCancellation] CancellationToken token)
     {
@@ -166,6 +171,15 @@ public sealed class FilePipeStream : IDisposable, IAsyncDisposable
             catch (EndOfStreamException)
             {
                 // Client closed mid-message. Drop it and keep listening
+            }
+            catch (IOException e)
+            {
+                // "The pipe is being closed": a client connected and closed before the server
+                // waited. That leaves the server stream closed for good, so only a new one can
+                // keep listening; just that client's message is lost.
+                Debug.WriteExceptionToFile(e);
+                await _pipeServer.DisposeAsync();
+                _pipeServer = CreateServer(_pipeName);
             }
             catch (Exception e)
             {

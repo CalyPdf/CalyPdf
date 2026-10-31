@@ -102,6 +102,35 @@ public class FilePipeStreamTests
     }
 
     [Fact]
+    public async Task ClientClosingBeforeServerWaits_DoesNotKillListener()
+    {
+        string pipeName = NewPipeName();
+        await using var server = new FilePipeStream(pipeName);
+
+        // Connect and close before the server is waiting: the case where a second instance
+        // launches while the first is still starting. The pipe is then broken by the time
+        // WaitForConnectionAsync runs, which fails with an IOException, not end-of-stream.
+        await using (var early = new NamedPipeClientStream(".", pipeName, PipeDirection.Out, PipeOptions.CurrentUserOnly))
+        {
+            await early.ConnectAsync(2000, CancellationToken.None);
+        }
+
+        using var cts = new CancellationTokenSource();
+        var received = new ConcurrentQueue<string>();
+        var consumer = ConsumeAsync(server, received, cts.Token);
+
+        await Task.Delay(300, CancellationToken.None);
+
+        await SendFullMessageAsync(pipeName, "after-early-close.pdf");
+        await Task.Delay(500, CancellationToken.None);
+
+        await cts.CancelAsync();
+        await AssertConsumerCompletes(consumer);
+
+        Assert.Contains("after-early-close.pdf", received);
+    }
+
+    [Fact]
     public async Task StalledClient_TimesOutAndListenerRecovers()
     {
         string pipeName = NewPipeName();
