@@ -1,4 +1,5 @@
-﻿using Caly.Core.Utilities;
+﻿using Caly.Core;
+using Caly.Core.Utilities;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -99,6 +100,41 @@ public class FilePipeStreamTests
         await AssertConsumerCompletes(consumer);
 
         Assert.Contains("after-disconnect.pdf", received);
+    }
+
+    [Fact]
+    public async Task SendPath_IsReceivedByServer()
+    {
+        // The real sender, not a hand-built copy of its bytes: a protocol change on either
+        // side must fail here.
+        string pipeName = NewPipeName();
+        await using var server = new FilePipeStream(pipeName);
+
+        using var cts = new CancellationTokenSource();
+        var received = new ConcurrentQueue<string>();
+        var consumer = ConsumeAsync(server, received, cts.Token);
+
+        const string path = @"C:\Docs\handoff é.pdf"; // non-ASCII: the length prefix counts UTF-8 bytes
+        Assert.True(await Task.Run(() => FilePipeStream.SendPath(path, pipeName, TimeSpan.FromSeconds(2))));
+        await Task.Delay(500, CancellationToken.None);
+
+        await cts.CancelAsync();
+        await AssertConsumerCompletes(consumer);
+
+        Assert.Contains(path, received);
+    }
+
+    [Fact]
+    public void SendPath_WithNoServer_ThrowsCriticalAfterTimeout()
+    {
+        // A running instance that never listens: the launch must fail with Caly's own error,
+        // and must not hang past the connect timeout.
+        var timer = System.Diagnostics.Stopwatch.StartNew();
+
+        Assert.Throws<CalyCriticalException>(() =>
+            FilePipeStream.SendPath("x.pdf", NewPipeName(), TimeSpan.FromMilliseconds(300)));
+
+        Assert.True(timer.Elapsed < TimeSpan.FromSeconds(5), $"Took {timer.Elapsed}.");
     }
 
     [Fact]

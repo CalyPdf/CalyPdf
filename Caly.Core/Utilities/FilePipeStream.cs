@@ -282,15 +282,20 @@ public sealed class FilePipeStream : IDisposable, IAsyncDisposable
         }
     }
 
-    public static bool SendPath(string filePath)
+    public static bool SendPath(string filePath) => SendPath(filePath, PipeName, ConnectTimeout);
+
+    /// <summary>
+    /// Sends to a specific pipe with a specific connect timeout (used by tests).
+    /// </summary>
+    internal static bool SendPath(string filePath, string pipeName, TimeSpan connectTimeout)
     {
         try
         {
-            using (var pipeClient = new NamedPipeClientStream(".", PipeName,
+            using (var pipeClient = new NamedPipeClientStream(".", pipeName,
                        PipeDirection.Out, PipeOptions.CurrentUserOnly,
                        TokenImpersonationLevel.Identification))
             {
-                pipeClient.Connect(ConnectTimeout);
+                pipeClient.Connect(connectTimeout);
 
                 Memory<byte> pathBytes = Encoding.UTF8.GetBytes(filePath);
                 if (pathBytes.Length > ushort.MaxValue)
