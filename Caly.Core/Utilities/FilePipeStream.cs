@@ -24,6 +24,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Pipes;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Text;
 using System.Threading;
@@ -38,11 +39,16 @@ public sealed class FilePipeStream : IDisposable, IAsyncDisposable
 {
     // https://googleprojectzero.blogspot.com/2019/09/windows-exploitation-tricks-spoofing.html
 
-    private const string PipeName = "caly_pdf_files.pipe";
+    // Per user: pipe names are machine-wide (and on Unix a socket in the shared /tmp), so a fixed
+    // name let one user's instance block every other user's. 15 + 16 chars, within the 44 limit.
+    private static readonly string PipeName =
+        $"caly_pdf_files_{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Environment.UserName)), 0, 8)}";
 
     private static ReadOnlySpan<byte> KeyPhrase => "ca1y k3y pa$$"u8;
 
-    private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(2);
+    // The lock proves the main instance is alive, so a slow connect means it is still starting
+    // (cold start, many files opened at once): wait for it rather than give up.
+    private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(10);
 
     private static readonly TimeSpan ReceiveTimeout = TimeSpan.FromSeconds(5);
 
@@ -229,7 +235,7 @@ public sealed class FilePipeStream : IDisposable, IAsyncDisposable
                        PipeDirection.Out, PipeOptions.CurrentUserOnly,
                        TokenImpersonationLevel.Identification))
             {
-                pipeClient.Connect(ConnectTimeout); // If you are getting a timeout in debug mode, just re-run Caly
+                pipeClient.Connect(ConnectTimeout);
 
                 Memory<byte> lengthBytes = BitConverter.GetBytes((ushort)1);
                 pipeClient.Write(lengthBytes.Span);
@@ -251,10 +257,8 @@ public sealed class FilePipeStream : IDisposable, IAsyncDisposable
         }
         catch (TimeoutException toe)
         {
-            // Could not connect to the running instance of Caly
-            // probably because it is actually not running, i.e. the 
-            // lock file was not properly deleted after close
-            CalyFileMutex.ForceReleaseMutex();
+            // The running instance holds the lock but is not listening (hung, or still starting)
+            Debug.WriteExceptionToFile(toe);
             throw ThrowOnTimeoutException(toe);
         }
         catch (Exception e)
@@ -300,10 +304,8 @@ public sealed class FilePipeStream : IDisposable, IAsyncDisposable
         }
         catch (TimeoutException toe)
         {
-            // Could not connect to the running instance of Caly
-            // probably because it is actually not running, i.e. the 
-            // lock file was not properly deleted after close
-            CalyFileMutex.ForceReleaseMutex();
+            // The running instance holds the lock but is not listening (hung, or still starting)
+            Debug.WriteExceptionToFile(toe);
             throw ThrowOnTimeoutException(toe);
         }
         catch (Exception e)
@@ -315,12 +317,8 @@ public sealed class FilePipeStream : IDisposable, IAsyncDisposable
 
     private static CalyCriticalException ThrowOnTimeoutException(TimeoutException toe)
     {
-        return new CalyCriticalException("Could not connect to the running instance of Caly," +
-                                        " probably because it is actually not running, i.e. the" +
-                                        " Caly lock was not properly removed after close.", toe)
-        {
-            TryRestartApp = true
-        };
+        return new CalyCriticalException("Could not connect to the running instance of Caly:" +
+                                        " it is running but not responding.", toe);
     }
 
     private enum PipeMessageType : byte
