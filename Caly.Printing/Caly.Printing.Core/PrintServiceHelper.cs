@@ -79,8 +79,8 @@ public static class PrintServiceHelper
         canvas.Clear(SKColors.White);
 
         // The SKPicture is recorded in PDF-point coordinates (pdfW × pdfH).
-        // Build a combined scale + rotation matrix, mirroring the on-screen rendering in
-        // SkiaPdfPageControl which does: canvas.DrawPicture(picture, SKMatrix.CreateScale(ppiScale, ppiScale)).
+        // Build a combined scale + rotation matrix: the unrotated case is
+        // canvas.DrawPicture(picture, SKMatrix.CreateScale(ppiScale, ppiScale)).
         SKMatrix transform = rotation switch
         {
             // 90° CW:  x' = (pdfH − y) * ppiScale,  y' = x * ppiScale
