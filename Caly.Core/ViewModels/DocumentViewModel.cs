@@ -762,6 +762,6 @@ public sealed partial class DocumentViewModel : ViewModelBase
 
         await _pdfPageService.CancelAndClear().ConfigureAwait(false);
 
-        GC.Collect(GC.MaxGeneration, GCCollectionMode.Optimized, false);
+        Helpers.RequestGcCollect();
     }
 }
