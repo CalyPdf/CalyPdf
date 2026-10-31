@@ -24,7 +24,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
@@ -492,16 +491,6 @@ public sealed class JsonSettingsService : ISettingsService
         return _current!;
     }
 
-    public async ValueTask<CalySettings> GetSettingsAsync()
-    {
-        if (_current is null)
-        {
-            await LoadAsync();
-        }
-
-        return _current!;
-    }
-
     /// <summary>
     /// Falls back to defaults, keeping the unreadable file as <c>caly_settings.bad</c> so a hand
     /// edit with a typo can be repaired instead of being lost (the next save writes defaults).
@@ -612,52 +601,6 @@ public sealed class JsonSettingsService : ISettingsService
         }
     }
 
-    public async Task LoadAsync()
-    {
-        Debug.ThrowOnUiThread();
-
-        if (Globals.IsMobilePlatform())
-        {
-            return; // TODO - Create proper mobile class
-        }
-
-        try
-        {
-            if (!File.Exists(_settingsFile))
-            {
-                SetDefaultSettings();
-
-                await using (FileStream createStream = File.Create(_settingsFile))
-                {
-                    await JsonSerializer.SerializeAsync(createStream, _current, SourceGenerationContext.Default.CalySettings)
-                        .ConfigureAwait(false);
-                }
-                return;
-            }
-
-            await using (FileStream createStream = File.OpenRead(_settingsFile))
-            {
-                _current = await JsonSerializer.DeserializeAsync(createStream, SourceGenerationContext.Default.CalySettings)
-                    .ConfigureAwait(false);
-                ValidateSetting(_current);
-            }
-
-            if (_current is null)
-            {
-                HandleCorruptedFile();
-            }
-        }
-        catch (JsonException jsonEx)
-        {
-            HandleCorruptedFile();
-            Debug.WriteExceptionToFile(jsonEx);
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteExceptionToFile(ex);
-        }
-    }
-
     public void Save()
     {
         if (Globals.IsMobilePlatform())
@@ -672,35 +615,6 @@ public sealed class JsonSettingsService : ISettingsService
                 using (FileStream createStream = File.Create(TempSettingsFile))
                 {
                     JsonSerializer.Serialize(createStream, _current, SourceGenerationContext.Default.CalySettings);
-                    createStream.Flush(flushToDisk: true);
-                }
-
-                File.Move(TempSettingsFile, _settingsFile, overwrite: true);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteExceptionToFile(ex);
-            }
-        }
-    }
-
-    public async Task SaveAsync()
-    {
-        Debug.ThrowOnUiThread();
-
-        if (Globals.IsMobilePlatform())
-        {
-            return; // TODO - Create proper mobile class
-        }
-
-        if (_current is not null)
-        {
-            try
-            {
-                await using (FileStream createStream = File.Create(TempSettingsFile))
-                {
-                    await JsonSerializer.SerializeAsync(createStream, _current, SourceGenerationContext.Default.CalySettings)
-                        .ConfigureAwait(false);
                     createStream.Flush(flushToDisk: true);
                 }
 

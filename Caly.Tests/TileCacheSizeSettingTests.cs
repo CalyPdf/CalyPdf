@@ -61,12 +61,9 @@ public class TileCacheSizeSettingTests
     private sealed class FixedSettingsService(CalySettings settings) : ISettingsService
     {
         public CalySettings GetSettings() => settings;
-        public ValueTask<CalySettings> GetSettingsAsync() => ValueTask.FromResult(settings);
         public void SetProperty(CalySettings.CalySettingsProperty property, object value) => throw new NotImplementedException();
         public void Load() => throw new NotImplementedException();
-        public Task LoadAsync() => throw new NotImplementedException();
         public void Save() => throw new NotImplementedException();
-        public Task SaveAsync() => throw new NotImplementedException();
     }
 
     private static async Task<long> BudgetFor(CalySettings? settings)

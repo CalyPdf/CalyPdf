@@ -23,19 +23,13 @@ public class PdfPigDocumentServiceOpenDocumentTests
 
         public CalySettings GetSettings() => CalySettings.Default;
 
-        public ValueTask<CalySettings> GetSettingsAsync() => ValueTask.FromResult(CalySettings.Default);
-
         public void Load()
         {
         }
 
-        public Task LoadAsync() => Task.CompletedTask;
-
         public void Save()
         {
         }
-
-        public Task SaveAsync() => Task.CompletedTask;
     }
 
     private static readonly FieldInfo ActiveOperationsField =
