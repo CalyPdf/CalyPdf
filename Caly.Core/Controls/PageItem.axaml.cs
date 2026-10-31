@@ -83,6 +83,12 @@ public sealed class PageItem : ContentControl
     public static readonly StyledProperty<bool> IsRotatingProperty =
         AvaloniaProperty.Register<PageItem, bool>(nameof(IsRotating));
 
+    /// <summary>
+    /// Defines the <see cref="ContentBounds"/> property.
+    /// </summary>
+    public static readonly StyledProperty<Rect?> ContentBoundsProperty =
+        AvaloniaProperty.Register<PageItem, Rect?>(nameof(ContentBounds));
+
     static PageItem()
     {
         AffectsRender<PageItem>(PictureProperty, IsPageVisibleProperty,
@@ -105,6 +111,33 @@ public sealed class PageItem : ContentControl
     {
         add => AddHandler(BeforeRotationEvent, value);
         remove => RemoveHandler(BeforeRotationEvent, value);
+    }
+
+    /// <summary>
+    /// Defines the <see cref="ContentBoundsChanged"/> event.
+    /// </summary>
+    public static readonly RoutedEvent<RoutedEventArgs> ContentBoundsChangedEvent =
+        RoutedEvent.Register<PageItem, RoutedEventArgs>(nameof(ContentBoundsChanged), RoutingStrategies.Bubble);
+
+    /// <summary>
+    /// Raised when <see cref="ContentBounds"/> changes, e.g. when the page's picture is first
+    /// rendered. Bubbles, so <see cref="PageItemsControl"/> can subscribe once instead of wiring
+    /// each container.
+    /// </summary>
+    public event EventHandler<RoutedEventArgs>? ContentBoundsChanged
+    {
+        add => AddHandler(ContentBoundsChangedEvent, value);
+        remove => RemoveHandler(ContentBoundsChangedEvent, value);
+    }
+
+    /// <summary>
+    /// The bounds of what the page draws, in the unrotated page's coordinates. <c>null</c> when
+    /// unknown. See <see cref="PageViewModel.ContentBounds"/>.
+    /// </summary>
+    public Rect? ContentBounds
+    {
+        get => GetValue(ContentBoundsProperty);
+        set => SetValue(ContentBoundsProperty, value);
     }
 
     public int Rotation
@@ -197,6 +230,10 @@ public sealed class PageItem : ContentControl
             {
                 RaiseEvent(new RoutedEventArgs(BeforeRotationEvent));
             }
+        }
+        else if (change.Property == ContentBoundsProperty)
+        {
+            RaiseEvent(new RoutedEventArgs(ContentBoundsChangedEvent));
         }
     }
 

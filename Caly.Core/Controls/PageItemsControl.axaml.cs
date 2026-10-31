@@ -43,7 +43,7 @@ namespace Caly.Core.Controls;
 /// </summary>
 [TemplatePart("PART_ScrollViewer", typeof(ScrollViewer))]
 [TemplatePart("PART_LayoutTransformControl", typeof(LayoutTransformControl))]
-public sealed class PageItemsControl : ItemsControl
+public sealed partial class PageItemsControl : ItemsControl
 {
     /// <summary>
     /// The default value for the <see cref="PageItemsControl.ItemsPanel"/> property.
@@ -228,8 +228,13 @@ public sealed class PageItemsControl : ItemsControl
         {
             AdjustXOffsetOnExtentChanged(e);
             _visibilityTracker.PostUpdateVisibility();
+            OnScrollChangedForFit(e);
         };
-        _sizeChangedHandler = (_, _) => _visibilityTracker.PostUpdateVisibility();
+        _sizeChangedHandler = (_, _) =>
+        {
+            _visibilityTracker.PostUpdateVisibility();
+            OnViewerSizeChangedForFit();
+        };
 
         // Use a Tunnel handler to ensure zoom checks run before bubble-phase handlers
         // and avoid unwanted event scrolls by 50px before we can reject them.
@@ -243,6 +248,8 @@ public sealed class PageItemsControl : ItemsControl
         AddHandler(PointerMovedEvent, OnInteractiveLayerPointerMoved, RoutingStrategies.Tunnel);
         AddHandler(PointerWheelChangedEvent, OnInteractiveLayerPointerMoved, RoutingStrategies.Tunnel);
         AddHandler(PageItem.BeforeRotationEvent, OnBeforePageRotation);
+        AddHandler(PageItem.ContentBoundsChangedEvent, OnPageContentBoundsChanged);
+        LayoutUpdated += OnLayoutUpdatedForFit; // Runs a requested zoom fit, see RequestFit
 
         ResetState();
     }
@@ -438,6 +445,9 @@ public sealed class PageItemsControl : ItemsControl
         if (IsSinglePage)
         {
             _visibilityTracker.PostUpdateVisibility();
+
+            // In a zoom fit mode, the page about to be shown is fitted before the view lands on it.
+            FitBeforeLanding(pageNumber, ref yOffset, ref xOffset, ref space);
         }
 
         // Single-page view always lands on an explicit Y (the page top by default).
@@ -629,6 +639,21 @@ public sealed class PageItemsControl : ItemsControl
             270 => (v, h - x),
             _ => (x, v)
         };
+    }
+
+    /// <summary>
+    /// Maps a rect on the unrotated page (top-left origin, y increasing downward) to the page as
+    /// displayed. Rect counterpart of <see cref="ToDisplayOffsets"/>.
+    /// </summary>
+    /// <param name="rotation">The page's clockwise rotation, in degrees (0, 90, 180 or 270).</param>
+    /// <param name="displaySize">The page size as displayed, i.e. after rotation.</param>
+    /// <param name="unrotated">The rect on the unrotated page.</param>
+    internal static Rect ToDisplayRect(int rotation, Size displaySize, Rect unrotated)
+    {
+        var (x1, y1) = ToDisplayOffsets(rotation, displaySize, unrotated.Left, unrotated.Top, isPdf: false);
+        var (x2, y2) = ToDisplayOffsets(rotation, displaySize, unrotated.Right, unrotated.Bottom, isPdf: false);
+
+        return new Rect(new Point(x1!.Value, y1!.Value), new Point(x2!.Value, y2!.Value)).Normalize();
     }
 
     /// <summary>
@@ -921,6 +946,7 @@ public sealed class PageItemsControl : ItemsControl
         base.OnApplyTemplate(e);
 
         Scroll = e.NameScope.FindFromNameScope<ScrollViewer>("PART_ScrollViewer");
+        _verticalScrollBar = null; // Looked up again in the new scroll viewer's template
         Scroll.AddHandler(ScrollViewer.ScrollChangedEvent, _scrollChangedHandler);
         Scroll.AddHandler(SizeChangedEvent, _sizeChangedHandler, RoutingStrategies.Direct);
         Scroll.Focus(); // Make sure the Scroll has focus
@@ -1067,6 +1093,8 @@ public sealed class PageItemsControl : ItemsControl
                 {
                     _pendingScrollToPage = false;
                 }
+
+                OnPositionRestoredForFit();
             }
 
             if (UpdatePagesVisibility())
@@ -1092,6 +1120,10 @@ public sealed class PageItemsControl : ItemsControl
         else if (change.Property == ZoomLevelProperty)
         {
             _zoomPanController.HandleExternalZoomLevelChanged();
+        }
+        else if (change.Property == ZoomModeProperty)
+        {
+            OnZoomModeChanged(change.GetNewValue<ZoomMode>());
         }
         else if (change.Property == PageDisplayModeProperty)
         {
@@ -1553,5 +1585,6 @@ public sealed class PageItemsControl : ItemsControl
         _isApplyingPendingScroll = false;
         _visibilityTracker.Reset();
         _suppressScrollAdjustment = false;
+        ResetFitState();
     }
 }

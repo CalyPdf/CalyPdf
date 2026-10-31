@@ -59,6 +59,17 @@ public sealed partial class MainViewModel
         }
     }
 
+    public ZoomMode[] ZoomModeOptions { get; } = Enum.GetValues<ZoomMode>();
+
+    /// <summary>
+    /// The zoom new documents open with. See <see cref="CalySettings.DefaultZoomMode"/>.
+    /// </summary>
+    public ZoomMode DefaultZoomMode
+    {
+        get => GetSetting(static s => s.DefaultZoomMode, ZoomMode.Manual);
+        set => SetSetting(static (s, v) => s.DefaultZoomMode = v, value);
+    }
+
     public CalyTheme[] ThemeOptions { get; } = Enum.GetValues<CalyTheme>();
 
     public CalyTheme Theme

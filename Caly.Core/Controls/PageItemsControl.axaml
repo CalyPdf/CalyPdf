@@ -24,6 +24,7 @@
         <Setter Property="MinZoomLevel" Value="{Binding MinZoomLevel}"/>
 		<Setter Property="MaxZoomLevel" Value="{Binding MaxZoomLevel}"/>
         <Setter Property="ZoomLevel" Value="{Binding ZoomLevel, Mode=TwoWay}"/>
+        <Setter Property="ZoomMode" Value="{Binding ZoomMode, Mode=TwoWay}"/>
         <Setter Property="ScrollOffset" Value="{Binding ScrollOffset, Mode=TwoWay}"/>
         <Setter Property="ReadingPoint" Value="{Binding ReadingPoint, Mode=OneWayToSource}"/>
         <Setter Property="PageDisplayMode" Value="{Binding PageDisplayMode}"/>
