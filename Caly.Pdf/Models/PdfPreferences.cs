@@ -56,6 +56,9 @@ public sealed class PdfPreferences
             pageMode = ParseName(pageModeToken, pageMode);
         }
 
+        // TODO - The open action's destination can ask for a zoom: /Fit → ZoomMode.FitPage, /FitH → FitWidth,
+        // /FitB → FitContent, /FitBH → FitContentWidth, /XYZ zoom → Manual at that zoom (0 or null keeps the zoom).
+        // /FitV, /FitBV (fit height) and /FitR (fit a rectangle) have no ZoomMode yet.
         if (catalog.TryGet<DictionaryToken>(NameToken.OpenAction, scanner, out var actionDict))
         {
             // TODO - Need to expose logic in PdfPig

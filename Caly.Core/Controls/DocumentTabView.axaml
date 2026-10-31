@@ -3,6 +3,8 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:Caly.Core.ViewModels"
+             xmlns:models="clr-namespace:Caly.Core.Models"
+             xmlns:utilities="clr-namespace:Caly.Core.Utilities"
              xmlns:controls="clr-namespace:Caly.Core.Controls"
              xmlns:tabalonia="clr-namespace:Tabalonia.Controls;assembly=Tabalonia"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
@@ -42,7 +44,8 @@
                                       Focusable="False"
                                       VerticalAlignment="Stretch"
                                       Background="Transparent"
-                                      IsChecked="{Binding #PART_Root.IsPaneOpen, Mode=TwoWay}">
+                                      IsChecked="{Binding #PART_Root.IsPaneOpen, Mode=TwoWay}"
+                                      AutomationProperties.Name="Toggle Sidebar Menu">
 				<ToggleButton.Styles>
 					<Style Selector="PathIcon.closed">
 						<Setter Property="Data" Value="{StaticResource pane_close_regular}" />
@@ -66,7 +69,8 @@
                     HorizontalAlignment="Center"
                     VerticalAlignment="Stretch"
                     Background="Transparent"
-                    Command="{Binding GoToPreviousPageCommand}">
+                    Command="{Binding GoToPreviousPageCommand}"
+                    AutomationProperties.Name="Previous Page">
                 <PathIcon Width="14"
                             Height="14"
                             Data="{StaticResource chevron_up_regular}">
@@ -79,7 +83,8 @@
                     HorizontalAlignment="Center"
                     VerticalAlignment="Stretch"
                     Background="Transparent"
-                    Command="{Binding GoToNextPageCommand}">
+                    Command="{Binding GoToNextPageCommand}"
+                    AutomationProperties.Name="Next Page">
                 <PathIcon Width="14"
                             Height="14"
                             Data="{StaticResource chevron_down_regular}">
@@ -127,8 +132,10 @@
                           Focusable="False"
                           VerticalAlignment="Stretch"
                           Background="Transparent"
-                          IsChecked="{Binding IsSinglePageMode, Mode=TwoWay}">
-				<!-- The icon and tooltip describe the mode the button is in. -->
+                          IsChecked="{Binding IsSinglePageMode, Mode=TwoWay}"
+                          AutomationProperties.Name="Single Page View">
+				<!-- The icon and tooltip describe the mode the button is in. The accessible name stays
+				     the same in both modes, as a toggle's should: its on/off state tells the mode. -->
 				<ToggleButton.Styles>
 					<Style Selector="ToggleButton > PathIcon">						
                         <Setter Property="Data" Value="{StaticResource document_page_break_regular}" />
@@ -151,7 +158,8 @@
                     HorizontalAlignment="Center"
                     VerticalAlignment="Stretch"
                     Background="Transparent"
-                    Command="{Binding RotateAllPagesCounterclockwiseCommand}">
+                    Command="{Binding RotateAllPagesCounterclockwiseCommand}"
+                    AutomationProperties.Name="Rotate Pages Counterclockwise">
 				<PathIcon Width="17"
                           Height="17"
                           Data="{StaticResource arrow_rotate_counterclockwise_regular}">
@@ -164,7 +172,8 @@
                     HorizontalAlignment="Center"
                     VerticalAlignment="Stretch"
                     Background="Transparent"
-                    Command="{Binding RotateAllPagesClockwiseCommand}">
+                    Command="{Binding RotateAllPagesClockwiseCommand}"
+                    AutomationProperties.Name="Rotate Pages Clockwise">
 				<PathIcon Width="17"
                           Height="17"
                           Data="{StaticResource arrow_rotate_clockwise_regular}">
@@ -180,7 +189,8 @@
 					HorizontalAlignment="Center"
 					VerticalAlignment="Stretch"
 					Background="Transparent"
-					Command="{Binding ZoomOutCommand}">
+					Command="{Binding ZoomOutCommand}"
+					AutomationProperties.Name="Zoom Out">
 				<PathIcon Width="17"
 						  Height="17"
 						  Data="{StaticResource zoom_out_regular}">
@@ -193,7 +203,8 @@
 					HorizontalAlignment="Center"
 					VerticalAlignment="Stretch"
 					Background="Transparent"
-					Command="{Binding ZoomInCommand}">
+					Command="{Binding ZoomInCommand}"
+					AutomationProperties.Name="Zoom In">
 				<PathIcon Width="17"
 						  Height="17"
 						  Data="{StaticResource zoom_in_regular}">
@@ -210,6 +221,85 @@
 					   VerticalAlignment="Center"
 					   HorizontalAlignment="Center"/>
 
+			<!-- Zoom fit modes. The icon shows the active mode. -->
+			<DropDownButton DockPanel.Dock="Left"
+                            Focusable="False"
+                            VerticalAlignment="Stretch"
+                            Background="Transparent"
+                            ToolTip.Tip="Fit"
+                            AutomationProperties.Name="Fit">
+				<DropDownButton.Styles>
+					<Style Selector="PathIcon.zoomFit">
+						<Setter Property="Data" Value="{StaticResource full_screen_zoom_regular}" />
+					</Style>
+					<Style Selector="PathIcon.zoomFit.fitPage">
+						<Setter Property="Data" Value="{StaticResource mobile_optimized_regular}" />
+					</Style>
+					<Style Selector="PathIcon.zoomFit.fitWidth">
+						<Setter Property="Data" Value="{StaticResource arrow_autofit_width_regular}" />
+					</Style>
+					<Style Selector="PathIcon.zoomFit.fitContent">
+						<Setter Property="Data" Value="{StaticResource page_fit_regular}" />
+						<Setter Property="RenderTransform" Value="rotate(90deg)" />
+					</Style>
+					<Style Selector="PathIcon.zoomFit.fitContentWidth">
+						<Setter Property="Data" Value="{StaticResource autofit_content_regular}" />
+						<Setter Property="RenderTransform" Value="scaleY(-1)" />
+					</Style>
+				</DropDownButton.Styles>
+
+				<PathIcon Classes="zoomFit"
+                          Width="17"
+                          Height="17"
+                          Classes.fitPage="{Binding IsFitPageMode}"
+                          Classes.fitWidth="{Binding IsFitWidthMode}"
+                          Classes.fitContent="{Binding IsFitContentMode}"
+                          Classes.fitContentWidth="{Binding IsFitContentWidthMode}"/>
+
+				<DropDownButton.Flyout>
+					<MenuFlyout Placement="BottomEdgeAlignedLeft">
+						<MenuItem Header="Actual size"
+                                  Command="{Binding ActualSizeCommand}"
+                                  InputGesture="{x:Static utilities:CalyHotkeyConfiguration.DocumentActualSizeGesture}"/>
+
+						<Separator/>
+
+						<!-- Picking the active mode again re-applies it (DocumentViewModel.SetZoomMode) -->
+						<MenuItem Header="Fit page"
+                                  ToggleType="Radio"
+                                  GroupName="ZoomFit"
+                                  IsChecked="{Binding IsFitPageMode, Mode=OneWay}"
+                                  Command="{Binding SetZoomModeCommand}"
+                                  CommandParameter="{x:Static models:ZoomMode.FitPage}"
+                                  InputGesture="{x:Static utilities:CalyHotkeyConfiguration.DocumentFitPageGesture}"/>
+
+						<MenuItem Header="Fit width"
+                                  ToggleType="Radio"
+                                  GroupName="ZoomFit"
+                                  IsChecked="{Binding IsFitWidthMode, Mode=OneWay}"
+                                  Command="{Binding SetZoomModeCommand}"
+                                  CommandParameter="{x:Static models:ZoomMode.FitWidth}"
+                                  InputGesture="{x:Static utilities:CalyHotkeyConfiguration.DocumentFitWidthGesture}"/>
+
+						<MenuItem Header="Fit content"
+                                  ToggleType="Radio"
+                                  GroupName="ZoomFit"
+                                  IsChecked="{Binding IsFitContentMode, Mode=OneWay}"
+                                  Command="{Binding SetZoomModeCommand}"
+                                  CommandParameter="{x:Static models:ZoomMode.FitContent}"
+                                  InputGesture="{x:Static utilities:CalyHotkeyConfiguration.DocumentFitContentGesture}"/>
+
+						<MenuItem Header="Fit content width"
+                                  ToggleType="Radio"
+                                  GroupName="ZoomFit"
+                                  IsChecked="{Binding IsFitContentWidthMode, Mode=OneWay}"
+                                  Command="{Binding SetZoomModeCommand}"
+                                  CommandParameter="{x:Static models:ZoomMode.FitContentWidth}"
+                                  InputGesture="{x:Static utilities:CalyHotkeyConfiguration.DocumentFitContentWidthGesture}"/>
+					</MenuFlyout>
+				</DropDownButton.Flyout>
+			</DropDownButton>
+
 			<controls:VerticalSeparator/>
 
 			<!-- Print -->
@@ -219,7 +309,8 @@
 					HorizontalAlignment="Center"
 					VerticalAlignment="Stretch"
 					Background="Transparent"
-					Command="{Binding PrintCommand}">
+					Command="{Binding PrintCommand}"
+					AutomationProperties.Name="Print">
 				<PathIcon Width="17"
 						  Height="17"
 						  Data="{StaticResource print_regular}">

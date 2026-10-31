@@ -32,6 +32,7 @@
         <Setter Property="IsRotating" Value="{Binding IsRotating}"/>
         <Setter Property="Rotation" Value="{Binding Rotation}"/>
 		<Setter Property="Picture" Value="{Binding PdfPicture}"/>
+		<Setter Property="ContentBounds" Value="{Binding ContentBounds}"/>
 		<Setter Property="VisibleArea" Value="{Binding VisibleArea}"/>
 		<Setter Property="IsPageLoading" Value="{Binding IsPageLoading}"/>
 		<Setter Property="IsPageVisible" Value="{Binding IsPageVisible}"/>

@@ -3,7 +3,8 @@
         xmlns:controls="using:Caly.Core.Controls"
         xmlns:vm="clr-namespace:Caly.Core.ViewModels"
         xmlns:progRing="clr-namespace:AvaloniaProgressRing;assembly=AvaloniaProgressRing"
-        xmlns:utilities="clr-namespace:Caly.Core.Utilities">
+        xmlns:utilities="clr-namespace:Caly.Core.Utilities"
+        xmlns:models="clr-namespace:Caly.Core.Models">
 
 	<Design.PreviewWith>
 		<controls:DocumentControl x:DataType="vm:DocumentViewModel" Width="630" Height="630"/>
@@ -33,6 +34,11 @@
                         <KeyBinding Gesture="{x:Static utilities:CalyHotkeyConfiguration.DocumentCloseGesture}" Command="{Binding CloseDocumentCommand}" />
                         <KeyBinding Gesture="{x:Static utilities:CalyHotkeyConfiguration.DocumentZoomInGesture}" Command="{Binding ZoomInCommand}" />
                         <KeyBinding Gesture="{x:Static utilities:CalyHotkeyConfiguration.DocumentZoomOutGesture}" Command="{Binding ZoomOutCommand}" />
+                        <KeyBinding Gesture="{x:Static utilities:CalyHotkeyConfiguration.DocumentFitPageGesture}" Command="{Binding SetZoomModeCommand}" CommandParameter="{x:Static models:ZoomMode.FitPage}" />
+                        <KeyBinding Gesture="{x:Static utilities:CalyHotkeyConfiguration.DocumentActualSizeGesture}" Command="{Binding ActualSizeCommand}" />
+                        <KeyBinding Gesture="{x:Static utilities:CalyHotkeyConfiguration.DocumentFitWidthGesture}" Command="{Binding SetZoomModeCommand}" CommandParameter="{x:Static models:ZoomMode.FitWidth}" />
+                        <KeyBinding Gesture="{x:Static utilities:CalyHotkeyConfiguration.DocumentFitContentGesture}" Command="{Binding SetZoomModeCommand}" CommandParameter="{x:Static models:ZoomMode.FitContent}" />
+                        <KeyBinding Gesture="{x:Static utilities:CalyHotkeyConfiguration.DocumentFitContentWidthGesture}" Command="{Binding SetZoomModeCommand}" CommandParameter="{x:Static models:ZoomMode.FitContentWidth}" />
                     </Grid.KeyBindings>
 
                     <!-- The pages control -->

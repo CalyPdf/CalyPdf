@@ -58,6 +58,11 @@ public sealed partial class DocumentViewModel : ViewModelBase
     private readonly IPdfDocumentService _pdfService;
     private readonly PdfPageService _pdfPageService;
 
+    /// <summary>
+    /// <c>null</c> in tests that do not care about settings, and on platforms that have none yet.
+    /// </summary>
+    private readonly ISettingsService? _settingsService;
+
     private readonly CancellationTokenSource _mainCts = new();
     private readonly CancellationToken _mainToken;
 
@@ -211,8 +216,11 @@ public sealed partial class DocumentViewModel : ViewModelBase
     }
 #endif
 
+    /// <param name="settingsService">Supplies the zoom a document opens with. Optional, like
+    /// <see cref="PdfPageService"/>'s, so tests that do not care about settings need none; the
+    /// DI container always passes it.</param>
     public DocumentViewModel(IPdfDocumentService pdfService, PdfPageService pdfPageService,
-        ITextSearchService textSearchService)
+        ITextSearchService textSearchService, ISettingsService? settingsService = null)
     {
         ArgumentNullException.ThrowIfNull(pdfService, nameof(pdfService));
 
@@ -222,6 +230,7 @@ public sealed partial class DocumentViewModel : ViewModelBase
         _pdfService = pdfService;
         _pdfPageService = pdfPageService;
         _textSearchService = textSearchService;
+        _settingsService = settingsService;
 
         _pdfService.PasswordPrompt = RequestPasswordAsync;
 
@@ -462,6 +471,8 @@ public sealed partial class DocumentViewModel : ViewModelBase
 
             if (state == DocumentOpeningState.Success)
             {
+                // Unknown values in the settings file are reset to Manual when settings load
+                ZoomMode = _settingsService?.GetSettings().DefaultZoomMode ?? ZoomMode.Manual;
                 PageCount = numberOfPages;
                 TextSelection = new TextSelection(numberOfPages);
                 if (numberOfPages > 0)

@@ -73,6 +73,12 @@ public sealed class CalySettings
     /// </summary>
     public int TileCacheSizeMB { get; set; }
 
+    /// <summary>
+    /// The zoom a document opens with. <see cref="ZoomMode.Manual"/>, the default, opens at 100%.
+    /// A fit mode keeps fitting as the window changes, until the user zooms by hand.
+    /// </summary>
+    public ZoomMode DefaultZoomMode { get; set; }
+
     public CalySettingsDebug? Debug { get; set; }
 
 

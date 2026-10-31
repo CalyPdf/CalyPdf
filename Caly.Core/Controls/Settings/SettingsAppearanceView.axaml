@@ -1,6 +1,8 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:Caly.Core.ViewModels"
+             xmlns:models="clr-namespace:Caly.Core.Models"
+             xmlns:converters="clr-namespace:Caly.Core.Converters"
              x:Class="Caly.Core.Controls.Settings.SettingsAppearanceView"
              x:DataType="vm:MainViewModel"
              x:CompileBindings="True">
@@ -19,6 +21,30 @@
                   ToolTip.Tip="System matches your operating system's light or dark setting, and keeps matching it if you change it."/>
 
         <TextBlock Text="Applies straight away."
+                   FontSize="11"
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
+
+        <Separator Margin="0,4"/>
+
+        <TextBlock Text="Documents"
+                   FontWeight="SemiBold"/>
+
+        <TextBlock Text="Default zoom"
+                   Margin="0,2,0,0"/>
+
+        <ComboBox ItemsSource="{Binding ZoomModeOptions}"
+                  SelectedItem="{Binding DefaultZoomMode, Mode=TwoWay}"
+                  HorizontalAlignment="Stretch"
+                  ToolTip.Tip="The zoom a document opens with. A fit mode keeps fitting as the window changes, until you zoom by hand.">
+            <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="models:ZoomMode">
+                    <TextBlock Text="{Binding Converter={x:Static converters:ZoomModeDisplayNameConverter.Instance}}"/>
+                </DataTemplate>
+            </ComboBox.ItemTemplate>
+        </ComboBox>
+
+        <TextBlock Text="Applies to the next document opened."
                    FontSize="11"
                    TextWrapping="Wrap"
                    Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>

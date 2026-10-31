@@ -20,6 +20,7 @@
 
 using System;
 using Avalonia;
+using Caly.Core.Models;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -52,9 +53,48 @@ public partial class DocumentViewModel
     /// </summary>
     [ObservableProperty] private Vector _scrollOffset;
 
+    /// <summary>
+    /// How the zoom is chosen. The view applies the fit modes and keeps them applied as the viewer
+    /// changes size; a zoom picked by hand switches back to <see cref="ZoomMode.Manual"/>.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsFitPageMode), nameof(IsFitWidthMode), nameof(IsFitContentMode),
+        nameof(IsFitContentWidthMode))]
+    public partial ZoomMode ZoomMode { get; set; }
+
+    public bool IsFitPageMode => ZoomMode == ZoomMode.FitPage;
+
+    public bool IsFitWidthMode => ZoomMode == ZoomMode.FitWidth;
+
+    public bool IsFitContentMode => ZoomMode == ZoomMode.FitContent;
+
+    public bool IsFitContentWidthMode => ZoomMode == ZoomMode.FitContentWidth;
+
+    [RelayCommand]
+    private void SetZoomMode(ZoomMode mode)
+    {
+        if (mode != ZoomMode.Manual && mode == ZoomMode)
+        {
+            // The view fits on every change into a fit mode, so passing through Manual re-applies
+            // the active one: picking it again snaps the page back into view after scrolling.
+            ZoomMode = ZoomMode.Manual;
+        }
+
+        ZoomMode = mode;
+    }
+
+    [RelayCommand]
+    private void ActualSize()
+    {
+        ZoomMode = ZoomMode.Manual;
+        ZoomLevel = 1;
+    }
+
     [RelayCommand(CanExecute = nameof(CanZoomIn))]
     private void ZoomIn()
     {
+        ZoomMode = ZoomMode.Manual;
+
         var index = Array.BinarySearch(ZoomLevelsDiscrete, ZoomLevel);
         if (index < -1)
         {
@@ -79,6 +119,8 @@ public partial class DocumentViewModel
     [RelayCommand(CanExecute = nameof(CanZoomOut))]
     private void ZoomOut()
     {
+        ZoomMode = ZoomMode.Manual;
+
         var index = Array.BinarySearch(ZoomLevelsDiscrete, ZoomLevel);
         if (index < -1)
         {

@@ -56,6 +56,17 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
     private IRef<SKPicture>? _pdfPicture;
 
     /// <summary>
+    /// The bounds of what the page draws, in the unrotated page's coordinates (top-left origin,
+    /// scaled by <see cref="PpiScale"/>, like <see cref="Size"/>). <c>null</c> until the page's
+    /// picture has been rendered once, or when the page draws nothing.
+    /// <para>
+    /// Kept when the picture is evicted: the page's content does not change, and the zoom fit
+    /// modes need the box of pages that are not being drawn.
+    /// </para>
+    /// </summary>
+    [ObservableProperty] public partial Rect? ContentBounds { get; set; }
+
+    /// <summary>
     /// Page size, scaled by <see cref="PpiScale"/>.
     /// </summary>
     [ObservableProperty]
@@ -169,6 +180,31 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
     public bool IsSizeSet()
     {
         return Interlocked.Read(ref _isSizeSet) == 1;
+    }
+
+    partial void OnPdfPictureChanged(IRef<SKPicture>? value)
+    {
+        if (value?.IsAlive == true)
+        {
+            ContentBounds = ComputeContentBounds(value.Item.CullRect, PpiScale);
+        }
+    }
+
+    /// <summary>
+    /// Maps a page picture's cull rect to <see cref="ContentBounds"/>. Pages are recorded with an
+    /// R-tree, so Skia trims the cull rect to the bounds of what was drawn (conservatively: it
+    /// ignores clips, and strokes and text are bounded loosely).
+    /// </summary>
+    /// <returns><c>null</c> when nothing was drawn.</returns>
+    internal static Rect? ComputeContentBounds(SKRect cullRect, double ppiScale)
+    {
+        if (cullRect.IsEmpty || cullRect.Width <= 0 || cullRect.Height <= 0)
+        {
+            return null;
+        }
+
+        return new Rect(cullRect.Left * ppiScale, cullRect.Top * ppiScale,
+            cullRect.Width * ppiScale, cullRect.Height * ppiScale);
     }
 
     partial void OnPdfTextLayerChanged(PdfTextLayer? value)

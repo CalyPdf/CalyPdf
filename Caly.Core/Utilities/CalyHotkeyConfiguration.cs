@@ -29,6 +29,11 @@ internal static class CalyHotkeyConfiguration
 {
     private static readonly KeyModifiers CommandModifiers;
 
+    /// <summary>
+    /// The modifier of the zoom shortcuts (the fit modes and actual size). See <see cref="GetZoomModifiers"/>.
+    /// </summary>
+    private static readonly KeyModifiers ZoomModifiers;
+
     static CalyHotkeyConfiguration()
     {
         if (Application.Current?.PlatformSettings is null)
@@ -37,7 +42,15 @@ internal static class CalyHotkeyConfiguration
         }
 
         CommandModifiers = Application.Current.PlatformSettings.HotkeyConfiguration.CommandModifiers;
+        ZoomModifiers = GetZoomModifiers(CommandModifiers);
     }
+
+    /// <summary>
+    /// The modifier of the zoom shortcuts on a platform whose command modifier is
+    /// <paramref name="commandModifiers"/>: Alt, or Cmd where the command key is Cmd (macOS).
+    /// </summary>
+    internal static KeyModifiers GetZoomModifiers(KeyModifiers commandModifiers) =>
+        commandModifiers == KeyModifiers.Meta ? KeyModifiers.Meta : KeyModifiers.Alt;
 
     /// <summary>
     /// Gets a platform-specific <see cref="KeyGesture"/> for the 'Copy' action.
@@ -68,6 +81,31 @@ internal static class CalyHotkeyConfiguration
     /// Gets a platform-specific <see cref="KeyGesture"/> for the 'Zoom Out' action.
     /// </summary>
     public static KeyGesture DocumentZoomOutGesture => new KeyGesture(Key.OemMinus, CommandModifiers);
+
+    /// <summary>
+    /// Gets a platform-specific <see cref="KeyGesture"/> for the 'Fit Page' zoom mode.
+    /// </summary>
+    public static KeyGesture DocumentFitPageGesture => new KeyGesture(Key.D0, ZoomModifiers);
+
+    /// <summary>
+    /// Gets a platform-specific <see cref="KeyGesture"/> for the 'Actual Size' (100%) action.
+    /// </summary>
+    public static KeyGesture DocumentActualSizeGesture => new KeyGesture(Key.D1, ZoomModifiers);
+
+    /// <summary>
+    /// Gets a platform-specific <see cref="KeyGesture"/> for the 'Fit Width' zoom mode.
+    /// </summary>
+    public static KeyGesture DocumentFitWidthGesture => new KeyGesture(Key.D2, ZoomModifiers);
+
+    /// <summary>
+    /// Gets a platform-specific <see cref="KeyGesture"/> for the 'Fit Content' zoom mode.
+    /// </summary>
+    public static KeyGesture DocumentFitContentGesture => new KeyGesture(Key.D3, ZoomModifiers);
+
+    /// <summary>
+    /// Gets a platform-specific <see cref="KeyGesture"/> for the 'Fit Content Width' zoom mode.
+    /// </summary>
+    public static KeyGesture DocumentFitContentWidthGesture => new KeyGesture(Key.D4, ZoomModifiers);
 
     /// <summary>
     /// Gets a platform-specific <see cref="KeyGesture"/> for the 'Search in Document' action.

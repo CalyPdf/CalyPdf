@@ -26,6 +26,7 @@ using Avalonia.Layout;
 using Avalonia.Media.Transformation;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Caly.Core.Models;
 using Caly.Core.Utilities;
 
 namespace Caly.Core.Controls;
@@ -93,20 +94,47 @@ internal sealed class ZoomPanController
 
     private void ApplyExternalZoomLevel()
     {
+        TryZoomTo(_owner.ZoomLevel);
+    }
+
+    /// <summary>
+    /// Zooms to <paramref name="newZoom"/>, synchronously: the layout is up to date when this
+    /// returns, so the caller can position the view on it (the zoom fit modes do).
+    /// </summary>
+    /// <param name="newZoom">The zoom level.</param>
+    /// <param name="keepTopInPlace"><c>false</c> to zoom around the viewport centre. <c>true</c> to
+    /// keep the content at the viewport's top edge in place instead: what the zoom fit modes do, as
+    /// a saved position (opening a document, switching tabs) and reading both anchor at the top.
+    /// Zooming in around the centre would push the top of the page out of view.</param>
+    /// <param name="afterLayout"><c>true</c> when the caller runs from <see cref="Layoutable.LayoutUpdated"/>:
+    /// the layout pass has laid out any zoom still in flight, so this one applies even while
+    /// <see cref="IsZooming"/>.</param>
+    /// <returns><c>false</c> when the zoom cannot be applied now: no layout yet, or another zoom
+    /// still in flight (see <see cref="IsZooming"/>). <c>true</c> when applied, or already at
+    /// <paramref name="newZoom"/>.</returns>
+    public bool TryZoomTo(double newZoom, bool keepTopInPlace = false, bool afterLayout = false)
+    {
         var layoutTransform = _owner.LayoutTransform;
-        if (layoutTransform is null || !layoutTransform.IsAttachedToVisualTree())
+        if (layoutTransform is null || !layoutTransform.IsAttachedToVisualTree() || _owner.Scroll is null ||
+            (IsZooming && !afterLayout))
         {
-            return;
+            return false;
         }
 
-        double newZoom = _owner.ZoomLevel;
         double currentScale = layoutTransform.LayoutTransform?.Value.M11 ?? 1.0;
         if (Math.Abs(currentScale - newZoom) < 1e-9)
         {
-            return; // Ignore as no change in zoom level
+            return true; // Ignore as no change in zoom level
         }
 
         double dZoom = newZoom / currentScale;
+
+        if (keepTopInPlace &&
+            _owner.Scroll.TranslatePoint(new Point(_owner.Scroll.Viewport.Width / 2, 0), layoutTransform) is { } top)
+        {
+            ZoomTo(dZoom, top, afterLayout);
+            return true;
+        }
 
         double w = 0, h = 0;
         if (!_owner.DesiredSize.IsEmpty())
@@ -120,7 +148,8 @@ internal sealed class ZoomPanController
 
         var pixelPoint = _owner.PointToScreen(new Point((int)(w / 2.0), (int)(h / 2.0)));
         var point = layoutTransform.PointToClient(pixelPoint);
-        ZoomTo(dZoom, point);
+        ZoomTo(dZoom, point, afterLayout);
+        return true;
     }
 
     /// <summary>
@@ -154,6 +183,7 @@ internal sealed class ZoomPanController
         try
         {
             IsZooming = true;
+            LeaveFitMode();
             double dZoom = Math.Round(Math.Pow(ZoomFactor, e.Delta.Y), 4); // If IsScrollInertiaEnabled = false, Y is only 1 or -1
             ZoomToInternal(dZoom, e.GetPosition(_owner.LayoutTransform));
         }
@@ -163,14 +193,14 @@ internal sealed class ZoomPanController
         }
     }
 
-    private void ZoomTo(double dZoom, Point point)
+    private void ZoomTo(double dZoom, Point point, bool afterLayout)
     {
         if (_owner.LayoutTransform is null || _owner.Scroll is null)
         {
             return;
         }
 
-        if (IsZooming)
+        if (IsZooming && !afterLayout)
         {
             return;
         }
@@ -183,6 +213,18 @@ internal sealed class ZoomPanController
         finally
         {
             SetZoomFinished();
+        }
+    }
+
+    /// <summary>
+    /// A zoom picked by hand (wheel, pinch) ends any zoom fit mode. Written through the two-way
+    /// binding, so the document's mode follows.
+    /// </summary>
+    private void LeaveFitMode()
+    {
+        if (_owner.ZoomMode != ZoomMode.Manual)
+        {
+            _owner.SetCurrentValue(PageItemsControl.ZoomModeProperty, ZoomMode.Manual);
         }
     }
 
@@ -373,6 +415,7 @@ internal sealed class ZoomPanController
         try
         {
             IsZooming = true;
+            LeaveFitMode();
 
             // Pinch zoom always starts with a scale of 1, then increase/decrease until PinchEnded
             double dZoom = (e.Scale * _pinchZoomReference) / _owner.ZoomLevel;

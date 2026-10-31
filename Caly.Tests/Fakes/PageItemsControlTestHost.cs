@@ -1,12 +1,17 @@
 using System.Collections;
+using System.Globalization;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
+using Avalonia.Data;
 using Avalonia.Layout;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using Caly.Core.Controls;
+using Caly.Core.Converters;
+using Caly.Core.Models;
 
 namespace Caly.Tests.Fakes;
 
@@ -76,6 +81,85 @@ internal static class PageItemsControlTestHost
             }
         });
 
+        return control;
+    }
+
+    /// <summary>
+    /// A host for the zoom fit modes, closer to PageItemsControl.axaml than <see cref="Create(int, double)"/>:
+    /// <list type="bullet">
+    /// <item>the scroll bars take room from the viewport (<c>AllowAutoHide=False</c>);</item>
+    /// <item>each page is sized from its item, a <see cref="Size"/>, on the page itself, as PageItem's
+    /// Width/Height bind DisplayWidth/DisplayHeight;</item>
+    /// <item>an optional zoom-dependent page gap, as in PageItem.axaml.</item>
+    /// </list>
+    /// Pass an <see cref="System.Collections.ObjectModel.ObservableCollection{T}"/> to change the
+    /// pages after the control is shown.
+    /// </summary>
+    public static PageItemsControl CreateFitHost(IList<Size> pageSizes, bool singlePage = false, double pageGap = 0)
+    {
+        var control = new PageItemsControl
+        {
+            MinZoomLevel = 0.1,
+            MaxZoomLevel = 10,
+            PageCount = pageSizes.Count,
+            Focusable = true,
+            Template = new FuncControlTemplate<PageItemsControl>((owner, scope) =>
+                InScope(new ScrollViewer
+                {
+                    Name = "PART_ScrollViewer",
+                    Focusable = true,
+                    AllowAutoHide = false,
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    Content = InScope(new LayoutTransformControl
+                    {
+                        Name = "PART_LayoutTransformControl",
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        ClipToBounds = true,
+                        Child = new ItemsPresenter
+                        {
+                            HorizontalAlignment = HorizontalAlignment.Center,
+                            VerticalAlignment = VerticalAlignment.Stretch,
+                            [!ItemsPresenter.ItemsPanelProperty] = owner[!ItemsControl.ItemsPanelProperty]
+                        }
+                    }, scope)
+                }, scope)),
+            ItemsSource = pageSizes
+        };
+
+        if (singlePage)
+        {
+            control.PageDisplayMode = PageDisplayMode.SinglePage;
+        }
+
+        var pageStyle = new Style(x => x.OfType<PageItem>())
+        {
+            Setters =
+            {
+                new Setter(Layoutable.WidthProperty, new Binding(nameof(Size.Width))),
+                new Setter(Layoutable.HeightProperty, new Binding(nameof(Size.Height))),
+                new Setter(Layoutable.UseLayoutRoundingProperty, false),
+                new Setter(TemplatedControl.TemplateProperty, new FuncControlTemplate<PageItem>((_, scope) =>
+                    InScope(new PageInteractiveLayerControl { Name = "PART_PageInteractiveLayerControl" }, scope)))
+            }
+        };
+
+        if (pageGap > 0)
+        {
+            pageStyle.Setters.Add(new Setter(Layoutable.MarginProperty, new Binding
+            {
+                Path = nameof(PageItemsControl.ZoomLevel),
+                RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor)
+                {
+                    AncestorType = typeof(PageItemsControl)
+                },
+                Converter = ZoomToPageSpacingConverter.Instance,
+                ConverterParameter = pageGap.ToString(CultureInfo.InvariantCulture)
+            }));
+        }
+
+        control.Styles.Add(pageStyle);
         return control;
     }
 

@@ -518,7 +518,7 @@ public sealed class JsonSettingsService : ISettingsService
     /// </summary>
     private string TempSettingsFile => _settingsFile + ".tmp";
 
-    private static void ValidateSetting(CalySettings? settings)
+    internal static void ValidateSetting(CalySettings? settings)
     {
         if (settings is null)
         {
@@ -543,6 +543,12 @@ public sealed class JsonSettingsService : ISettingsService
         if (!IsValidTileCacheSize(settings.TileCacheSizeMB))
         {
             settings.TileCacheSizeMB = DefaultTileCacheSizeMB;
+        }
+
+        // A number in the file reads as any value; only the named modes mean something.
+        if (!Enum.IsDefined(settings.DefaultZoomMode))
+        {
+            settings.DefaultZoomMode = ZoomMode.Manual;
         }
     }
 
