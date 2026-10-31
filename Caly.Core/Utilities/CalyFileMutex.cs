@@ -20,6 +20,7 @@
 
 using System;
 using System.IO;
+using Caly.Core.Services;
 
 namespace Caly.Core.Utilities;
 
@@ -40,7 +41,10 @@ namespace Caly.Core.Utilities;
 /// </summary>
 public sealed class CalyFileMutex
 {
-    private static readonly string LockFileName = Path.Combine(Path.GetTempPath(), "caly.lock");
+    // Per user, not the temp folder: on Linux that is the shared /tmp, where one user's lock blocked every other user.
+    private static readonly string DefaultLockFilePath = Path.Combine(JsonSettingsService.SettingsFilePath, "caly.lock");
+
+    private readonly string _lockFilePath;
 
     private FileStream? _lockFile;
 
@@ -49,13 +53,20 @@ public sealed class CalyFileMutex
     /// </summary>
     /// <param name="initiallyOwned">Not in use.</param>
     /// <param name="name">Not in use.</param>
-    public CalyFileMutex(bool initiallyOwned, string? name)
+    public CalyFileMutex(bool initiallyOwned, string? name) : this(DefaultLockFilePath)
     {
-        // Same signature as default System.Threading.Mutex
     }
 
     /// <summary>
-    /// 
+    /// Locks a specific file (used by tests).
+    /// </summary>
+    internal CalyFileMutex(string lockFilePath)
+    {
+        _lockFilePath = lockFilePath;
+    }
+
+    /// <summary>
+    /// Takes the lock if no other process holds it.
     /// </summary>
     /// <param name="timeout">Not in use.</param>
     /// <param name="b">Not in use.</param>
@@ -65,12 +76,15 @@ public sealed class CalyFileMutex
 
         try
         {
-            // Force FileMode.CreateNew - if the file already exists, should throw (done for Linux)
-            _lockFile = new FileStream(LockFileName, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.Delete);
+            Directory.CreateDirectory(Path.GetDirectoryName(_lockFilePath)!);
+
+            // FileShare.None is an OS lock (sharing mode on Windows, flock on Unix) that dies with
+            // the process, so a crashed instance leaves no stale lock and nobody can delete a live one.
+            _lockFile = new FileStream(_lockFilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         }
         catch (IOException)
         {
-            // File already in use
+            // Held by another instance
             return false;
         }
 
@@ -79,36 +93,14 @@ public sealed class CalyFileMutex
 
     public void ReleaseMutex()
     {
-        try
-        {
-            File.Delete(LockFileName);
-        }
-        catch (Exception e)
-        {
-            Debug.WriteExceptionToFile(e);
-        }
-
         if (_lockFile is null)
         {
-            throw new NullReferenceException("Cannot release file mutex, because the file is null.");
+            throw new InvalidOperationException("Cannot release file mutex, because it is not held.");
         }
 
+        // The file is left in place: on Unix, deleting it would let a newcomer lock a fresh file
+        // while a second newcomer still holds the unlinked one, giving two main instances.
         _lockFile.Dispose();
         _lockFile = null;
-    }
-
-    public static bool ForceReleaseMutex()
-    {
-        try
-        {
-            File.Delete(LockFileName);
-            return true;
-        }
-        catch (Exception e)
-        {
-            Debug.WriteExceptionToFile(e);
-        }
-
-        return false;
     }
 }
