@@ -99,7 +99,10 @@ internal sealed partial class PdfDocumentsManagerService : IPdfDocumentsManagerS
     private readonly ChannelReader<OpenDocumentRequest> _channelReader;
     private readonly CancellationTokenSource _processingQueueCts = new();
 
-    private readonly ConcurrentDictionary<string, PdfDocumentRecord> _openedFiles = new();
+    // Same rule as the default file systems: case-insensitive on Windows and macOS, so
+    // 'C:\a.pdf' and 'c:\A.PDF' are one open document, not two tabs.
+    private readonly ConcurrentDictionary<string, PdfDocumentRecord> _openedFiles =
+        new(OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
 
     private async Task ProcessDocumentsQueue(CancellationToken token)
     {
