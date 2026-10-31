@@ -189,8 +189,16 @@ public sealed class JsonSettingsService : ISettingsService
         return false;
     }
 
-    internal JsonSettingsService(Visual target, ICalyWindowRegistry? windowRegistry = null)
+    /// <summary>
+    /// The file this instance loads and saves. Only tests point it elsewhere.
+    /// </summary>
+    private readonly string _settingsFile;
+
+    internal JsonSettingsService(Visual target, ICalyWindowRegistry? windowRegistry = null, string? settingsFile = null)
     {
+        _settingsFile = settingsFile ?? SettingsFileFullPath;
+
+
         if (Globals.IsMobilePlatform())
         {
             SetDefaultSettings(); // TODO - Create proper mobile class
@@ -494,15 +502,32 @@ public sealed class JsonSettingsService : ISettingsService
         return _current!;
     }
 
+    /// <summary>
+    /// Falls back to defaults, keeping the unreadable file as <c>caly_settings.bad</c> so a hand
+    /// edit with a typo can be repaired instead of being lost (the next save writes defaults).
+    /// </summary>
     private void HandleCorruptedFile()
     {
-        if (File.Exists(SettingsFileFullPath))
+        try
         {
-            File.Delete(SettingsFileFullPath);
+            if (File.Exists(_settingsFile))
+            {
+                File.Move(_settingsFile, _settingsFile + ".bad", overwrite: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteExceptionToFile(ex);
         }
 
         SetDefaultSettings();
     }
+
+    /// <summary>
+    /// Writes to a temporary file, then swaps it in, so a crash mid-write leaves the previous
+    /// settings intact instead of a truncated file.
+    /// </summary>
+    private string TempSettingsFile => _settingsFile + ".tmp";
 
     private static void ValidateSetting(CalySettings? settings)
     {
@@ -546,11 +571,11 @@ public sealed class JsonSettingsService : ISettingsService
 
         try
         {
-            if (!File.Exists(SettingsFileFullPath))
+            if (!File.Exists(_settingsFile))
             {
                 SetDefaultSettings();
 
-                using (FileStream createStream = File.Create(SettingsFileFullPath))
+                using (FileStream createStream = File.Create(_settingsFile))
                 {
                     JsonSerializer.Serialize(createStream, _current, SourceGenerationContext.Default.CalySettings);
                 }
@@ -558,16 +583,22 @@ public sealed class JsonSettingsService : ISettingsService
                 return;
             }
 
-            using (FileStream createStream = File.OpenRead(SettingsFileFullPath))
+            bool isBadSize;
+            using (FileStream createStream = File.OpenRead(_settingsFile))
             {
-                if (createStream.Length is 0 or > MaxSettingsFileBytes)
+                isBadSize = createStream.Length is 0 or > MaxSettingsFileBytes;
+                if (!isBadSize)
                 {
-                    HandleCorruptedFile();
-                    return;
+                    // A file holding just 'null' deserialises to null.
+                    _current = JsonSerializer.Deserialize(createStream, SourceGenerationContext.Default.CalySettings);
+                    ValidateSetting(_current);
                 }
+            }
 
-                _current = JsonSerializer.Deserialize(createStream, SourceGenerationContext.Default.CalySettings);
-                ValidateSetting(_current);
+            // Outside the using: the file cannot be moved while it is still open.
+            if (isBadSize || _current is null)
+            {
+                HandleCorruptedFile();
             }
         }
         catch (JsonException jsonEx)
@@ -592,11 +623,11 @@ public sealed class JsonSettingsService : ISettingsService
 
         try
         {
-            if (!File.Exists(SettingsFileFullPath))
+            if (!File.Exists(_settingsFile))
             {
                 SetDefaultSettings();
 
-                await using (FileStream createStream = File.Create(SettingsFileFullPath))
+                await using (FileStream createStream = File.Create(_settingsFile))
                 {
                     await JsonSerializer.SerializeAsync(createStream, _current, SourceGenerationContext.Default.CalySettings)
                         .ConfigureAwait(false);
@@ -604,11 +635,16 @@ public sealed class JsonSettingsService : ISettingsService
                 return;
             }
 
-            await using (FileStream createStream = File.OpenRead(SettingsFileFullPath))
+            await using (FileStream createStream = File.OpenRead(_settingsFile))
             {
                 _current = await JsonSerializer.DeserializeAsync(createStream, SourceGenerationContext.Default.CalySettings)
                     .ConfigureAwait(false);
                 ValidateSetting(_current);
+            }
+
+            if (_current is null)
+            {
+                HandleCorruptedFile();
             }
         }
         catch (JsonException jsonEx)
@@ -633,15 +669,13 @@ public sealed class JsonSettingsService : ISettingsService
         {
             try
             {
-                using (FileStream createStream = File.Create(SettingsFileFullPath))
+                using (FileStream createStream = File.Create(TempSettingsFile))
                 {
                     JsonSerializer.Serialize(createStream, _current, SourceGenerationContext.Default.CalySettings);
+                    createStream.Flush(flushToDisk: true);
                 }
-            }
-            catch (JsonException jsonEx)
-            {
-                HandleCorruptedFile();
-                Debug.WriteExceptionToFile(jsonEx);
+
+                File.Move(TempSettingsFile, _settingsFile, overwrite: true);
             }
             catch (Exception ex)
             {
@@ -663,16 +697,14 @@ public sealed class JsonSettingsService : ISettingsService
         {
             try
             {
-                await using (FileStream createStream = File.Create(SettingsFileFullPath))
+                await using (FileStream createStream = File.Create(TempSettingsFile))
                 {
                     await JsonSerializer.SerializeAsync(createStream, _current, SourceGenerationContext.Default.CalySettings)
                         .ConfigureAwait(false);
+                    createStream.Flush(flushToDisk: true);
                 }
-            }
-            catch (JsonException jsonEx)
-            {
-                HandleCorruptedFile();
-                Debug.WriteExceptionToFile(jsonEx);
+
+                File.Move(TempSettingsFile, _settingsFile, overwrite: true);
             }
             catch (Exception ex)
             {
