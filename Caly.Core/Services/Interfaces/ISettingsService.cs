@@ -18,7 +18,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-using System.Threading.Tasks;
 using Caly.Core.Models;
 using static Caly.Core.Models.CalySettings;
 
@@ -30,13 +29,7 @@ public interface ISettingsService
 
     CalySettings GetSettings();
 
-    ValueTask<CalySettings> GetSettingsAsync();
-
     void Load();
 
-    Task LoadAsync();
-
     void Save();
-
-    Task SaveAsync();
 }
