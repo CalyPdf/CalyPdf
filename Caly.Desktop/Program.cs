@@ -45,6 +45,12 @@ namespace Caly.Desktop
         [STAThread]
         public static void Main(string[] args)
         {
+            // Resolve a relative path against the caller's folder before the current directory changes below
+            if (args.Length > 0 && !string.IsNullOrEmpty(args[0]))
+            {
+                args[0] = Path.GetFullPath(args[0]);
+            }
+
             // Make sure the current directory is where the app is located, not where a file is opened
             Directory.SetCurrentDirectory(AppDomain.CurrentDomain.BaseDirectory);
 
