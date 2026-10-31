@@ -218,7 +218,7 @@ internal static class CalyExtensions
     {
         return Task.Run(() =>
         {
-            if (string.IsNullOrEmpty(path) || !IsValidPath(path) || !Directory.Exists(path))
+            if (string.IsNullOrEmpty(path))
             {
                 return;
             }
