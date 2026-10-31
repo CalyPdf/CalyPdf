@@ -40,3 +40,17 @@ public class CalyFileMutexTests
     }
 }
 
+public class CalyExtensionsNetworkPathTests
+{
+    [Theory]
+    [InlineData(@"\\attacker.example\share\x.pdf", true)]
+    [InlineData("//attacker.example/share/x.pdf", true)]
+    [InlineData(@"\\?\UNC\attacker.example\share\x.pdf", true)]
+    [InlineData(@"C:\Docs\x.pdf", false)]
+    [InlineData("/home/user/x.pdf", false)]
+    [InlineData("x.pdf", false)]
+    public void IsNetworkPath(string path, bool expected)
+    {
+        Assert.Equal(expected, CalyExtensions.IsNetworkPath(path));
+    }
+}

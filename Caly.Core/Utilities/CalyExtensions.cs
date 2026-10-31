@@ -97,6 +97,16 @@ internal static class CalyExtensions
                 return;
             }
 
+            if (IsNetworkPath(path))
+            {
+                // Checked before File.Exists, which would already connect: on Windows that sends
+                // the user's NTLM hash to whatever server a PDF link names.
+                App.Messenger.Send(new ShowNotificationMessage(NotificationType.Warning,
+                    "Network Path Blocked",
+                    $"'{path}' is on a network share and was not opened."));
+                return;
+            }
+
             if (!IsValidFilePath(path))
             {
                 App.Messenger.Send(new ShowNotificationMessage(NotificationType.Warning,
@@ -124,6 +134,15 @@ internal static class CalyExtensions
             var directory = Path.GetDirectoryName(path);
             await OpenDirectory(directory);
         });
+    }
+
+    /// <summary>
+    /// Whether <paramref name="path"/> is a UNC path (<c>\\server\share</c>, <c>//server/share</c>,
+    /// <c>\\?\UNC\...</c>), i.e. opening it would reach out to another machine.
+    /// </summary>
+    internal static bool IsNetworkPath(ReadOnlySpan<char> path)
+    {
+        return path.Length >= 2 && path[0] is '\\' or '/' && path[1] is '\\' or '/';
     }
 
     private static bool IsValidFilePath(ReadOnlySpan<char> path)
