@@ -21,7 +21,6 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -293,43 +292,15 @@ internal static class CalyExtensions
     /// </summary>
     private static void ProcessStart(string url)
     {
-        // https://brockallen.com/2016/09/24/process-start-for-urls-on-net-core/
-
         // See https://docs.avaloniaui.net/docs/concepts/services/launcher to use avalonia to do so
 
         Debug.ThrowOnUiThread();
 
         try
         {
-            Process.Start(url);
-        }
-        catch (Exception ex)
-        {
-            ProcessStartFallback(url);
-        }
-    }
-    
-    /// <summary>
-    /// Warning - sanitise the input as this will execute anything passed.
-    /// </summary>
-    private static void ProcessStartFallback(string url)
-    {
-        try
-        {
-            // hack because of this: https://github.com/dotnet/corefx/issues/10361
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                url = url.Replace("&", "^&");
-                Process.Start(new ProcessStartInfo("cmd", $"/c start \"\" \"{url}\"") { CreateNoWindow = true });
-            }
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                Process.Start("xdg-open", url);
-            }
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                Process.Start("open", url);
-            }
+            // Shell execute hands the url to the OS (ShellExecute / xdg-open / open), with no
+            // command line to escape: the old 'cmd /c start' route mangled '&' in query strings.
+            using var _ = Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
         }
         catch (Exception ex)
         {
