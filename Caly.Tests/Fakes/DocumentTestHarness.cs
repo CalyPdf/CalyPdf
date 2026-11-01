@@ -52,6 +52,9 @@ internal sealed class RenderingPdfDocumentService : IPdfDocumentService
     /// <summary>When set, <see cref="RenderGate"/> holds back that page's renders only.</summary>
     public int? GatedPage { get; set; }
 
+    /// <summary>Side of the square every page draws. Change it to make a re-render draw something else.</summary>
+    public float DrawnSide { get; set; } = 100;
+
     public async Task<IRef<SKPicture>?> GetRenderPageAsync(int pageNumber, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
@@ -65,10 +68,11 @@ internal sealed class RenderingPdfDocumentService : IPdfDocumentService
         }
 
         using var recorder = new SKPictureRecorder();
-        var canvas = recorder.BeginRecording(new SKRect(0, 0, 100, 100));
+        // Bounds follow what is drawn, as the R-tree real pages are recorded with trims them.
+        var canvas = recorder.BeginRecording(new SKRect(0, 0, DrawnSide, DrawnSide));
         using (var paint = new SKPaint { Color = SKColors.Red })
         {
-            canvas.DrawRect(new SKRect(0, 0, 100, 100), paint);
+            canvas.DrawRect(new SKRect(0, 0, DrawnSide, DrawnSide), paint);
         }
 
         return RefCountable.Create(recorder.EndRecording());

@@ -103,9 +103,10 @@ public partial class TiledPdfPageControl
         var service = TileRenderService;
         var pageDisplaySize = PageDisplaySize;
 
+        // No picture is not a reason to stop: an evicted picture leaves its tiles cached, and they are
+        // drawn while the page is parsed again. Only missing tiles need the picture.
         if (viewPort.IsEmpty()
             || !visibleArea.HasValue || visibleArea.Value.IsEmpty()
-            || picture?.IsAlive != true
             || service is null
             || pageDisplaySize.Width <= 0 || pageDisplaySize.Height <= 0)
         {
@@ -114,7 +115,9 @@ public partial class TiledPdfPageControl
             return;
         }
 
-        var cullRect = _ppiScaleMatrix.MapRect(picture.Item.CullRect);
+        var cullRect = picture?.IsAlive == true
+            ? _ppiScaleMatrix.MapRect(picture.Item.CullRect)
+            : viewPort.ToSKRect();
         int tileLevel = TileGrid.ComputeTileLevel(ZoomLevel);
         int pageNumber = PageNumber;
 

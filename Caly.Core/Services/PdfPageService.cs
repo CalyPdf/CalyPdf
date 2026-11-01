@@ -192,11 +192,17 @@ namespace Caly.Core.Services
         private const int ContinuousPageCacheBuffer = 1;
 
         /// <summary>
-        /// <see cref="ContinuousPageCacheBuffer"/> for single-page view. Only one page is realised there, and
-        /// evicting a picture also drops its tiles (<see cref="Rendering.TileRenderService.InvalidatePage"/>),
-        /// so this wider window is what lets the tile cache serve a turn back to a recently read page.
+        /// <see cref="ContinuousPageCacheBuffer"/> for single-page view, where only one page is realised:
+        /// turning back to a page within it needs no new parse.
         /// </summary>
         private const int SinglePageCacheBuffer = 3;
+
+        /// <summary>
+        /// What each page's last rendered picture drew. A page's tiles outlive its picture in the
+        /// tile cache, so a re-render that draws something else (the "could not display" picture of
+        /// a timed-out render, then the real page) must drop the tiles the old picture left.
+        /// </summary>
+        private readonly ConcurrentDictionary<int, (SKRect CullRect, int Operations)> _pictureFingerprints = new();
 
         private static int GetCacheBuffer(PageDisplayMode mode)
             => mode == PageDisplayMode.SinglePage ? SinglePageCacheBuffer : ContinuousPageCacheBuffer;
@@ -274,6 +280,14 @@ namespace Caly.Core.Services
                     {
                         System.Diagnostics.Debug.Assert(picture.IsAlive);
                         _cachePictures[pageNumber] = picture;
+
+                        var fingerprint = (picture.Item.CullRect, picture.Item.ApproximateOperationCount);
+                        if (_pictureFingerprints.TryGetValue(pageNumber, out var previous) && previous != fingerprint)
+                        {
+                            TileRenderService.InvalidatePage(pageNumber);
+                        }
+
+                        _pictureFingerprints[pageNumber] = fingerprint;
                     }
                 }
                 finally
@@ -675,12 +689,13 @@ namespace Caly.Core.Services
                     continue;
                 }
 
-                // Page is outside the realised range, safe to evict.
+                // Page is outside the realised range, safe to evict. Its tiles stay: the tile cache has
+                // its own byte budget, and the page draws them while it is parsed again on return. A
+                // picture's real memory (decoded images included) is unknown here: 1 MB to 370 MB a page.
                 if (_cachePictures.TryRemove(kvp.Key, out var picture))
                 {
                     System.Diagnostics.Debug.WriteLine($"Removed page #{kvp.Key}'s picture from cache.");
                     picture.Dispose();
-                    TileRenderService.InvalidatePage(kvp.Key);
                 }
             }
         }
