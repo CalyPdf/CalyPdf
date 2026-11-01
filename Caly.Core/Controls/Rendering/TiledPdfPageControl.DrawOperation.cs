@@ -35,16 +35,16 @@ public partial class TiledPdfPageControl
     {
         private TileDrawEntry[]? _tiles;
         private readonly int _tileCount;
-        private readonly SKSamplingOptions _samplingOptions;
+        private readonly bool _interactive;
         private readonly SKRect _cullRect;
 
-        public TiledDrawOperation(Rect bounds, SKRect cullRect, TileDrawEntry[] tiles, int tileCount, SKSamplingOptions samplingOptions)
+        public TiledDrawOperation(Rect bounds, SKRect cullRect, TileDrawEntry[] tiles, int tileCount, bool interactive)
         {
             Bounds = bounds;
             _cullRect = cullRect;
             _tiles = tiles;
             _tileCount = tileCount;
-            _samplingOptions = samplingOptions;
+            _interactive = interactive;
         }
 
         public Rect Bounds { get; }
@@ -101,13 +101,16 @@ public partial class TiledPdfPageControl
             canvas.DrawPaint(backgroundPaint);
 #endif
 
+            // The back end is only known here: GrContext is null under the software renderer.
+            var samplingOptions = GetSamplingOptions(_interactive, gpu: lease!.GrContext is not null);
+
             canvas.Save();
             canvas.ClipRect(_cullRect);
 
             for (int i = 0; i < _tileCount; ++i)
             {
                 ref readonly var tile = ref tiles[i];
-                tile.DrawTile(canvas, _samplingOptions);
+                tile.DrawTile(canvas, samplingOptions);
             }
 
             canvas.Restore();
