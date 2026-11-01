@@ -52,8 +52,8 @@ namespace Caly.Core.Services
         private readonly CancellationGenerations _pagesGenerations;
 
         /// <summary>
-        /// Single-page view prefetches live in their own generation, not the pages one: a page turn
-        /// starts a new pages generation, and must not cancel the prefetch of the page it turns to.
+        /// Neighbour prefetches live in their own generation, not the pages one: a scroll or page turn
+        /// starts a new pages generation, and must not cancel the prefetch of the page it brings into view.
         /// Only <see cref="CancelAndClear"/> and disposal end it; a prefetch whose page has left the
         /// cache window is skipped instead (see <see cref="_pictureKeepWindow"/>).
         /// </summary>
@@ -836,14 +836,11 @@ namespace Caly.Core.Services
                     }
                 }
 
-                if (m.DisplayMode == PageDisplayMode.SinglePage)
-                {
-                    // Nothing off the current page is ever visible in single-page view, so
-                    // without this every page turn would be a cold render.
-                    var prefetchToken = await GetPrefetchToken();
-                    EnqueuePrefetch(document, visibleStart - 1, prefetchToken);
-                    EnqueuePrefetch(document, visibleEnd, prefetchToken);
-                }
+                // Pictures are otherwise only requested once a page is on screen, so every page
+                // scrolled or turned to would show its skeleton for a whole parse.
+                var prefetchToken = await GetPrefetchToken();
+                EnqueuePrefetch(document, visibleStart - 1, prefetchToken);
+                EnqueuePrefetch(document, visibleEnd, prefetchToken);
             }, token);
         }
 
@@ -904,13 +901,13 @@ namespace Caly.Core.Services
 
         /// <summary>
         /// Renders the page's picture into <see cref="_cachePictures"/> without handing it to the
-        /// page: <see cref="RefreshPages"/> picks it up from the cache when the page is turned to.
+        /// page: <see cref="RefreshPages"/> picks it up from the cache when the page comes into view.
         /// </summary>
         private async Task ProcessPrefetchPictureRequest(RenderRequest renderRequest)
         {
             if (!IsInPictureKeepWindow(renderRequest.Page.PageNumber))
             {
-                return; // Turned or jumped away since this was queued
+                return; // Scrolled, turned or jumped away since this was queued
             }
 
             using var picture = await GetPicture(renderRequest.Page.PageNumber, renderRequest.Token)

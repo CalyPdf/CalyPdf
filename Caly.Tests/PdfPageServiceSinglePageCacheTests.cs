@@ -1,5 +1,4 @@
 using Avalonia.Headless.XUnit;
-using Avalonia.Threading;
 using Caly.Core.Models;
 using Caly.Core.Services;
 using Caly.Core.ViewModels;
@@ -18,14 +17,16 @@ public class PdfPageServiceSinglePageCacheTests
         DisplayMode = mode
     };
 
-    [AvaloniaFact]
-    public async Task SinglePage_PrefetchesNeighboursWithoutShowingThem()
+    [AvaloniaTheory]
+    [InlineData(PageDisplayMode.SinglePage)]
+    [InlineData(PageDisplayMode.Continuous)]
+    public async Task PrefetchesNeighboursWithoutShowingThem(PageDisplayMode mode)
     {
         var pdfService = new RenderingPdfDocumentService();
         await using var pageService = new PdfPageService(pdfService);
         var document = NewLoadedDocument(pdfService, pageService, pageCount: 3);
 
-        await pageService.RefreshPages(Showing(document, 2, PageDisplayMode.SinglePage));
+        await pageService.RefreshPages(Showing(document, 2, mode));
 
         Assert.True(await WaitUntil(() =>
             document.Pages[1].PdfPicture is not null &&
@@ -35,33 +36,19 @@ public class PdfPageServiceSinglePageCacheTests
         Assert.Null(document.Pages[2].PdfPicture);
     }
 
-    [AvaloniaFact]
-    public async Task Continuous_DoesNotPrefetch()
+    [AvaloniaTheory]
+    [InlineData(PageDisplayMode.SinglePage)]
+    [InlineData(PageDisplayMode.Continuous)]
+    public async Task MovingToAPrefetchedPage_DoesNotRenderItAgain(PageDisplayMode mode)
     {
         var pdfService = new RenderingPdfDocumentService();
         await using var pageService = new PdfPageService(pdfService);
         var document = NewLoadedDocument(pdfService, pageService, pageCount: 3);
 
-        await pageService.RefreshPages(Showing(document, 2, PageDisplayMode.Continuous));
-        Assert.True(await WaitUntil(() => document.Pages[1].PdfPicture is not null));
-        await Task.Delay(100);
-        Dispatcher.UIThread.RunJobs();
-
-        Assert.Equal(0, pdfService.RenderCountFor(1));
-        Assert.Equal(0, pdfService.RenderCountFor(3));
-    }
-
-    [AvaloniaFact]
-    public async Task SinglePage_TurningToAPrefetchedPage_DoesNotRenderItAgain()
-    {
-        var pdfService = new RenderingPdfDocumentService();
-        await using var pageService = new PdfPageService(pdfService);
-        var document = NewLoadedDocument(pdfService, pageService, pageCount: 3);
-
-        await pageService.RefreshPages(Showing(document, 1, PageDisplayMode.SinglePage));
+        await pageService.RefreshPages(Showing(document, 1, mode));
         Assert.True(await WaitUntil(() => pdfService.RenderCountFor(2) == 1));
 
-        await pageService.RefreshPages(Showing(document, 2, PageDisplayMode.SinglePage));
+        await pageService.RefreshPages(Showing(document, 2, mode));
         Assert.True(await WaitUntil(() => document.Pages[1].PdfPicture is not null));
 
         Assert.Equal(1, pdfService.RenderCountFor(2));
