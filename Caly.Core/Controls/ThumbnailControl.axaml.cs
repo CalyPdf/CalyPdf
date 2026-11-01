@@ -189,8 +189,9 @@ public sealed class ThumbnailControl : TemplatedControl
             return;
         }
 
-        double ratio = Math.Round(ThumbnailSize.Height / PageSize.Height, 7);
-        _scale = Matrix.CreateScale(ratio, ratio);
+        double widthS = Math.Round(ThumbnailSize.Width / PageSize.Width, 7);
+        double heigthS = Math.Round(ThumbnailSize.Height / PageSize.Height, 7);
+        _scale = Matrix.CreateScale(widthS, heigthS);
     }
 
     private static bool IsNotValid(Size v)
