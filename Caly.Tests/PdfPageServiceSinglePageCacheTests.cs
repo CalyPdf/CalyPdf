@@ -61,6 +61,7 @@ public class PdfPageServiceSinglePageCacheTests
         await using var pageService = new PdfPageService(pdfService);
         var document = NewLoadedDocument(pdfService, pageService, pageCount: 3);
         pdfService.RenderGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        pdfService.GatedPage = 2;
 
         await pageService.RefreshPages(Showing(document, 1, PageDisplayMode.SinglePage));
         Assert.True(await WaitUntil(() => pdfService.RenderCountFor(2) == 1)); // Prefetch of page 2 in flight

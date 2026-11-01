@@ -371,7 +371,7 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
         }, token);
     }
 
-    public async Task<PdfTextLayer?> GetPageTextLayerAsync(int pageNumber, CancellationToken token)
+    public async Task<PageTextLayerContent?> GetPageTextLayerAsync(int pageNumber, CancellationToken token)
     {
         Debug.ThrowOnUiThread();
 
@@ -384,7 +384,7 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
                 return null;
             }
 
-            var pageTextLayer = await ExecuteWithLockAsync(lockCt =>
+            return await ExecuteWithLockAsync(lockCt =>
                     {
                         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(lockCt);
                         try
@@ -407,13 +407,6 @@ internal sealed partial class PdfPigDocumentService : IPdfDocumentService
                         }
                     }, guardCt)
                     .ConfigureAwait(false);
-
-            if (pageTextLayer is null)
-            {
-                return null;
-            }
-
-            return PdfTextLayerHelper.GetTextLayer(pageTextLayer, guardCt);
         }, token);
     }
 

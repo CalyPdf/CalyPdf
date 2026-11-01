@@ -64,7 +64,7 @@ public class DocumentViewModelBookmarkSyncTests
         public Task<UglyToad.PdfPig.Rendering.Skia.PdfPageSize?> GetPageSizeAsync(int pageNumber, CancellationToken token)
             => throw new NotImplementedException();
 
-        public Task<PdfTextLayer?> GetPageTextLayerAsync(int pageNumber, CancellationToken token)
+        public Task<PageTextLayerContent?> GetPageTextLayerAsync(int pageNumber, CancellationToken token)
             => throw new NotImplementedException();
 
         public Task<IRef<SKPicture>?> GetRenderPageAsync(int pageNumber, CancellationToken token)

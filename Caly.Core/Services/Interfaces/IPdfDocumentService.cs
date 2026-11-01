@@ -103,7 +103,12 @@ public interface IPdfDocumentService : IAsyncDisposable
 
     Task<PdfPageSize?> GetPageSizeAsync(int pageNumber, CancellationToken token);
 
-    Task<PdfTextLayer?> GetPageTextLayerAsync(int pageNumber, CancellationToken token);
+    /// <summary>
+    /// The page's letters and the rest of what its text layer is built from. Building the layer
+    /// itself (<see cref="Caly.Pdf.PdfTextLayerHelper.GetTextLayer"/>) is left to the caller, so it
+    /// does not hold up the document's other page reads.
+    /// </summary>
+    Task<PageTextLayerContent?> GetPageTextLayerAsync(int pageNumber, CancellationToken token);
 
     Task<IRef<SKPicture>?> GetRenderPageAsync(int pageNumber, CancellationToken token);
 }

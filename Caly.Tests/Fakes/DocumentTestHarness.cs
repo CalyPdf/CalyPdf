@@ -35,6 +35,9 @@ internal sealed class RenderingPdfDocumentService : IPdfDocumentService
     /// </summary>
     public int RenderCountFor(int pageNumber) => _renderCounts.GetValueOrDefault(pageNumber);
 
+    /// <summary>The page numbers of the renders, in the order they started.</summary>
+    public System.Collections.Concurrent.ConcurrentQueue<int> RenderOrder { get; } = new();
+
     public int NumberOfPages => _numberOfPages;
     public string? FileName => "rendering.pdf";
     public bool IsActive { get; set; }
@@ -46,13 +49,17 @@ internal sealed class RenderingPdfDocumentService : IPdfDocumentService
     /// </summary>
     public TaskCompletionSource? RenderGate { get; set; }
 
+    /// <summary>When set, <see cref="RenderGate"/> holds back that page's renders only.</summary>
+    public int? GatedPage { get; set; }
+
     public async Task<IRef<SKPicture>?> GetRenderPageAsync(int pageNumber, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         Interlocked.Increment(ref _renderCount);
         _renderCounts.AddOrUpdate(pageNumber, 1, static (_, count) => count + 1);
+        RenderOrder.Enqueue(pageNumber);
 
-        if (RenderGate is { } gate)
+        if (RenderGate is { } gate && (GatedPage is null || GatedPage == pageNumber))
         {
             await gate.Task.WaitAsync(token);
         }
@@ -71,8 +78,8 @@ internal sealed class RenderingPdfDocumentService : IPdfDocumentService
     public Task<UglyToad.PdfPig.Rendering.Skia.PdfPageSize?> GetPageSizeAsync(int pageNumber, CancellationToken token)
         => throw new NotImplementedException();
 
-    public Task<PdfTextLayer?> GetPageTextLayerAsync(int pageNumber, CancellationToken token)
-        => Task.FromResult<PdfTextLayer?>(null);
+    public Task<PageTextLayerContent?> GetPageTextLayerAsync(int pageNumber, CancellationToken token)
+        => Task.FromResult<PageTextLayerContent?>(null);
 
     public long? FileSize => throw new NotImplementedException();
     public string? LocalPath => throw new NotImplementedException();
