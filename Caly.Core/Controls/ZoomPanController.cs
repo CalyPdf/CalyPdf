@@ -157,10 +157,7 @@ internal sealed class ZoomPanController
     /// </summary>
     public void OnPointerWheelChanged(object? sender, PointerWheelEventArgs e)
     {
-        var hotkeys = Application.Current!.PlatformSettings?.HotkeyConfiguration;
-        var ctrl = hotkeys is not null && e.KeyModifiers.HasFlag(hotkeys.CommandModifiers);
-
-        if (ctrl && e.Delta.Y != 0)
+        if (((IKeyModifiersEventArgs)e).IsPanningOrZooming() && e.Delta.Y != 0)
         {
             ZoomTo(e);
             e.Handled = true;

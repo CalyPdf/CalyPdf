@@ -954,7 +954,8 @@ public sealed partial class PageItemsControl : ItemsControl
         LayoutTransform = e.NameScope.FindFromNameScope<LayoutTransformControl>("PART_LayoutTransformControl");
         LayoutTransform.AddHandler(PointerPressedEvent, _zoomPanController.OnPointerPressed);
         LayoutTransform.AddHandler(PointerMovedEvent, _zoomPanController.OnPointerMoved);
-        LayoutTransform.AddHandler(PointerReleasedEvent, _zoomPanController.OnPointerReleased);
+        // handledEventsToo: the text-selection tunnel handler marks a middle-button release handled
+        LayoutTransform.AddHandler(PointerReleasedEvent, _zoomPanController.OnPointerReleased, handledEventsToo: true);
 
         if (Globals.IsMobilePlatform())
         {

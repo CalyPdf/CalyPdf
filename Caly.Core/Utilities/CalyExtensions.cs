@@ -67,22 +67,16 @@ internal static class CalyExtensions
 
     public static bool IsPanning(this PointerEventArgs e)
     {
-        if (!e.Properties.IsLeftButtonPressed)
-        {
-            return false;
-        }
-
-        var hotkeys = Application.Current!.PlatformSettings?.HotkeyConfiguration;
-        return hotkeys is not null && e.KeyModifiers.HasFlag(hotkeys.CommandModifiers);
+        return e.IsPanningOrZooming() &&
+               (e.Properties.IsMiddleButtonPressed || e.Properties.IsLeftButtonPressed);
     }
 
     public static bool IsPanningOrZooming(this PointerEventArgs e)
     {
-        var hotkeys = Application.Current!.PlatformSettings?.HotkeyConfiguration;
-        return hotkeys is not null && e.KeyModifiers.HasFlag(hotkeys.CommandModifiers);
+        return e.Properties.IsMiddleButtonPressed || ((IKeyModifiersEventArgs)e).IsPanningOrZooming();
     }
 
-    public static bool IsPanningOrZooming(this KeyEventArgs e)
+    public static bool IsPanningOrZooming(this IKeyModifiersEventArgs e)
     {
         var hotkeys = Application.Current!.PlatformSettings?.HotkeyConfiguration;
         return hotkeys is not null && e.KeyModifiers.HasFlag(hotkeys.CommandModifiers);
