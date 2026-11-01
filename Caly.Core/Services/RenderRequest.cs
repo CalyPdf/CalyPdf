@@ -21,8 +21,8 @@ internal enum RenderRequestTypes : byte
     TextLayer = 2,
 
     /// <summary>
-    /// A neighbour of the page on screen in single-page view, rendered into the cache ahead of a
-    /// page turn. The reader is about to need it, so it beats thumbnails.
+    /// A neighbour of the pages on screen, rendered into the cache before a scroll or page turn
+    /// brings it into view. The reader is about to need it, so it beats thumbnails.
     /// </summary>
     PrefetchPicture = 3,
 
