@@ -115,8 +115,10 @@ public sealed partial class PageViewModel : ViewModelBase, IDisposable
 
     /// <summary>
     /// Whether this page has nothing to show yet, and so should display the loading skeleton.
+    /// Cached tiles outlive an evicted picture, and the page draws them while it is parsed again.
     /// </summary>
-    public bool IsPageLoading => IsPageVisible && PdfPicture is null;
+    public bool IsPageLoading => IsPageVisible && PdfPicture is null
+                                 && TileRenderService?.Cache.HasImages(PageNumber) != true;
 
     private const int ThumbnailHeight = 135;
 

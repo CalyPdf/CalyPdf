@@ -27,6 +27,7 @@ using Caly.Core.Services.Interfaces;
 using Caly.Core.Services.Rendering;
 using Caly.Core.Utilities;
 using Caly.Core.ViewModels;
+using Caly.Pdf;
 using Caly.Pdf.Models;
 using SkiaSharp;
 using System;
@@ -52,8 +53,8 @@ namespace Caly.Core.Services
         private readonly CancellationGenerations _pagesGenerations;
 
         /// <summary>
-        /// Single-page view prefetches live in their own generation, not the pages one: a page turn
-        /// starts a new pages generation, and must not cancel the prefetch of the page it turns to.
+        /// Neighbour prefetches live in their own generation, not the pages one: a scroll or page turn
+        /// starts a new pages generation, and must not cancel the prefetch of the page it brings into view.
         /// Only <see cref="CancelAndClear"/> and disposal end it; a prefetch whose page has left the
         /// cache window is skipped instead (see <see cref="_pictureKeepWindow"/>).
         /// </summary>
@@ -71,24 +72,20 @@ namespace Caly.Core.Services
         {
             Debug.ThrowOnUiThread();
 
-            var options = new ParallelOptions()
-            {
-                // PdfPig cannot process pages in parallel, so we limit number of request being processed in parallel.
-                // The main reason to allow parallel processing of request is for the creation of the text layer
-                // via `PdfTextLayerHelper.GetTextLayer()` (which is independent of PdfPig) to not block requests relying on PdfPig.
-                MaxDegreeOfParallelism = 4,
-                CancellationToken = _mainToken
-            };
-            
+            // PdfPig reads one page at a time, so requests take turns: the next is taken off the queue
+            // only once the previous one is done with PdfPig, so pages are read in priority order.
+            // Requests in flight together would wait for the document's lock first come, first served,
+            // and a page coming into view would wait behind thumbnails queued before it. Work that does
+            // not need PdfPig (text layout, drawing thumbnails) carries on in the background.
             try
             {
-                await Parallel.ForEachAsync(_requestsReader.ReadAllAsync(_mainToken), options, async (r, _) =>
+                await foreach (var r in _requestsReader.ReadAllAsync(_mainToken))
                 {
                     try
                     {
                         if (r.Token.IsCancellationRequested)
                         {
-                            return;
+                            continue;
                         }
 
                         switch (r.Type)
@@ -124,7 +121,7 @@ namespace Caly.Core.Services
                         // We just ignore for the moment
                         Debug.WriteExceptionToFile(e);
                     }
-                });
+                }
             }
             catch (OperationCanceledException) { }
         }
@@ -195,11 +192,17 @@ namespace Caly.Core.Services
         private const int ContinuousPageCacheBuffer = 1;
 
         /// <summary>
-        /// <see cref="ContinuousPageCacheBuffer"/> for single-page view. Only one page is realised there, and
-        /// evicting a picture also drops its tiles (<see cref="Rendering.TileRenderService.InvalidatePage"/>),
-        /// so this wider window is what lets the tile cache serve a turn back to a recently read page.
+        /// <see cref="ContinuousPageCacheBuffer"/> for single-page view, where only one page is realised:
+        /// turning back to a page within it needs no new parse.
         /// </summary>
         private const int SinglePageCacheBuffer = 3;
+
+        /// <summary>
+        /// What each page's last rendered picture drew. A page's tiles outlive its picture in the
+        /// tile cache, so a re-render that draws something else (the "could not display" picture of
+        /// a timed-out render, then the real page) must drop the tiles the old picture left.
+        /// </summary>
+        private readonly ConcurrentDictionary<int, (SKRect CullRect, int Operations)> _pictureFingerprints = new();
 
         private static int GetCacheBuffer(PageDisplayMode mode)
             => mode == PageDisplayMode.SinglePage ? SinglePageCacheBuffer : ContinuousPageCacheBuffer;
@@ -218,10 +221,8 @@ namespace Caly.Core.Services
 
             if (pageSize.HasValue)
             {
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    renderRequest.Page.SetSize(pageSize.Value);
-                });
+                // Posted, not awaited: a document queues one of these per page, ahead of its pictures.
+                Dispatcher.UIThread.Post(() => renderRequest.Page.SetSize(pageSize.Value));
             }
         }
 
@@ -279,6 +280,14 @@ namespace Caly.Core.Services
                     {
                         System.Diagnostics.Debug.Assert(picture.IsAlive);
                         _cachePictures[pageNumber] = picture;
+
+                        var fingerprint = (picture.Item.CullRect, picture.Item.ApproximateOperationCount);
+                        if (_pictureFingerprints.TryGetValue(pageNumber, out var previous) && previous != fingerprint)
+                        {
+                            TileRenderService.InvalidatePage(pageNumber);
+                        }
+
+                        _pictureFingerprints[pageNumber] = fingerprint;
                     }
                 }
                 finally
@@ -297,21 +306,49 @@ namespace Caly.Core.Services
         {
             token.ThrowIfCancellationRequested();
 
-            if (!_cacheTextLayers.TryGetValue(pageNumber, out var textLayer))
+            if (_cacheTextLayers.TryGetValue(pageNumber, out var textLayer))
             {
-                var sw = ValueStopwatch.StartNew();
-                textLayer = await _pdfDocumentService.GetPageTextLayerAsync(pageNumber, token);
-                TimeSpan elapsed = sw.GetElapsedTime();
-
-                System.Diagnostics.Debug.WriteLine($"Text layer page #{pageNumber} in {elapsed.TotalMilliseconds}ms.");
-
-                if (textLayer is not null)
-                {
-                    _cacheTextLayers[pageNumber] = textLayer;
-                }
+                return textLayer;
             }
 
+            var content = await _pdfDocumentService.GetPageTextLayerAsync(pageNumber, token)
+                .ConfigureAwait(false);
+
+            return content is null ? null : BuildTextLayer(pageNumber, content, token);
+        }
+
+        /// <summary>
+        /// Groups the page's letters into words and lines, and caches the result. Needs no PdfPig.
+        /// </summary>
+        private PdfTextLayer BuildTextLayer(int pageNumber, PageTextLayerContent content, CancellationToken token)
+        {
+            var sw = ValueStopwatch.StartNew();
+            var textLayer = PdfTextLayerHelper.GetTextLayer(content, token);
+            System.Diagnostics.Debug.WriteLine($"Text layer page #{pageNumber} in {sw.GetElapsedTime().TotalMilliseconds}ms.");
+
+            _cacheTextLayers[pageNumber] = textLayer;
             return textLayer;
+        }
+
+        /// <summary>
+        /// Runs the part of a request that does not need PdfPig off the request loop, so the next
+        /// request can read its page meanwhile.
+        /// </summary>
+        private static void RunInBackground(Func<Task> work)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await work().ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                { }
+                catch (Exception e)
+                {
+                    Debug.WriteExceptionToFile(e);
+                }
+            });
         }
 
         private async Task ProcessPictureRequest(RenderRequest renderRequest)
@@ -362,28 +399,45 @@ namespace Caly.Core.Services
                 return;
             }
 
-            using var picture = await GetPicture(renderRequest.Page.PageNumber, renderRequest.Token)
+            var picture = await GetPicture(renderRequest.Page.PageNumber, renderRequest.Token)
                 .ConfigureAwait(false);
 
-            if (!renderRequest.Page.IsSizeSet())
+            try
             {
-                // This is the first we load the page, width and height are not set yet
-                var pageSize = await GetPageSize(renderRequest.Page.PageNumber, renderRequest.Token)
-                    .ConfigureAwait(false);
-
-                if (pageSize.HasValue)
+                Size? pageSize = null;
+                if (!renderRequest.Page.IsSizeSet())
                 {
-                    await Dispatcher.UIThread.InvokeAsync(() =>
-                    {
-                        renderRequest.Page.SetSize(pageSize.Value);
-                    });
+                    // This is the first we load the page, width and height are not set yet
+                    pageSize = await GetPageSize(renderRequest.Page.PageNumber, renderRequest.Token)
+                        .ConfigureAwait(false);
                 }
-            }
 
-            if (picture is not null)
+                // Drawing the thumbnail plays the whole page back: hundreds of ms for a map.
+                var pictureToDraw = picture;
+                picture = null;
+                RunInBackground(async () =>
+                {
+                    using (pictureToDraw)
+                    {
+                        if (pageSize.HasValue)
+                        {
+                            await Dispatcher.UIThread.InvokeAsync(() =>
+                            {
+                                renderRequest.Page.SetSize(pageSize.Value);
+                            });
+                        }
+
+                        if (pictureToDraw is not null)
+                        {
+                            await SetThumbnail(renderRequest.Page, pictureToDraw.Item, renderRequest.Token)
+                                .ConfigureAwait(false);
+                        }
+                    }
+                });
+            }
+            finally
             {
-                await SetThumbnail(renderRequest.Page, picture.Item, renderRequest.Token)
-                    .ConfigureAwait(false);
+                picture?.Dispose();
             }
         }
 
@@ -443,13 +497,27 @@ namespace Caly.Core.Services
                 return;
             }
 
-            var textLayer = await GetTextLayer(renderRequest.Page.PageNumber, renderRequest.Token)
+            int pageNumber = renderRequest.Page.PageNumber;
+            if (_cacheTextLayers.TryGetValue(pageNumber, out var cached))
+            {
+                await Dispatcher.UIThread.InvokeAsync(() => renderRequest.Page.PdfTextLayer = cached);
+                return;
+            }
+
+            var content = await _pdfDocumentService.GetPageTextLayerAsync(pageNumber, renderRequest.Token)
                 .ConfigureAwait(false);
 
-            if (textLayer is not null)
+            if (content is null)
             {
-                await Dispatcher.UIThread.InvokeAsync(() => renderRequest.Page.PdfTextLayer = textLayer);
+                return;
             }
+
+            // The layout takes up to hundreds of ms on dense pages (662 ms on a large map).
+            RunInBackground(async () =>
+            {
+                var textLayer = BuildTextLayer(pageNumber, content, renderRequest.Token);
+                await Dispatcher.UIThread.InvokeAsync(() => renderRequest.Page.PdfTextLayer = textLayer);
+            });
         }
 
         public void RequestPageSize(PageViewModel page)
@@ -621,12 +689,13 @@ namespace Caly.Core.Services
                     continue;
                 }
 
-                // Page is outside the realised range, safe to evict.
+                // Page is outside the realised range, safe to evict. Its tiles stay: the tile cache has
+                // its own byte budget, and the page draws them while it is parsed again on return. A
+                // picture's real memory (decoded images included) is unknown here: 1 MB to 370 MB a page.
                 if (_cachePictures.TryRemove(kvp.Key, out var picture))
                 {
                     System.Diagnostics.Debug.WriteLine($"Removed page #{kvp.Key}'s picture from cache.");
                     picture.Dispose();
-                    TileRenderService.InvalidatePage(kvp.Key);
                 }
             }
         }
@@ -836,14 +905,11 @@ namespace Caly.Core.Services
                     }
                 }
 
-                if (m.DisplayMode == PageDisplayMode.SinglePage)
-                {
-                    // Nothing off the current page is ever visible in single-page view, so
-                    // without this every page turn would be a cold render.
-                    var prefetchToken = await GetPrefetchToken();
-                    EnqueuePrefetch(document, visibleStart - 1, prefetchToken);
-                    EnqueuePrefetch(document, visibleEnd, prefetchToken);
-                }
+                // Pictures are otherwise only requested once a page is on screen, so every page
+                // scrolled or turned to would show its skeleton for a whole parse.
+                var prefetchToken = await GetPrefetchToken();
+                EnqueuePrefetch(document, visibleStart - 1, prefetchToken);
+                EnqueuePrefetch(document, visibleEnd, prefetchToken);
             }, token);
         }
 
@@ -904,13 +970,13 @@ namespace Caly.Core.Services
 
         /// <summary>
         /// Renders the page's picture into <see cref="_cachePictures"/> without handing it to the
-        /// page: <see cref="RefreshPages"/> picks it up from the cache when the page is turned to.
+        /// page: <see cref="RefreshPages"/> picks it up from the cache when the page comes into view.
         /// </summary>
         private async Task ProcessPrefetchPictureRequest(RenderRequest renderRequest)
         {
             if (!IsInPictureKeepWindow(renderRequest.Page.PageNumber))
             {
-                return; // Turned or jumped away since this was queued
+                return; // Scrolled, turned or jumped away since this was queued
             }
 
             using var picture = await GetPicture(renderRequest.Page.PageNumber, renderRequest.Token)

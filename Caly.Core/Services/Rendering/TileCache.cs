@@ -308,6 +308,17 @@ public sealed class TileCache : IDisposable
     }
 
     /// <summary>
+    /// Whether the page has at least one tile with pixels. Blank tiles do not count: they show nothing.
+    /// </summary>
+    public bool HasImages(int pageNumber)
+    {
+        lock (_lock)
+        {
+            return _pageKeys.ContainsKey(pageNumber);
+        }
+    }
+
+    /// <summary>
     /// Removes all tiles for a given page from the cache.
     /// </summary>
     public void InvalidatePage(int pageNumber)

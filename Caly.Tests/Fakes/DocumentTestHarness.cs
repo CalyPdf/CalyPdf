@@ -35,6 +35,9 @@ internal sealed class RenderingPdfDocumentService : IPdfDocumentService
     /// </summary>
     public int RenderCountFor(int pageNumber) => _renderCounts.GetValueOrDefault(pageNumber);
 
+    /// <summary>The page numbers of the renders, in the order they started.</summary>
+    public System.Collections.Concurrent.ConcurrentQueue<int> RenderOrder { get; } = new();
+
     public int NumberOfPages => _numberOfPages;
     public string? FileName => "rendering.pdf";
     public bool IsActive { get; set; }
@@ -46,22 +49,30 @@ internal sealed class RenderingPdfDocumentService : IPdfDocumentService
     /// </summary>
     public TaskCompletionSource? RenderGate { get; set; }
 
+    /// <summary>When set, <see cref="RenderGate"/> holds back that page's renders only.</summary>
+    public int? GatedPage { get; set; }
+
+    /// <summary>Side of the square every page draws. Change it to make a re-render draw something else.</summary>
+    public float DrawnSide { get; set; } = 100;
+
     public async Task<IRef<SKPicture>?> GetRenderPageAsync(int pageNumber, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         Interlocked.Increment(ref _renderCount);
         _renderCounts.AddOrUpdate(pageNumber, 1, static (_, count) => count + 1);
+        RenderOrder.Enqueue(pageNumber);
 
-        if (RenderGate is { } gate)
+        if (RenderGate is { } gate && (GatedPage is null || GatedPage == pageNumber))
         {
             await gate.Task.WaitAsync(token);
         }
 
         using var recorder = new SKPictureRecorder();
-        var canvas = recorder.BeginRecording(new SKRect(0, 0, 100, 100));
+        // Bounds follow what is drawn, as the R-tree real pages are recorded with trims them.
+        var canvas = recorder.BeginRecording(new SKRect(0, 0, DrawnSide, DrawnSide));
         using (var paint = new SKPaint { Color = SKColors.Red })
         {
-            canvas.DrawRect(new SKRect(0, 0, 100, 100), paint);
+            canvas.DrawRect(new SKRect(0, 0, DrawnSide, DrawnSide), paint);
         }
 
         return RefCountable.Create(recorder.EndRecording());
@@ -71,8 +82,8 @@ internal sealed class RenderingPdfDocumentService : IPdfDocumentService
     public Task<UglyToad.PdfPig.Rendering.Skia.PdfPageSize?> GetPageSizeAsync(int pageNumber, CancellationToken token)
         => throw new NotImplementedException();
 
-    public Task<PdfTextLayer?> GetPageTextLayerAsync(int pageNumber, CancellationToken token)
-        => Task.FromResult<PdfTextLayer?>(null);
+    public Task<PageTextLayerContent?> GetPageTextLayerAsync(int pageNumber, CancellationToken token)
+        => Task.FromResult<PageTextLayerContent?>(null);
 
     public long? FileSize => throw new NotImplementedException();
     public string? LocalPath => throw new NotImplementedException();

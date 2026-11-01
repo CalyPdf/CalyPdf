@@ -561,4 +561,20 @@ public class TileCacheTests
     }
 
     #endregion
+
+    [Fact]
+    public void HasImages_OnlyWhileThePageHoldsAnImageTile()
+    {
+        using var cache = new TileCache();
+        cache.AddBlank(Key(page: 1));
+        cache.Add(Key(page: 2), CreateTile());
+
+        Assert.False(cache.HasImages(1)); // A blank tile has nothing to show
+        Assert.True(cache.HasImages(2));
+        Assert.False(cache.HasImages(3));
+
+        cache.InvalidatePage(2);
+
+        Assert.False(cache.HasImages(2));
+    }
 }

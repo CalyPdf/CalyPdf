@@ -172,23 +172,24 @@ public sealed partial class TiledPdfPageControl : Control
     private const int RenderTileMargin = 1;
     
     /// <summary>
-    /// How long after the last zoom/scroll event before the control switches back to
-    /// <see cref="IdleSamplingOptions"/>. Short enough to feel instantaneous once motion
-    /// stops; long enough to ride out per-frame bursts during continuous scrolling.
+    /// How long after the last zoom/scroll event before the control switches back to its settled
+    /// sampling (see <see cref="GetSamplingOptions"/>). Short enough to feel instantaneous once
+    /// motion stops; long enough to ride out per-frame bursts during continuous scrolling.
     /// </summary>
     private static readonly TimeSpan SettleDelay = TimeSpan.FromMilliseconds(150);
 
     /// <summary>
     /// True while the control is in an "interactive" state — zoom or visible-area
     /// changes have fired recently and we're still within <see cref="SettleDelay"/> of
-    /// the last one. Drives the sampling choice in <see cref="Render"/>.
+    /// the last one. Drives the sampling choice (<see cref="GetSamplingOptions"/>).
     /// Only accessed on the UI thread.
     /// </summary>
     private bool _isInteracting;
 
     /// <summary>
     /// Dispatcher timer that flips <see cref="_isInteracting"/> back to false and triggers
-    /// a repaint at <see cref="IdleSamplingOptions"/> quality. Lazily created on first
+    /// a repaint at settled quality (the software renderer's only, under the GPU it draws the same).
+    /// Lazily created on first
     /// interaction so pages that never scroll/zoom don't pay for the timer.
     /// </summary>
     private DispatcherTimer? _settleTimer;
@@ -478,8 +479,8 @@ public sealed partial class TiledPdfPageControl : Control
 
     /// <summary>
     /// Flags the control as actively interacting (zoom/scroll in flight) and (re)starts the
-    /// settle timer. While the flag is set, <see cref="Render"/> uses
-    /// <see cref="InteractiveSamplingOptions"/>; when the timer fires without another
+    /// settle timer. While the flag is set, the software renderer samples tiles with nearest-pixel
+    /// (<see cref="GetSamplingOptions"/>); when the timer fires without another
     /// interaction resetting it, <see cref="OnSettleTick"/> flips back and triggers a
     /// high-quality repaint.
     /// </summary>

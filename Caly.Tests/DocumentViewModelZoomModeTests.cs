@@ -175,8 +175,8 @@ public class DocumentViewModelZoomModeTests
         public Task<PdfPageSize?> GetPageSizeAsync(int pageNumber, CancellationToken token)
             => Task.FromResult<PdfPageSize?>(null);
 
-        public Task<PdfTextLayer?> GetPageTextLayerAsync(int pageNumber, CancellationToken token)
-            => Task.FromResult<PdfTextLayer?>(null);
+        public Task<PageTextLayerContent?> GetPageTextLayerAsync(int pageNumber, CancellationToken token)
+            => Task.FromResult<PageTextLayerContent?>(null);
 
         public Task<IRef<SKPicture>?> GetRenderPageAsync(int pageNumber, CancellationToken token)
             => Task.FromResult<IRef<SKPicture>?>(null);

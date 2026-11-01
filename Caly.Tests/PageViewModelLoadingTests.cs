@@ -69,6 +69,18 @@ public class PageViewModelLoadingTests
     }
 
     [Fact]
+    public void VisiblePageWithCachedTilesIsNotLoading()
+    {
+        var page = CreatePage();
+        using var surface = SkiaSharp.SKSurface.Create(new SkiaSharp.SKImageInfo(8, 8));
+        page.TileRenderService.Cache.Add(new TileKey(1, 0, 0, 0), new TileImage(surface.Snapshot()));
+
+        page.VisibleArea = new Rect(0, 0, 100, 100);
+
+        Assert.False(page.IsPageLoading);
+    }
+
+    [Fact]
     public void OffScreenPageIsNotLoading()
     {
         var page = CreatePage();

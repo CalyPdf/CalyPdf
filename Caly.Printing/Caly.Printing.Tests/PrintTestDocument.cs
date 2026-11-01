@@ -102,7 +102,7 @@ internal sealed class PrintTestDocument : IPdfDocumentService
     public Task<IReadOnlyList<PdfEmbeddedFileViewModel>?> GetEmbeddedFileAsync(CancellationToken token)
         => throw new NotSupportedException();
 
-    public Task<PdfTextLayer?> GetPageTextLayerAsync(int pageNumber, CancellationToken token)
+    public Task<PageTextLayerContent?> GetPageTextLayerAsync(int pageNumber, CancellationToken token)
         => throw new NotSupportedException();
 }
 
