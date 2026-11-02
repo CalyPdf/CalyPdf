@@ -18,7 +18,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Avalonia.Android" Version="12.1.4" />
+		<PackageReference Include="Avalonia.Android" Version="12.1.5" />
 	</ItemGroup>
 
 	<ItemGroup>
