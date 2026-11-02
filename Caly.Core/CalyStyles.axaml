@@ -19,6 +19,12 @@
     </Style>
     <!-- End change delays for all ScrollViewers -->
 
+    <!-- Popups inherit UseLayoutRounding from the control they open on, and pages turn it off.
+         Unrounded, Windows truncates the popup to whole pixels and its content shows scroll arrows. -->
+    <Style Selector="FlyoutPresenter, MenuFlyoutPresenter">
+        <Setter Property="UseLayoutRounding" Value="True" />
+    </Style>
+
     <!-- Hide app title in main window -->
     <Style Selector="WindowDrawnDecorations /template/ Panel#PART_TitleTextPanel > TextBlock">
         <Setter Property="IsVisible" Value="False" />
