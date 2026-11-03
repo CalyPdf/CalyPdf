@@ -57,7 +57,8 @@
 		                        RenderModeOverride="{Binding RenderMode}"
 		                        DefaultBackground="{Binding Scene, Converter={x:Static artwork3d:Artwork3DView.BackgroundForScene}}"
 		                        PanModifiers="Shift"
-		                        ResetKey="{x:Null}"/>
+		                        ResetKey="{x:Null}"
+		                        HighlightColor="{x:Static artwork3d:Artwork3DView.SelectionHighlightColor}"/>
 
 		<!-- Where the "3D" badge was. -->
 		<Border Name="Toolbar"

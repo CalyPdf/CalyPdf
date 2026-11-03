@@ -30,11 +30,14 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Caly.Core.Models;
 using Caly.Core.Services.Rendering;
+using Caly.Core.ViewModels;
+using Caly.Pdf.Artwork;
 using Caly.Rendering.Scene3D;
 using Caly.Scene3D.Avalonia;
 using System;
 using System.Diagnostics;
 using System.Windows.Input;
+using UglyToad.PdfPig.Artwork;
 
 namespace Caly.Core.Controls.Artwork3D;
 
@@ -100,6 +103,24 @@ public sealed partial class Artwork3DView : UserControl
         View3D.GetPropertyChangedObservable(Scene3DControl.ViewProperty)
             .Subscribe(new AnonymousObserver<AvaloniaPropertyChangedEventArgs>(_ => RestoreCamera()));
         View3D.FrameRendered += OnFirstFramesRendered;
+
+        // The selected part's name in the status bar, while the pointer is over the model. Pointer events over
+        // the view do not reach the page's hover handling, which writes the status everywhere else.
+        View3D.PointerEntered += (_, _) => WritePartStatus();
+        View3D.PointerMoved += (_, _) => WritePartStatus();
+
+        // Leaving for the toolbar, a scroll bar or the space between pages: nothing else writes the status
+        // there. Over the page, the page's hover handling writes it again right after.
+        View3D.PointerExited += (_, _) => this.FindAncestorOfType<PageItemsControl>()?.SetCurrentValue(PageItemsControl.InteractiveActionOverProperty, null);
+        View3D.GetPropertyChangedObservable(Scene3DControl.SelectedNodeProperty)
+            .Subscribe(new AnonymousObserver<AvaloniaPropertyChangedEventArgs>(_ =>
+            {
+                _partStatus = null;
+                if (View3D.IsPointerOver)
+                {
+                    WritePartStatus();
+                }
+            }));
 
         if (RenderTimings.IsEnabled)
         {
@@ -220,6 +241,34 @@ public sealed partial class Artwork3DView : UserControl
         }
 
         RenderTimings.RecordView3DFrame(View3D.Statistics.FrameMilliseconds);
+    }
+
+    /// <summary>
+    /// The colour the selected part is drawn in: the page's own text-selection colour, opaque, so that
+    /// "selected" looks one way in the app.
+    /// </summary>
+    public static readonly Color SelectionHighlightColor = Color.FromRgb(
+        PageInteractiveLayerControl.SelectionColor.R, PageInteractiveLayerControl.SelectionColor.G, PageInteractiveLayerControl.SelectionColor.B);
+
+    // The status text of the selected part, made once per selection: the pointer moves over the view often.
+    private string? _partStatus;
+
+    /// <summary>Puts the selected part's name, or nothing, in the status bar of the pages around this view.</summary>
+    private void WritePartStatus()
+    {
+        if (this.FindAncestorOfType<PageItemsControl>() is not { } pages)
+        {
+            return;
+        }
+
+        int node = View3D.SelectedNode;
+        if (node >= 0 && _partStatus is null && View3D.Scene is { } scene && (uint)node < (uint)scene.Nodes.Length)
+        {
+            Artwork3DFormat format = (DataContext as Artwork3DViewModel)?.Format ?? Artwork3DFormat.U3D;
+            _partStatus = Artwork3DPartNames.Status(scene, node, format);
+        }
+
+        pages.SetCurrentValue(PageItemsControl.InteractiveActionOverProperty, node >= 0 ? _partStatus : null);
     }
 
     /// <summary>

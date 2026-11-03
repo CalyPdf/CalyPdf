@@ -210,6 +210,15 @@ internal sealed class MainWindow : Window
         }
     }
 
+    /// <summary>The node a click selected, as the file names it; empty with none.</summary>
+    private string SelectedPart()
+    {
+        int node = _view3D.SelectedNode;
+        return node >= 0 && _view3D.Scene is { } scene && (uint)node < (uint)scene.Nodes.Length
+            ? "  part " + scene.GetName(scene.Nodes[node].Name)
+            : "";
+    }
+
     private void OnFrameRendered(object? sender, EventArgs e)
     {
         Scene3DStatistics s = _view3D.Statistics;
@@ -263,7 +272,7 @@ internal sealed class MainWindow : Window
         }
 
         _statistics.Text = string.Create(CultureInfo.InvariantCulture,
-            $"{s.DrawCalls} draws  {s.Triangles / 1000.0:F0}k tris  {s.CulledDraws} culled  {s.Samples}x  {s.FrameMilliseconds:F1} ms  GPU {s.TotalBytes / 1048576.0:F0} MB  {s.TexturesLoaded} textures  frame {s.FramesRendered}");
+            $"{s.DrawCalls} draws  {s.Triangles / 1000.0:F0}k tris  {s.CulledDraws} culled  {s.Samples}x  {s.FrameMilliseconds:F1} ms  GPU {s.TotalBytes / 1048576.0:F0} MB  {s.TexturesLoaded} textures  frame {s.FramesRendered}{SelectedPart()}");
 
         if (_options.Scenario == "recycle" && !_scenarioStarted)
         {
