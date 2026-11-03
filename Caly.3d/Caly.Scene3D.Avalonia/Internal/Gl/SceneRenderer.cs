@@ -102,7 +102,7 @@ internal sealed class SceneRenderer
         public static MaterialOverride None => new() { OpacityFactor = 1 };
     }
 
-    private enum Shape
+    private enum Shape : byte
     {
         /// <summary>The item's own primitives: triangles, line segments or points.</summary>
         Primitives,
@@ -886,6 +886,8 @@ internal sealed class SceneRenderer
 
         SceneMeshFlags meshFlags = scene.Meshes[item.Mesh].Flags;
         SceneTopology drawn = shape switch { Shape.Edges => SceneTopology.Lines, Shape.Points => SceneTopology.Points, _ => topology };
+        // Exact on purpose: this asks whether the value differs from the one last sent to the shader, not whether
+        // two opacities are close. State.Opacity starts as NaN, which equals nothing, so the first draw sends it.
         if (item.Material != state.Material || item.Opacity != state.Opacity || meshFlags != state.MeshFlags || drawn != state.Topology)
         {
             // Line segments and points have no surface for light to fall on: they are drawn in their colour,

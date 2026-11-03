@@ -1,7 +1,7 @@
 namespace Caly.Scene3D.Avalonia;
 
 /// <summary>What a <see cref="Scene3DControl"/> is doing.</summary>
-public enum Scene3DStatus
+public enum Scene3DStatus : byte
 {
     /// <summary>No scene has been set.</summary>
     Empty = 0,

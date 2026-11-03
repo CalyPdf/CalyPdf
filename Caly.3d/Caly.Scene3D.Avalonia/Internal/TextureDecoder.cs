@@ -1,4 +1,6 @@
 using System.Buffers;
+using System.Numerics;
+using System.Runtime.InteropServices;
 using Caly.Rendering.Scene3D;
 using SkiaSharp;
 
@@ -275,11 +277,30 @@ internal static unsafe class TextureDecoder
         }
     }
 
-    private static bool AnyPartial(ReadOnlySpan<byte> rgba)
+    /// <summary>Whether any alpha is neither 0 nor 255.</summary>
+    internal static bool AnyPartial(ReadOnlySpan<byte> rgba)
     {
-        for (int i = 3; i < rgba.Length; i += 4)
+        // Four bytes as one uint, so a vector compares Vector<uint>.Count pixels at once.
+        ReadOnlySpan<uint> pixels = MemoryMarshal.Cast<byte, uint>(rgba);
+        uint alpha = AlphaMask;
+        int i = 0;
+        if (Vector.IsHardwareAccelerated)
         {
-            if (rgba[i] is not (0 or 255))
+            var mask = new Vector<uint>(alpha);
+            for (; i <= pixels.Length - Vector<uint>.Count; i += Vector<uint>.Count)
+            {
+                Vector<uint> a = new Vector<uint>(pixels.Slice(i)) & mask;
+                if (!Vector.EqualsAll(Vector.Equals(a, Vector<uint>.Zero) | Vector.Equals(a, mask), Vector<uint>.AllBitsSet))
+                {
+                    return true;
+                }
+            }
+        }
+
+        for (; i < pixels.Length; i++)
+        {
+            uint a = pixels[i] & alpha;
+            if (a != 0 && a != alpha)
             {
                 return true;
             }
@@ -288,11 +309,28 @@ internal static unsafe class TextureDecoder
         return false;
     }
 
-    private static bool AnyTransparent(ReadOnlySpan<byte> rgba)
+    /// <summary>Whether any alpha is below 255.</summary>
+    internal static bool AnyTransparent(ReadOnlySpan<byte> rgba)
     {
-        for (int i = 3; i < rgba.Length; i += 4)
+        // An opaque pixel has all its bits set once its colour bits are or-ed in. The BCL has no masked search.
+        ReadOnlySpan<uint> pixels = MemoryMarshal.Cast<byte, uint>(rgba);
+        uint colour = ~AlphaMask;
+        int i = 0;
+        if (Vector.IsHardwareAccelerated)
         {
-            if (rgba[i] != 255)
+            var fill = new Vector<uint>(colour);
+            for (; i <= pixels.Length - Vector<uint>.Count; i += Vector<uint>.Count)
+            {
+                if (!Vector.EqualsAll(new Vector<uint>(pixels.Slice(i)) | fill, Vector<uint>.AllBitsSet))
+                {
+                    return true;
+                }
+            }
+        }
+
+        for (; i < pixels.Length; i++)
+        {
+            if ((pixels[i] | colour) != uint.MaxValue)
             {
                 return true;
             }
@@ -300,4 +338,7 @@ internal static unsafe class TextureDecoder
 
         return false;
     }
+
+    /// <summary>The bits of the fourth byte (alpha) of a pixel read as a uint.</summary>
+    private static uint AlphaMask => BitConverter.IsLittleEndian ? 0xFF000000u : 0x000000FFu;
 }

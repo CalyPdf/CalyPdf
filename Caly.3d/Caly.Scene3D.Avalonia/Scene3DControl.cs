@@ -103,7 +103,7 @@ public partial class Scene3DControl : OpenGlControlBase, ICustomHitTest
     /// </summary>
     internal const double ContextClickTolerance = 4;
 
-    private enum Drag
+    private enum Drag : byte
     {
         None,
         Rotate,

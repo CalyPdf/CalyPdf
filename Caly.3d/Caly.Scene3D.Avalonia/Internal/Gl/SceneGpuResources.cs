@@ -1,3 +1,4 @@
+using System.Buffers;
 using Caly.Rendering.Scene3D;
 
 namespace Caly.Scene3D.Avalonia.Internal.Gl;
@@ -130,28 +131,39 @@ internal sealed class SceneGpuResources
             return starts;
         }
 
-        var indices = new uint[total];
-        var weights = new uint[total];
-        int next = 0;
-        for (int i = 0; i < meshes.Length; i++)
+        // Too large for the stack (one entry per vertex), and only needed until the upload: pooled.
+        int count = checked((int)total);
+        uint[] indices = ArrayPool<uint>.Shared.Rent(count);
+        uint[] weights = ArrayPool<uint>.Shared.Rent(count);
+        try
         {
-            if ((uint)meshes[i].Skin >= (uint)scene.Skins.Count ||
-                scene.Skins[meshes[i].Skin].Motion is null ||
-                scene.Skins[meshes[i].Skin].Indices.Length != meshes[i].VertexCount)
+            int next = 0;
+            for (int i = 0; i < meshes.Length; i++)
             {
-                continue;
+                if ((uint)meshes[i].Skin >= (uint)scene.Skins.Count ||
+                    scene.Skins[meshes[i].Skin].Motion is null ||
+                    scene.Skins[meshes[i].Skin].Indices.Length != meshes[i].VertexCount)
+                {
+                    continue;
+                }
+
+                SceneSkin skin = scene.Skins[meshes[i].Skin];
+                skin.Indices.CopyTo(indices.AsSpan(next));
+                skin.Weights.CopyTo(weights.AsSpan(next));
+                starts[i] = next;
+                _skinned[i] = true;
+                next += meshes[i].VertexCount;
             }
 
-            SceneSkin skin = scene.Skins[meshes[i].Skin];
-            skin.Indices.CopyTo(indices.AsSpan(next));
-            skin.Weights.CopyTo(weights.AsSpan(next));
-            starts[i] = next;
-            _skinned[i] = true;
-            next += meshes[i].VertexCount;
+            _boneIndices = UploadStream(GlApi.ArrayBuffer, indices.AsSpan(0, count));
+            _boneWeights = UploadStream(GlApi.ArrayBuffer, weights.AsSpan(0, count));
+        }
+        finally
+        {
+            ArrayPool<uint>.Shared.Return(indices);
+            ArrayPool<uint>.Shared.Return(weights);
         }
 
-        _boneIndices = UploadStream(GlApi.ArrayBuffer, indices.AsSpan());
-        _boneWeights = UploadStream(GlApi.ArrayBuffer, weights.AsSpan());
         VertexBytes += total * 8;
         return starts;
     }

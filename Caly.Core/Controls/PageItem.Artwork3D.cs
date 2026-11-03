@@ -23,6 +23,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Metadata;
 using Avalonia.VisualTree;
 using Caly.Core.Controls.Artwork3D;
+using Caly.Core.ViewModels;
 
 namespace Caly.Core.Controls;
 
@@ -38,8 +39,8 @@ public sealed partial class PageItem
     /// <summary>
     /// Defines the <see cref="ActiveArtwork3D"/> property.
     /// </summary>
-    public static readonly StyledProperty<object?> ActiveArtwork3DProperty =
-        AvaloniaProperty.Register<PageItem, object?>(nameof(ActiveArtwork3D));
+    public static readonly StyledProperty<Artwork3DViewModel?> ActiveArtwork3DProperty =
+        AvaloniaProperty.Register<PageItem, Artwork3DViewModel?>(nameof(ActiveArtwork3D));
 
     /// <summary>
     /// The zoom the page is shown at. Only what is laid out against the screen rather than the page
@@ -55,7 +56,7 @@ public sealed partial class PageItem
     /// The 3D artwork of this page that is being viewed in place, as the data context of its view;
     /// <c>null</c> when there is none, which is the case of nearly every page.
     /// </summary>
-    public object? ActiveArtwork3D
+    public Artwork3DViewModel? ActiveArtwork3D
     {
         get => GetValue(ActiveArtwork3DProperty);
         set => SetValue(ActiveArtwork3DProperty, value);
@@ -100,7 +101,7 @@ public sealed partial class PageItem
     /// </summary>
     private void SyncArtwork3DView()
     {
-        object? artwork = ActiveArtwork3D;
+        Artwork3DViewModel? artwork = ActiveArtwork3D;
         if (_artwork3DHost is null || artwork is null || !this.IsAttachedToVisualTree())
         {
             DropArtwork3DView();
