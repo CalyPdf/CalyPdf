@@ -49,5 +49,6 @@ The workspace is outside git. If it is missing, the rulings are summarised in `C
 | Adding or fixing a U3D/PRC reader feature, scene model change, limits | `extending-scene3d-readers` |
 | Camera, projection, visibility, node names, view conversion | `pdf-3d-view-conventions` |
 | Declaring work done, running on screen, AOT, benchmarks | `verifying-3d-changes` |
+| Colours, brushes or contrast of the 3D toolbar, flyouts or badge | `applying-caly-colours` |
 
 At the end of a session of real work, append an entry to the workspace `JOURNAL.md` (what was done, learned, next) and update `CLAUDE.md`/the Scene3D README if behaviour changed.
