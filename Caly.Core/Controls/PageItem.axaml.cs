@@ -36,7 +36,7 @@ namespace Caly.Core.Controls;
 /// </summary>
 [TemplatePart("PART_PageInteractiveLayerControl", typeof(PageInteractiveLayerControl))]
 [TemplatePart("PART_PageLoadingHost", typeof(Panel))]
-public sealed class PageItem : ContentControl
+public sealed partial class PageItem : ContentControl
 {
     /// <summary>
     /// Defines the <see cref="IsPageLoading"/> property.
@@ -213,6 +213,8 @@ public sealed class PageItem : ContentControl
         // Optional: minimal templates (tests, design surfaces) need not provide the host.
         _pageLoadingHost = e.NameScope.Find<Panel>("PART_PageLoadingHost");
         SyncPageLoadingSkeleton();
+
+        ApplyArtwork3DTemplate(e.NameScope);
     }
     
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -222,6 +224,11 @@ public sealed class PageItem : ContentControl
         if (change.Property == IsPageLoadingProperty)
         {
             SyncPageLoadingSkeleton();
+        }
+
+        if (change.Property == ActiveArtwork3DProperty)
+        {
+            SyncArtwork3DView();
         }
 
         if (change.Property == IsRotatingProperty)
@@ -244,6 +251,9 @@ public sealed class PageItem : ContentControl
         // A pooled container can come back while its page is already loading, in which
         // case there is no IsPageLoading change left to build the skeleton off.
         SyncPageLoadingSkeleton();
+
+        // Likewise a page that comes back on screen with its 3D artwork still being viewed.
+        SyncArtwork3DView();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
@@ -255,6 +265,10 @@ public sealed class PageItem : ContentControl
         // would survive reuse, but it is cheap to rebuild and holding one costs a control tree per
         // idle container, so drop it and let SyncPageLoadingSkeleton rebuild it if needed.
         DisposePageLoadingSkeleton();
+
+        // The 3D view frees its GPU memory by leaving the tree. Its artwork stays active: the view
+        // is built again when the page comes back.
+        DropArtwork3DView();
     }
 
     private void DisposePageLoadingSkeleton()

@@ -104,6 +104,9 @@ internal sealed class PrintTestDocument : IPdfDocumentService
 
     public Task<PageTextLayerContent?> GetPageTextLayerAsync(int pageNumber, CancellationToken token)
         => throw new NotSupportedException();
+
+    public Task<Caly.Pdf.Artwork.Artwork3DContent?> GetArtwork3DContentAsync(PdfArtwork3D artwork, CancellationToken token)
+        => throw new NotSupportedException();
 }
 
 /// <summary>

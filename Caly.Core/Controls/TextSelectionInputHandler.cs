@@ -35,7 +35,7 @@ namespace Caly.Core.Controls;
 /// layout and virtualization. The pure selection semantics live in
 /// <see cref="TextSelectionLogic"/>.
 /// </summary>
-internal sealed class TextSelectionInputHandler
+internal sealed partial class TextSelectionInputHandler
 {
     private readonly PageItemsControl _owner;
 
@@ -169,6 +169,7 @@ internal sealed class TextSelectionInputHandler
             return;
         }
 
+        Point? startPointerPressed = _startPointerPressed;
         _startPointerPressed = null;
 
         var pointerPoint = e.GetCurrentPoint(control);
@@ -180,10 +181,12 @@ internal sealed class TextSelectionInputHandler
 
             var point = pointerPoint.Position;
 
-            // Annotation
-            PdfAnnotation? annotation = control.PdfTextLayer.FindAnnotationOver(point.X, point.Y);
-
-            if (!HandleAnnotationAction(_owner, annotation))
+            // 3D artwork comes first, as it does when hovering: a click on it asks to view it.
+            if (TryActivateArtwork3D(control, startPointerPressed, point))
+            {
+                // Nothing else lies under a 3D artwork that a click could mean.
+            }
+            else if (!HandleAnnotationAction(_owner, control.PdfTextLayer.FindAnnotationOver(point.X, point.Y)))
             {
                 // Annotation not found or action not handled, we check for words.
                 // Words
@@ -405,6 +408,13 @@ internal sealed class TextSelectionInputHandler
     /// </summary>
     private void HandleMouseMoveOver(PageInteractiveLayerControl control, PointerPointProperties properties, Point loc)
     {
+        // 3D artwork comes first: its annotation may also carry plain contents, and the artwork's
+        // description (format, authored views) says more than those do.
+        if (TryShowArtwork3DOver(control, properties, loc))
+        {
+            return;
+        }
+
         PdfAnnotation? annotation = control.PdfTextLayer!.FindAnnotationOver(loc.X, loc.Y);
 
         if (annotation is not null)

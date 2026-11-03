@@ -128,7 +128,8 @@ namespace Caly.Pdf.TextLayer
             return new PageTextLayerContent()
             {
                 Letters = _letters,
-                Annotations = _pdfAnnotations
+                Annotations = _pdfAnnotations,
+                Artworks3D = _pdfArtworks3D
             };
         }
 

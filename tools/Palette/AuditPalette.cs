@@ -117,6 +117,20 @@ foreach (string theme in new[] { "Light", "Dark" })
     Contrast("G4", "BaseHigh", "BaseMediumLow", 3.0, "glyph on pressed fill");
     Contrast("G5", "ChromeWhite", "Accent", 3.0, "icon on accent fill");
 
+    // Slider brushes bound in CalyTheme.axaml, on the window (RegionColor) and on flyouts (ChromeMediumLow): the thumb in
+    // every state and the filled track 3:1, the empty track 1.5:1 and told from the filled one by lightness.
+    foreach (string bg in new[] { "RegionColor", "ChromeMediumLow" })
+    {
+        Contrast("G7", "SliderThumbBackground", bg, 3.0, "slider thumb");
+        Contrast("G7", "SliderThumbBackgroundPointerOver", bg, 3.0, "slider thumb, hover");
+        Contrast("G7", "SliderThumbBackgroundPressed", bg, 3.0, "slider thumb, pressed");
+        Contrast("G7", "SliderTrackValueFill", bg, 3.0, "slider filled track");
+        Contrast("G7", "SliderTrackFill", bg, 1.5, "slider empty track");
+    }
+
+    double trackStep = Math.Abs(LStar(Get("SliderTrackValueFill")) - LStar(Get("SliderTrackFill")));
+    Report(theme, "G7", "slider filled vs empty track: lightness step (L*)", $"{trackStep:N1} (min 8.0)", trackStep >= 8.0);
+
     // Tab and button brushes bound in CalyTheme.axaml.
     (string Fg, string Bg, double Min, string Kind)[] brushPairs =
     {

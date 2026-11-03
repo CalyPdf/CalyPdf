@@ -190,6 +190,9 @@ public class DocumentViewModelZoomModeTests
         public Task<IReadOnlyList<PdfEmbeddedFileViewModel>?> GetEmbeddedFileAsync(CancellationToken token)
             => throw new NotImplementedException();
 
+        public Task<Caly.Pdf.Artwork.Artwork3DContent?> GetArtwork3DContentAsync(PdfArtwork3D artwork, CancellationToken token)
+            => throw new NotImplementedException();
+
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

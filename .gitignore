@@ -454,7 +454,13 @@ $RECYCLE.BIN/
 !.vscode/extensions.json
 /local
 
-.claude
+.claude/*
+!.claude/skills/
+
+# Local clones kept beside the submodules for reference (this branch takes Scene3D and the
+# OpenJpeg filter as packages, not as source)
+/external/Scene3D/
+/external/UglyToad.PdfPig.Filters.Jpx.OpenJpeg/
 
 # Caly 
 /caly_settings

@@ -50,4 +50,25 @@
     <SolidColorBrush x:Key="ScrollBarTrackFill" Color="{DynamicResource SystemChromeLowColor}" />
     <SolidColorBrush x:Key="ScrollBarTrackFillPointerOver" Color="{DynamicResource SystemChromeLowColor}" />
 
+    <!--
+    Sliders. Fluent paints the thumb and the filled track in Accent, about 1:1 on ChromeMediumLow (flyouts) in Dark;
+    the Base ramp passes 3:1 on RegionColor and on ChromeMediumLow in both themes (AuditPalette G7).
+    -->
+    <SolidColorBrush x:Key="SliderThumbBackground" Color="{DynamicResource SystemBaseHighColor}" />
+    <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="{DynamicResource SystemBaseMediumHighColor}" />
+    <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="{DynamicResource SystemBaseMediumColor}" />
+    <SolidColorBrush x:Key="SliderTrackValueFill" Color="{DynamicResource SystemBaseMediumHighColor}" />
+    <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="{DynamicResource SystemBaseMediumHighColor}" />
+    <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="{DynamicResource SystemBaseMediumHighColor}" />
+    <SolidColorBrush x:Key="SliderTrackFill" Color="{DynamicResource SystemBaseMediumLowColor}" />
+    <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="{DynamicResource SystemBaseMediumLowColor}" />
+    <SolidColorBrush x:Key="SliderTrackFillPressed" Color="{DynamicResource SystemBaseMediumLowColor}" />
+
+    <!-- Fluent's 20 px thumb is heavy next to 12 px text. -->
+    <x:Double x:Key="SliderHorizontalThumbWidth">16</x:Double>
+    <x:Double x:Key="SliderHorizontalThumbHeight">16</x:Double>
+    <x:Double x:Key="SliderVerticalThumbWidth">16</x:Double>
+    <x:Double x:Key="SliderVerticalThumbHeight">16</x:Double>
+    <CornerRadius x:Key="SliderThumbCornerRadius">8</CornerRadius>
+
 </ResourceDictionary>
