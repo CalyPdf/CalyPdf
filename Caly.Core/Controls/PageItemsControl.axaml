@@ -33,6 +33,7 @@
         <Setter Property="VisiblePages" Value="{Binding VisiblePages, Mode=TwoWay}"/>
         <Setter Property="RefreshPages" Value="{Binding RefreshPagesCommand}"/>
         <Setter Property="ClearSelection" Value="{Binding ClearSelectionCommand}"/>
+        <Setter Property="ActivateArtwork3D" Value="{Binding ActivateArtwork3DCommand}"/>
 		<Setter Property="InteractiveActionOver" Value="{Binding InteractiveActionOver}"/>
 
 		<Setter Property="Template">

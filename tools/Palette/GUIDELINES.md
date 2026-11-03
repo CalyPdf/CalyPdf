@@ -82,6 +82,9 @@ Each theme MUST define all of: `accent`, `ink`, `surface`, `chrome`, `paper`, `e
 | Close button: pressed circle | `ChromeMediumLow` |
 | Selected drop-down item text (rest, hover, pressed) | `ChromeWhite` |
 | Scrollbar track (rest and expanded) | `ChromeLow` |
+| 3D toolbar fill (`Artwork3DView.axaml`) | `RegionColor` |
+| Slider thumb: rest, hover, pressed | `BaseHigh`, `BaseMediumHigh`, `BaseMedium` |
+| Slider track: filled, empty | `BaseMediumHigh`, `BaseMediumLow` |
 
 - `DocumentsTabsControl.axaml` MUST NOT set `Background` on the `TabsControl`.
 - The `TabsControl` content row MUST be painted `RegionColor` by the style in `DocumentsTabsControl.axaml`.
@@ -122,6 +125,7 @@ Ratios are measured in both themes.
 | G6 | Tab titles: selected, unselected, inactive, hover, inactive hover | 4.5 |
 | G6 | Close, scroll and add-tab glyphs, every state except disabled, on their background | 3.0 |
 | G6 | Selected drop-down item text on `Accent`, every state | 4.5 |
+| G7 | Slider thumb (every state) and filled track on `RegionColor` and `ChromeMediumLow` (flyouts); empty track 1.5; filled vs empty track 8.0 L* | 3.0 |
 | D1 | Tab separator on the strip | 1.5 |
 | D2 | `BaseMediumLow` on `BaseLow` (disabled text) | 1.5 |
 | D3 | Disabled scroll glyph on the strip | 1.5 |

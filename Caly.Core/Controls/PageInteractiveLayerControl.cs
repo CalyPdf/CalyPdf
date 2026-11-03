@@ -18,22 +18,22 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-using System;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
+using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
+using Avalonia.Styling;
 using Avalonia.VisualTree;
 using Caly.Core.Utilities;
 using Caly.Pdf.Models;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using Avalonia.Markup.Xaml.MarkupExtensions;
-using Avalonia.Styling;
 using SkiaSharp;
 using UglyToad.PdfPig.Core;
 
@@ -42,7 +42,7 @@ namespace Caly.Core.Controls;
 /// <summary>
 /// Control that represents the text layer of a PDF page, handling text selection and interaction.
 /// </summary>
-public sealed class PageInteractiveLayerControl : Control
+public sealed partial class PageInteractiveLayerControl : Control
 {
     // https://github.com/AvaloniaUI/Avalonia/blob/master/src/Avalonia.Controls/Primitives/TextSelectionCanvas.cs#L62
     // Check caret handle
@@ -84,7 +84,7 @@ public sealed class PageInteractiveLayerControl : Control
     static PageInteractiveLayerControl()
     {
         AffectsRender<PageInteractiveLayerControl>(PdfTextLayerProperty, VisibleAreaProperty,
-            SelectedWordsProperty, SearchResultsProperty);
+            SelectedWordsProperty, SearchResultsProperty, ActiveArtwork3DIndexProperty);
     }
 
     public PageInteractiveLayerControl()
@@ -170,6 +170,8 @@ public sealed class PageInteractiveLayerControl : Control
 
     internal void HideAnnotation()
     {
+        _shownArtwork3D = null;
+
         if (FlyoutBase.GetAttachedFlyout(this) is not Flyout attachedFlyout)
         {
             return;
@@ -249,6 +251,18 @@ public sealed class PageInteractiveLayerControl : Control
         {
             HighlightPaths.Replace(ref _searchResultsPaths, change.NewValue as IReadOnlyList<PdfRectangle[]>);
         }
+        else if (change.Property == Artwork3DRefusalsProperty)
+        {
+            // What the open flyout says of an artwork may no longer be
+            // true: the next pointer move writes it again.
+            _shownArtwork3D = null;
+        }
+        else if (change.Property == ZoomLevelProperty && PdfTextLayer?.Artworks3D is { Count: > 0 })
+        {
+            // The badges are drawn at the inverse of the zoom. A zoom that keeps the whole page in view does not
+            // change VisibleArea, so nothing else would redraw them.
+            InvalidateVisual();
+        }
 #if DEBUG
         else if (change.Property == PdfTextLayerProperty)
         {
@@ -323,6 +337,11 @@ public sealed class PageInteractiveLayerControl : Control
             // Each operation holds its own references: the paths stay alive while a frame still draws them
             context.Custom(new HighlightDrawOperation(new Rect(Bounds.Size), VisibleArea.Value.ToSKRect(),
                 _searchResultsPaths?.Clone(), _selectedWordsPaths?.Clone()));
+        }
+
+        if (PdfTextLayer.Artworks3D is { Count: > 0 } artworks)
+        {
+            RenderArtwork3DBadges(context, artworks, VisibleArea.Value);
         }
     }
 
