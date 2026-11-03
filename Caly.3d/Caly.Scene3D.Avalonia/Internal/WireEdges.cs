@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Caly.Rendering.Scene3D;
 
 namespace Caly.Scene3D.Avalonia.Internal;
@@ -10,10 +11,10 @@ namespace Caly.Scene3D.Avalonia.Internal;
 /// </summary>
 internal sealed class WireEdges
 {
-    private readonly uint[] _indices;
+    private readonly List<uint> _indices; // the list it was built in: no copy
     private readonly int[] _first, _count;
 
-    private WireEdges(uint[] indices, int[] first, int[] count)
+    private WireEdges(List<uint> indices, int[] first, int[] count)
     {
         _indices = indices;
         _first = first;
@@ -21,7 +22,7 @@ internal sealed class WireEdges
     }
 
     /// <summary>All edges, two vertex numbers each, part after part.</summary>
-    public ReadOnlySpan<uint> Indices => _indices;
+    public ReadOnlySpan<uint> Indices => CollectionsMarshal.AsSpan(_indices);
 
     /// <summary>Where a part's edges begin in <see cref="Indices"/>.</summary>
     public int First(int part) => (uint)part < (uint)_first.Length ? _first[part] : 0;
@@ -37,7 +38,8 @@ internal sealed class WireEdges
         ReadOnlySpan<uint> indices = scene.Indices;
         var first = new int[parts.Length];
         var count = new int[parts.Length];
-        var list = new List<uint>();
+        // Two indices per edge; see ExpectedEdges.
+        var list = new List<uint>(2 * ExpectedEdges(indices.Length / 3));
         var seen = new HashSet<long>(EdgeKeyComparer.Instance);
 
         foreach (SceneMesh mesh in meshes)
@@ -59,7 +61,7 @@ internal sealed class WireEdges
 
                 ReadOnlySpan<uint> triangles = indices.Slice(part.IndexStart, part.IndexCount - part.IndexCount % 3);
                 seen.Clear();
-                seen.EnsureCapacity(triangles.Length);
+                seen.EnsureCapacity(ExpectedEdges(triangles.Length / 3));
                 for (int t = 0; t < triangles.Length; t += 3)
                 {
                     uint a = triangles[t], b = triangles[t + 1], c = triangles[t + 2];
@@ -77,7 +79,11 @@ internal sealed class WireEdges
             }
         }
 
-        return new WireEdges(list.ToArray(), first, count);
+        return new WireEdges(list, first, count);
+
+        // About one and a half edges to a triangle in a closed surface, plus the rim of an open one (a
+        // sixteenth), so that neither table doubles for one edge too many.
+        static int ExpectedEdges(long triangles) => (int)Math.Min(triangles * 3 / 2 + triangles / 16 + 16, int.MaxValue / 4);
 
         void Add(uint a, uint b)
         {

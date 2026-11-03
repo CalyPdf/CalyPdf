@@ -38,10 +38,10 @@ internal sealed class OutlineEdges
     // Vertex normals this close are one normal carried across an edge.
     private const float SameNormalCosine = 0.9999f;
 
-    private readonly int[] _vertices;
+    private readonly List<int> _vertices; // the list it was built in: no copy
     private readonly int[] _first, _count;
 
-    private OutlineEdges(int[] vertices, int[] first, int[] count)
+    private OutlineEdges(List<int> vertices, int[] first, int[] count)
     {
         _vertices = vertices;
         _first = first;
@@ -49,10 +49,10 @@ internal sealed class OutlineEdges
     }
 
     /// <summary>All edge vertices, <see cref="WordsPerVertex"/> words each, two per edge.</summary>
-    public ReadOnlySpan<int> Vertices => _vertices;
+    public ReadOnlySpan<int> Vertices => CollectionsMarshal.AsSpan(_vertices);
 
     /// <summary>Number of edge vertices.</summary>
-    public int VertexCount => _vertices.Length / WordsPerVertex;
+    public int VertexCount => _vertices.Count / WordsPerVertex;
 
     /// <summary>The first edge vertex of a mesh.</summary>
     public int First(int mesh) => (uint)mesh < (uint)_first.Length ? _first[mesh] : 0;
@@ -126,7 +126,7 @@ internal sealed class OutlineEdges
             count[m] = builder.Emit(scene.Positions.Slice(mesh.VertexStart * 3, mesh.VertexCount * 3), vertices);
         }
 
-        return new OutlineEdges(vertices.ToArray(), first, count);
+        return new OutlineEdges(vertices, first, count);
     }
 
     /// <summary>The edges of one mesh; reused from mesh to mesh.</summary>
@@ -174,14 +174,15 @@ internal sealed class OutlineEdges
             ReadOnlySpan<SceneMeshPart> parts = scene.Parts;
             ReadOnlySpan<uint> indices = scene.Indices;
 
-            // About one and a half edges to a triangle in a closed surface: sized once, never grown.
+            // About one and a half edges to a triangle in a closed surface, plus the rim of an open one (a
+            // sixteenth): sized once, never grown. Without the rim an open sheet doubled both tables.
             long triangleCount = 0;
             for (int p = mesh.FirstPart; p < mesh.FirstPart + mesh.PartCount && (uint)p < (uint)parts.Length; p++)
             {
                 triangleCount += Math.Max(0, parts[p].IndexCount) / 3;
             }
 
-            int expectedEdges = (int)Math.Min(triangleCount * 3 / 2 + 16, int.MaxValue / 2);
+            int expectedEdges = (int)Math.Min(triangleCount * 3 / 2 + triangleCount / 16 + 16, int.MaxValue / 2);
             _edgeOf.EnsureCapacity(expectedEdges);
             if (_edges.Length < expectedEdges)
             {
@@ -275,48 +276,56 @@ internal sealed class OutlineEdges
         /// <summary>Appends the edges that can be drawn; returns how many vertices that is.</summary>
         public int Emit(ReadOnlySpan<float> positions, List<int> vertices)
         {
-            int before = vertices.Count;
+            // Counted first, so the list grows once to the exact size instead of doubling as it is filled.
+            int drawn = 0;
             for (int i = 0; i < _edgeCount; i++)
             {
-                Edge edge = _edges[i];
-                Vector3 normalB;
-                bool smooth = false;
-                if (edge.Faces == 2)
+                if (IsDrawn(_edges[i]))
                 {
-                    if (Vector3.Dot(edge.NormalA, edge.NormalB) >= CoplanarCosine)
-                    {
-                        continue;
-                    }
+                    drawn++;
+                }
+            }
 
-                    normalB = edge.NormalB;
-                    smooth = edge.Smooth;
-                }
-                else
+            int before = vertices.Count;
+            CollectionsMarshal.SetCount(vertices, before + drawn * 2 * WordsPerVertex);
+            Span<int> output = CollectionsMarshal.AsSpan(vertices).Slice(before);
+            for (int i = 0; i < _edgeCount; i++)
+            {
+                ref readonly Edge edge = ref _edges[i];
+                if (!IsDrawn(edge))
                 {
-                    // One face, or more than two: always drawn, as faces that turn opposite ways are.
-                    normalB = -edge.NormalA;
+                    continue;
                 }
+
+                // One face, or more than two: always drawn, as faces that turn opposite ways are.
+                bool two = edge.Faces == 2;
+                Vector3 normalB = two ? edge.NormalB : -edge.NormalA;
+                bool smooth = two && edge.Smooth;
 
                 Vector3 a = Read(positions, edge.A), b = Read(positions, edge.B);
                 Vector3 middle = (a + b) * 0.5f;
                 int packedA = Pack(edge.NormalA, smooth ? SmoothFlag : 0), packedB = Pack(normalB);
-                Append(vertices, a, middle, packedA, packedB);
-                Append(vertices, b, middle, packedA, packedB);
+                Write(output, a, middle, packedA, packedB);
+                Write(output.Slice(WordsPerVertex), b, middle, packedA, packedB);
+                output = output.Slice(2 * WordsPerVertex);
             }
 
-            return (vertices.Count - before) / WordsPerVertex;
+            return drawn * 2;
         }
 
-        private static void Append(List<int> vertices, Vector3 position, Vector3 middle, int normalA, int normalB)
+        /// <summary>An edge between two faces in one plane is left out (written so that a NaN is drawn).</summary>
+        private static bool IsDrawn(in Edge edge) => edge.Faces != 2 || !(Vector3.Dot(edge.NormalA, edge.NormalB) >= CoplanarCosine);
+
+        private static void Write(Span<int> vertex, Vector3 position, Vector3 middle, int normalA, int normalB)
         {
-            vertices.Add(BitConverter.SingleToInt32Bits(position.X));
-            vertices.Add(BitConverter.SingleToInt32Bits(position.Y));
-            vertices.Add(BitConverter.SingleToInt32Bits(position.Z));
-            vertices.Add(BitConverter.SingleToInt32Bits(middle.X));
-            vertices.Add(BitConverter.SingleToInt32Bits(middle.Y));
-            vertices.Add(BitConverter.SingleToInt32Bits(middle.Z));
-            vertices.Add(normalA);
-            vertices.Add(normalB);
+            vertex[7] = normalB; // the last first: one bounds check for the eight
+            vertex[0] = BitConverter.SingleToInt32Bits(position.X);
+            vertex[1] = BitConverter.SingleToInt32Bits(position.Y);
+            vertex[2] = BitConverter.SingleToInt32Bits(position.Z);
+            vertex[3] = BitConverter.SingleToInt32Bits(middle.X);
+            vertex[4] = BitConverter.SingleToInt32Bits(middle.Y);
+            vertex[5] = BitConverter.SingleToInt32Bits(middle.Z);
+            vertex[6] = normalA;
         }
 
         private static Vector3 Read(ReadOnlySpan<float> values, int vertex)

@@ -24,6 +24,7 @@ using Avalonia.VisualTree;
 using Caly.Core.Models;
 using Caly.Core.Utilities;
 using Caly.Pdf.Models;
+using UglyToad.PdfPig.Artwork;
 
 namespace Caly.Core.Controls;
 
@@ -103,7 +104,15 @@ internal sealed partial class TextSelectionInputHandler
             control.SetDefaultCursor();
         }
 
-        _owner.SetCurrentValue(PageItemsControl.InteractiveActionOverProperty, $"3D model ({artwork.FormatDisplayName})");
+        _owner.SetCurrentValue(PageItemsControl.InteractiveActionOverProperty, GetArtwork3DStatus(artwork));
         return true;
     }
+
+    /// <summary>The status text for 3D artwork under the pointer; a constant for the formats Caly reads, as it is set on every move.</summary>
+    internal static string GetArtwork3DStatus(PdfArtwork3D artwork) => artwork.Format switch
+    {
+        Artwork3DFormat.U3D => "3D model (U3D)",
+        Artwork3DFormat.Prc => "3D model (PRC)",
+        _ => $"3D model ({artwork.FormatDisplayName})"
+    };
 }
