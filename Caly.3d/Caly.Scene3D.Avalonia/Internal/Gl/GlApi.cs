@@ -606,10 +606,21 @@ internal sealed unsafe class GlApi
     /// <summary>Discards any pending errors and returns the first, or <see cref="NoError"/>.</summary>
     public int DrainErrors()
     {
+        // glGetError returns and clears one recorded error per call, and a driver may record several (one per
+        // kind, or one per part of a distributed implementation), so it is called until it returns none.
+        // The guard is for a lost context, where some drivers return GL_CONTEXT_LOST on every call.
         int first = _getError();
+        if (first == NoError)
+        {
+            return NoError;
+        }
+
+        // ReSharper disable EmptyForStatement
         for (int guard = 0; guard < 64 && _getError() != NoError; guard++)
         {
+            // Drain all errors
         }
+        // ReSharper restore EmptyForStatement
 
         return first;
     }

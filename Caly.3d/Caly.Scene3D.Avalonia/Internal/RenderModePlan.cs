@@ -3,7 +3,7 @@ using Caly.Rendering.Scene3D;
 namespace Caly.Scene3D.Avalonia.Internal;
 
 /// <summary>How the surfaces of a scene are drawn in a render mode.</summary>
-internal enum SurfacePass
+internal enum SurfacePass : byte
 {
     /// <summary>Not at all.</summary>
     None,
@@ -22,7 +22,7 @@ internal enum SurfacePass
 }
 
 /// <summary>How edges or points are coloured in a render mode.</summary>
-internal enum MarkPass
+internal enum MarkPass : byte
 {
     /// <summary>Not drawn.</summary>
     None,

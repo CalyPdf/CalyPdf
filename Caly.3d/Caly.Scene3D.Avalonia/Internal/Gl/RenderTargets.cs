@@ -12,7 +12,7 @@ namespace Caly.Scene3D.Avalonia.Internal.Gl;
 internal sealed class RenderTargets
 {
     /// <summary>How the multisampled image reaches Avalonia's framebuffer.</summary>
-    public enum ResolvePath
+    public enum ResolvePath : byte
     {
         Untested,
         Direct,

@@ -238,4 +238,32 @@ public class TextureDecoderTests
             output.Write(buffer);
         }
     }
+
+    [Theory]
+    [InlineData(0, true, false)]
+    [InlineData(255, false, false)]
+    [InlineData(254, true, true)]
+    [InlineData(1, true, true)]
+    public void TheAlphaScansFindOnePixelWhereverItIs(byte alpha, bool transparent, bool partial)
+    {
+        // Lengths across several vector widths, so both the vector loop and the leftover pixels are covered.
+        for (int pixels = 1; pixels <= 3 * System.Numerics.Vector<uint>.Count + 3; pixels++)
+        {
+            for (int at = 0; at < pixels; at++)
+            {
+                var rgba = new byte[pixels * 4];
+                for (int i = 0; i < rgba.Length; i++)
+                {
+                    rgba[i] = (i & 3) == 3 ? (byte)255 : (byte)(i * 37);
+                }
+
+                Assert.False(TextureDecoder.AnyTransparent(rgba));
+                Assert.False(TextureDecoder.AnyPartial(rgba));
+
+                rgba[at * 4 + 3] = alpha;
+                Assert.Equal(transparent, TextureDecoder.AnyTransparent(rgba));
+                Assert.Equal(partial, TextureDecoder.AnyPartial(rgba));
+            }
+        }
+    }
 }
