@@ -33,6 +33,12 @@ internal struct FrameSetup
 
     /// <summary>Most bytes the multisampled framebuffer may take.</summary>
     public long FramebufferBudget;
+
+    /// <summary>The node drawn tinted and boxed in <see cref="Highlight"/>, or null for none.</summary>
+    public int? SelectedNode;
+
+    /// <summary>The selection's colour, 0..1.</summary>
+    public Vector3 Highlight;
 }
 
 /// <summary>
@@ -65,6 +71,11 @@ internal sealed class SceneRenderer
 
     // The silhouette edges of the render modes that draw them, and the program that draws them.
     private readonly OutlineGpuResources _outlines;
+    private readonly PickTarget _pickTarget;
+
+    // The selection of the frame being drawn (FrameSetup.SelectedNode, -1 for none) and its colour.
+    private int _selectedNode = -1;
+    private Vector3 _highlight;
     private readonly int _outlineProgram;
     private readonly int _uOutlineModelView, _uOutlineProjection, _uOutlineNormalMatrix, _uOutlineCrease, _uOutlineOrthographic, _uOutlineColor;
 
@@ -98,6 +109,9 @@ internal sealed class SceneRenderer
 
         /// <summary>Light line segments and points as surfaces are (the shaded wireframe and vertices).</summary>
         public bool LightMarks;
+
+        /// <summary>With <see cref="UseColor"/>: opacity 1 whatever the material says (the picking pass's colours are numbers).</summary>
+        public bool ForceOpaque;
 
         public static MaterialOverride None => new() { OpacityFactor = 1 };
     }
@@ -172,6 +186,7 @@ internal sealed class SceneRenderer
         _uBones = gl.GetUniformLocation(_program, "uBones");
 
         _outlines = new OutlineGpuResources(gl);
+        _pickTarget = new PickTarget(gl);
         _outlineProgram = gl.CreateProgram(header + Shaders.OutlineVertex, header + Shaders.OutlineFragment, Shaders.OutlineAttributes);
         _uOutlineModelView = gl.GetUniformLocation(_outlineProgram, "uModelView");
         _uOutlineProjection = gl.GetUniformLocation(_outlineProgram, "uProjection");
@@ -459,11 +474,77 @@ internal sealed class SceneRenderer
         }
     }
 
+    /// <summary>
+    /// The node drawn at <paramref name="pixel"/> (one framebuffer pixel, as a region of the whole view), or -1
+    /// where only the background is. Draws every item's surfaces, whatever the render mode, into a one-pixel
+    /// target, each in its node's colour. Call after <see cref="Render"/> with the same setup: it uses the draw
+    /// list that frame prepared. Leaves no framebuffer bound that the caller had.
+    /// </summary>
+    public int Pick(in FrameSetup setup, ViewRegion pixel)
+    {
+        if (_scene is not { } scene || _drawList.Count == 0 || !pixel.HasArea)
+        {
+            return -1;
+        }
+
+        Matrix4x4 view = ViewCamera.ViewMatrix(setup.Pose);
+        (float near, float far) = ViewCamera.ClipPlanes(setup.Pose, setup.Projection, _drawList.VisibleBounds);
+        if (!ViewCamera.TryProjectionMatrix(setup.Projection, setup.FullViewSize, pixel, near, far, out Matrix4x4 projection))
+        {
+            return -1;
+        }
+
+        GlApi gl = _gl;
+        _pickTarget.Bind();
+        gl.Viewport(0, 0, 1, 1);
+        gl.Disable(GlApi.ScissorTest);
+        gl.Disable(GlApi.Blend);
+        gl.Disable(GlApi.CullFace);
+        gl.Enable(GlApi.DepthTest);
+        gl.DepthFunc(GlApi.LessOrEqual);
+        gl.DepthMask(true);
+        gl.ClearColor(0, 0, 0, 0);
+        gl.Clear(GlApi.ColorBufferBit | GlApi.DepthBufferBit);
+
+        // Culled against the one pixel: only what may cover it is drawn. The next frame culls again.
+        _drawList.Update(view, view * projection);
+        gl.UseProgram(_program);
+        gl.UniformMatrix(_uProjection, projection);
+        gl.UniformMatrix(_uTexTransform, Matrix4x4.Identity);
+        gl.Uniform(_uTexture, 0);
+        gl.Uniform(_uBones, Shaders.BoneTextureUnit);
+        gl.Uniform(_uSkinOffset, -1);
+
+        var state = new DrawState { VertexArray = -1, Material = int.MinValue, Opacity = float.NaN, SkinOffset = -1, Orthographic = setup.Projection.Kind == SceneProjection.Orthographic };
+        _override = MaterialOverride.None with { UseColor = true, ForceOpaque = true };
+        PickItems(scene, _drawList.Opaque, view, ref state);
+        PickItems(scene, _drawList.Transparent, view, ref state);
+        _override = MaterialOverride.None;
+
+        int node = _pickTarget.ReadNode();
+        gl.BindVertexArray(0);
+        gl.UseProgram(0);
+        return node;
+    }
+
+    private void PickItems(Scene scene, ReadOnlySpan<DrawItem> items, in Matrix4x4 view, ref DrawState state)
+    {
+        foreach (ref readonly DrawItem item in items)
+        {
+            // Each item's own colour: the material is sent again for every one.
+            _override.Color = Picking.Encode(item.Node);
+            state.Material = int.MinValue;
+            DrawOne(scene, item, view, ref state, countTriangles: false);
+        }
+    }
+
     private void Draw(Scene scene, in FrameSetup setup, in Matrix4x4 view, in Matrix4x4 projection, int pixelHeight)
     {
         GlApi gl = _gl;
         _drawList.Update(view, view * projection);
         LastCulled = _drawList.Culled;
+        _selectedNode = setup.SelectedNode ?? -1;
+        _highlight = Sanitize(setup.Highlight);
         UploadBones();
 
         gl.Enable(GlApi.DepthTest);
@@ -570,6 +651,16 @@ internal sealed class SceneRenderer
             _override = MaterialOverride.None with { UseColor = true, Color = edgeColor };
             state.Material = int.MinValue;
             DrawBoxes(scene, view, ref state, faces: false);
+        }
+
+        // The selected node's box, over everything: it says where the part is even where others hide it.
+        if (_selectedNode >= 0)
+        {
+            _override = MaterialOverride.None with { UseColor = true, Color = _highlight };
+            state.Material = int.MinValue;
+            gl.Disable(GlApi.DepthTest);
+            DrawBoxes(scene, view, ref state, faces: false, onlyNode: _selectedNode);
+            gl.Enable(GlApi.DepthTest);
         }
 
         _override = MaterialOverride.None;
@@ -722,7 +813,8 @@ internal sealed class SceneRenderer
     }
 
     /// <summary>The box of each node drawn, around its mesh as the mesh's own coordinates bound it: edges or faces.</summary>
-    private void DrawBoxes(Scene scene, in Matrix4x4 view, ref DrawState state, bool faces)
+    /// <param name="onlyNode">The one node whose box is drawn, or -1 for every node's.</param>
+    private void DrawBoxes(Scene scene, in Matrix4x4 view, ref DrawState state, bool faces, int onlyNode = -1)
     {
         GlApi gl = _gl;
         gl.BindVertexArray(faces ? _boxFaces : _boxLines);
@@ -734,16 +826,16 @@ internal sealed class SceneRenderer
         }
 
         StartNodePass(scene);
-        DrawBoxesOf(scene, _drawList.Opaque, view, ref state, faces);
-        DrawBoxesOf(scene, _drawList.Transparent, view, ref state, faces);
+        DrawBoxesOf(scene, _drawList.Opaque, view, ref state, faces, onlyNode);
+        DrawBoxesOf(scene, _drawList.Transparent, view, ref state, faces, onlyNode);
     }
 
-    private void DrawBoxesOf(Scene scene, ReadOnlySpan<DrawItem> items, in Matrix4x4 view, ref DrawState state, bool faces)
+    private void DrawBoxesOf(Scene scene, ReadOnlySpan<DrawItem> items, in Matrix4x4 view, ref DrawState state, bool faces, int onlyNode)
     {
         GlApi gl = _gl;
         foreach (ref readonly DrawItem item in items)
         {
-            if (!FirstOfNode(item.Node))
+            if ((onlyNode >= 0 && item.Node != onlyNode) || !FirstOfNode(item.Node))
             {
                 continue;
             }
@@ -813,6 +905,7 @@ internal sealed class SceneRenderer
         public SceneTopology Topology;
         public int SkinOffset;
         public bool Orthographic;
+        public bool Selected;
     }
 
     /// <summary>
@@ -888,15 +981,17 @@ internal sealed class SceneRenderer
         SceneTopology drawn = shape switch { Shape.Edges => SceneTopology.Lines, Shape.Points => SceneTopology.Points, _ => topology };
         // Exact on purpose: this asks whether the value differs from the one last sent to the shader, not whether
         // two opacities are close. State.Opacity starts as NaN, which equals nothing, so the first draw sends it.
-        if (item.Material != state.Material || item.Opacity != state.Opacity || meshFlags != state.MeshFlags || drawn != state.Topology)
+        bool selected = item.Node == _selectedNode;
+        if (item.Material != state.Material || item.Opacity != state.Opacity || meshFlags != state.MeshFlags || drawn != state.Topology || selected != state.Selected)
         {
             // Line segments and points have no surface for light to fall on: they are drawn in their colour,
             // unless the render mode lights them as the surfaces they come from (shaded wireframe and vertices).
             bool lit = drawn == SceneTopology.Triangles || (_override.LightMarks && topology == SceneTopology.Triangles);
             topology = drawn;
-            SetMaterial(scene, item.Material, item.Opacity, meshFlags, state.Orthographic, lit: lit);
+            SetMaterial(scene, item.Material, item.Opacity, meshFlags, state.Orthographic, lit: lit, selected: selected);
             state.Material = item.Material;
             state.Opacity = item.Opacity;
+            state.Selected = selected;
             state.MeshFlags = meshFlags;
             state.Topology = topology;
         }
@@ -920,7 +1015,8 @@ internal sealed class SceneRenderer
         LastTriangles += countTriangles && drawn == SceneTopology.Triangles ? count / 3 : 0;
     }
 
-    private void SetMaterial(Scene scene, int materialIndex, float nodeOpacity, SceneMeshFlags meshFlags, bool orthographic, bool lit = true)
+    /// <param name="selected">The item is of the selected node: tinted towards the highlight, or painted in it in one-colour modes.</param>
+    private void SetMaterial(Scene scene, int materialIndex, float nodeOpacity, SceneMeshFlags meshFlags, bool orthographic, bool lit = true, bool selected = false)
     {
         GlApi gl = _gl;
 
@@ -934,14 +1030,17 @@ internal sealed class SceneRenderer
         Vector3 diffuse = _shading.Diffuse(material.Diffuse == Vector3.Zero ? material.Ambient : material.Diffuse);
         float opacity = Unit(material.Opacity, 1) * nodeOpacity * Unit(_override.OpacityFactor, 1);
 
+        // The picking pass's colours are node numbers: never tinted.
+        selected &= !_override.ForceOpaque;
+
         // A render mode that paints in one colour (edges, points, boxes, illustrated surfaces): unlit, untextured.
         if (_override.UseColor)
         {
             gl.Uniform(_uFlags, (orthographic ? Shaders.FlagOrthographic : 0) | (_override.ColorLit ? Shaders.FlagLit : 0));
-            gl.Uniform(_uDiffuse, _override.Color);
+            gl.Uniform(_uDiffuse, selected ? _highlight : _override.Color);
             gl.Uniform(_uSpecular, Vector3.Zero);
             gl.Uniform(_uEmissive, Vector3.Zero);
-            gl.Uniform(_uOpacity, opacity);
+            gl.Uniform(_uOpacity, _override.ForceOpaque ? 1f : opacity);
             gl.Uniform(_uShininess, 1f);
             gl.Uniform(_uAlphaCutoff, 0.5f);
             return;
@@ -966,9 +1065,18 @@ internal sealed class SceneRenderer
         }
 
         gl.Uniform(_uFlags, flags);
+        // The selected node: half its colour, half the highlight, and half the highlight again as emitted light,
+        // so that it shows as the highlight in shadow too and its shape still shows under the light.
+        Vector3 emissive = material.Emissive;
+        if (selected)
+        {
+            diffuse = Vector3.Lerp(diffuse, _highlight, 0.5f);
+            emissive += _highlight * 0.5f;
+        }
+
         gl.Uniform(_uDiffuse, Sanitize(diffuse));
         gl.Uniform(_uSpecular, Sanitize(_shading.Specular(material.Specular)));
-        gl.Uniform(_uEmissive, Sanitize(material.Emissive + diffuse * _override.AddedEmissive));
+        gl.Uniform(_uEmissive, Sanitize(emissive + diffuse * _override.AddedEmissive));
         gl.Uniform(_uOpacity, opacity);
         gl.Uniform(_uShininess, _shading.Exponent(material.Reflectivity));
         gl.Uniform(_uAlphaCutoff, Unit(material.AlphaReference, 0.5f));
@@ -1023,6 +1131,7 @@ internal sealed class SceneRenderer
         _resources.Release();
         _outlines.Release();
         _targets.Release();
+        _pickTarget.Release();
         _gl.DeleteTexture(_boneTexture);
         _boneTexture = 0;
         _gl.DeleteProgram(_program);

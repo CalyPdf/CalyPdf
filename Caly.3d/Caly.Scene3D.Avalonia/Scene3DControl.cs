@@ -68,6 +68,14 @@ public partial class Scene3DControl : OpenGlControlBase, ICustomHitTest
     public static readonly StyledProperty<Key?> ResetKeyProperty =
         AvaloniaProperty.Register<Scene3DControl, Key?>(nameof(ResetKey), Key.Home);
 
+    /// <summary>Defines the <see cref="SelectedNode"/> property.</summary>
+    public static readonly StyledProperty<int> SelectedNodeProperty =
+        AvaloniaProperty.Register<Scene3DControl, int>(nameof(SelectedNode), -1);
+
+    /// <summary>Defines the <see cref="HighlightColor"/> property.</summary>
+    public static readonly StyledProperty<Color> HighlightColorProperty =
+        AvaloniaProperty.Register<Scene3DControl, Color>(nameof(HighlightColor), Color.FromRgb(0x33, 0x99, 0xFF));
+
     /// <summary>Defines the <see cref="Status"/> property.</summary>
     public static readonly DirectProperty<Scene3DControl, Scene3DStatus> StatusProperty =
         AvaloniaProperty.RegisterDirect<Scene3DControl, Scene3DStatus>(nameof(Status), o => o.Status);
@@ -143,9 +151,12 @@ public partial class Scene3DControl : OpenGlControlBase, ICustomHitTest
         SceneProperty.Changed.AddClassHandler<Scene3DControl>((control, _) => control.OnSceneChanged());
         ViewProperty.Changed.AddClassHandler<Scene3DControl>((control, _) =>
         {
+            control.ClearSelection();
             control.ResetView();
             control.StartEdges();
         });
+        SelectedNodeProperty.Changed.AddClassHandler<Scene3DControl>((control, _) => control.RequestNextFrameRendering());
+        HighlightColorProperty.Changed.AddClassHandler<Scene3DControl>((control, _) => control.RequestNextFrameRendering());
         PrepareEdgesProperty.Changed.AddClassHandler<Scene3DControl>((control, _) => control.StartEdges());
         RenderModeOverrideProperty.Changed.AddClassHandler<Scene3DControl>((control, _) =>
         {
@@ -231,6 +242,77 @@ public partial class Scene3DControl : OpenGlControlBase, ICustomHitTest
     {
         get => GetValue(ResetKeyProperty);
         set => SetValue(ResetKeyProperty, value);
+    }
+
+    /// <summary>
+    /// The node selected by a click (<see cref="SelectAt"/>): drawn tinted and with its bounding box in
+    /// <see cref="HighlightColor"/>; -1 for none. Cleared by Escape and by a new scene or view.
+    /// </summary>
+    public int SelectedNode
+    {
+        get => GetValue(SelectedNodeProperty);
+        set => SetValue(SelectedNodeProperty, value);
+    }
+
+    /// <summary>The colour the selected node is tinted and boxed in.</summary>
+    public Color HighlightColor
+    {
+        get => GetValue(HighlightColorProperty);
+        set => SetValue(HighlightColorProperty, value);
+    }
+
+    /// <summary>How many releases were taken as a click on the model, whether or not a scene was there to pick.</summary>
+    internal int ClicksTaken { get; private set; }
+
+    /// <summary>The point of the control a pick was asked for and the next frame will look at; null for none.</summary>
+    internal Point? PendingPick { get; private set; }
+
+    // Counts clearings of the selection: a pick answered after one (a new scene or view) is dropped.
+    private int _selectionGeneration;
+
+    /// <summary>
+    /// Selects the node drawn at <paramref name="point"/> (device-independent pixels, in the control), or
+    /// none where only the background is; the answer comes with the next frame. Does nothing while no
+    /// scene is on the GPU.
+    /// </summary>
+    public void SelectAt(Point point)
+    {
+        if (!_hasPose || _uploadedScene is null)
+        {
+            return;
+        }
+
+        PendingPick = point;
+        RequestNextFrameRendering();
+    }
+
+    private void ClearSelection()
+    {
+        PendingPick = null;
+        _selectionGeneration++;
+        SelectedNode = -1;
+    }
+
+    /// <summary>Runs the pick asked for since the last frame, after that frame was drawn with the same setup.</summary>
+    private void TakePendingPick(SceneRenderer renderer, in FrameSetup setup, double scaling, int framebuffer)
+    {
+        if (PendingPick is not { } point)
+        {
+            return;
+        }
+
+        PendingPick = null;
+        int node = renderer.Pick(setup, Picking.PickRegion(setup.Region, point, Bounds.Size, scaling));
+        renderer.Gl.BindFramebuffer(GlApi.Framebuffer, framebuffer);
+
+        int generation = _selectionGeneration;
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (generation == _selectionGeneration)
+            {
+                SelectedNode = node;
+            }
+        });
     }
 
     /// <summary>Whether the scene has animations to play.</summary>
@@ -493,6 +575,7 @@ public partial class Scene3DControl : OpenGlControlBase, ICustomHitTest
 
     private void OnSceneChanged()
     {
+        ClearSelection();
         CancelEdges();
         Scene? scene = Scene;
         _scenePending = scene is not null;
@@ -640,6 +723,13 @@ public partial class Scene3DControl : OpenGlControlBase, ICustomHitTest
             // is marked handled before the base class sees it, which would otherwise ask for a menu
             // after every right-drag.
             e.Handled = drag != Drag.Zoom || _movedSincePress || e.InitialPressMouseButton != MouseButton.Right;
+
+            // A left button that never left its place was a click on the model: it selects what is there.
+            if (drag == Drag.Rotate && !_movedSincePress && e.InitialPressMouseButton == MouseButton.Left)
+            {
+                ClicksTaken++;
+                SelectAt(e.GetPosition(this));
+            }
         }
 
         base.OnPointerReleased(e);
@@ -671,6 +761,15 @@ public partial class Scene3DControl : OpenGlControlBase, ICustomHitTest
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
+
+        // Escape clears a selection first; with nothing selected it is left to the host.
+        if (e.Key == Key.Escape && !e.Handled && SelectedNode >= 0)
+        {
+            SelectedNode = -1;
+            e.Handled = true;
+            return;
+        }
+
         if (ResetKey is not { } resetKey || e.Key != resetKey || e.Handled)
         {
             return;
@@ -810,13 +909,19 @@ public partial class Scene3DControl : OpenGlControlBase, ICustomHitTest
                     ? new Vector4(authored, 1)
                     : new Vector4(background.R / 255f, background.G / 255f, background.B / 255f, background.A / 255f),
                 FramebufferBudget = FramebufferBudgetBytes,
-                AnimationTime = animationTime
+                AnimationTime = animationTime,
+                SelectedNode = SelectedNode >= 0 ? SelectedNode : null,
+                Highlight = new Vector3(HighlightColor.R, HighlightColor.G, HighlightColor.B) / 255f
             };
 
             // Without a camera (no scene) or a scene on the GPU, only the background is drawn.
             long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
             renderer.Render(fb, pixelWidth, pixelHeight, setup, drawScene: _hasPose && _uploadedScene is not null);
             LastFrameAllocatedBytes = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+            if (_hasPose && _uploadedScene is not null)
+            {
+                TakePendingPick(renderer, setup, scaling, fb);
+            }
             if (FinishEachFrame)
             {
                 renderer.Gl.Finish();

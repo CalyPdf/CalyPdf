@@ -47,7 +47,7 @@ public sealed partial class PageInteractiveLayerControl : Control
     // https://github.com/AvaloniaUI/Avalonia/blob/master/src/Avalonia.Controls/Primitives/TextSelectionCanvas.cs#L62
     // Check caret handle
 
-    private static readonly Color SelectionColor = Color.FromArgb(169, 0x33, 0x99, 0xFF);
+    internal static readonly Color SelectionColor = Color.FromArgb(169, 0x33, 0x99, 0xFF);
     private static readonly Color SearchColor = Color.FromArgb(120, 255, 0, 0);
 
     private const string AnnotationFlyoutClass = "calyAnnotationFlyout";

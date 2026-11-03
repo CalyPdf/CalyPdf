@@ -3,6 +3,10 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using UglyToad.PdfPig.Artwork;
+using Caly.Rendering.Scene3D;
+using Caly.Pdf.Artwork;
+using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Caly.Scene3D.Avalonia;
@@ -154,6 +158,94 @@ public class Artwork3DActivationInputTests
         {
             Artwork3DAvailability.MarkAvailable();
         }
+    }
+
+    /// <summary>A view of the box document's artwork on page 1, drawn into a frame so that the pointer can be over it.</summary>
+    private static async Task<(Setup Setup, Scene3DControl View3D, Point Centre)> ShowView(Artwork3DFixture f)
+    {
+        Artwork3DViewModel artwork = f.Activate();
+        Assert.True(await WaitUntil(() => artwork.State == Artwork3DState.Ready));
+
+        Setup s = Show(with3DHost: true);
+        s.Page.ActiveArtwork3D = artwork;
+        RunLayout();
+        for (int i = 0; i < 3; i++)
+        {
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            RunLayout();
+        }
+
+        Scene3DControl view3D = s.Page.GetVisualDescendants().OfType<Scene3DControl>().Single();
+        Point centre = s.Page.TranslatePoint(new Point(PageWidth / 2, 150), s.Window)!.Value;
+        Assert.Same(view3D, s.Window.InputHitTest(centre));
+        return (s, view3D, centre);
+    }
+
+    private static int FirstNodeWithAMesh(Scene scene)
+    {
+        for (int i = 0; i < scene.Nodes.Length; i++)
+        {
+            if (scene.Nodes[i].Mesh >= 0)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    [AvaloniaFact]
+    public async Task SelectingAPartShowsItsNameWhileThePointerIsOverTheView()
+    {
+        await using var f = new Artwork3DFixture();
+        (Setup s, Scene3DControl view3D, Point centre) = await ShowView(f);
+        Scene scene = view3D.Scene!;
+        int node = FirstNodeWithAMesh(scene);
+
+        s.Window.MouseMove(centre);
+        view3D.SelectedNode = node;
+
+        Assert.Equal(Artwork3DPartNames.Status(scene, node, Artwork3DFormat.U3D), s.Pages.InteractiveActionOver);
+    }
+
+    [AvaloniaFact]
+    public async Task ClearingTheSelectionClearsTheStatus()
+    {
+        await using var f = new Artwork3DFixture();
+        (Setup s, Scene3DControl view3D, Point centre) = await ShowView(f);
+        s.Window.MouseMove(centre);
+        view3D.SelectedNode = FirstNodeWithAMesh(view3D.Scene!);
+        Assert.NotNull(s.Pages.InteractiveActionOver);
+
+        view3D.SelectedNode = -1;
+
+        Assert.Null(s.Pages.InteractiveActionOver);
+    }
+
+    [AvaloniaFact]
+    public async Task LeavingTheViewClearsThePartsName()
+    {
+        await using var f = new Artwork3DFixture();
+        (Setup s, Scene3DControl view3D, Point centre) = await ShowView(f);
+        s.Window.MouseMove(centre);
+        view3D.SelectedNode = FirstNodeWithAMesh(view3D.Scene!);
+        Assert.NotNull(s.Pages.InteractiveActionOver);
+
+        // Beside the page, where no page handler writes the status.
+        s.Window.MouseMove(new Point(ViewportSize - 5, 5));
+
+        Assert.Null(s.Pages.InteractiveActionOver);
+    }
+
+    [AvaloniaFact]
+    public async Task TheViewUsesThePageSelectionColour()
+    {
+        await using var f = new Artwork3DFixture();
+        (_, Scene3DControl view3D, _) = await ShowView(f);
+
+        // Set by the view, not the control's own default (which happens to be the same blue).
+        Assert.True(view3D.IsSet(Scene3DControl.HighlightColorProperty));
+        Assert.Equal(Color.FromRgb(0x33, 0x99, 0xFF), view3D.HighlightColor);
     }
 
     /// <summary>

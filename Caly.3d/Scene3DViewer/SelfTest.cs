@@ -87,7 +87,11 @@ internal sealed class SelfTest
         }
     }
 
-    private sealed record Case(string Name, Func<Scene> Build, SceneView View, Rect Region, Action<Frame, Checks> Check);
+    /// <param name="PickAt">After the frame is checked, the point of the control to select at; null for no pick.</param>
+    /// <param name="ExpectNode">The node that pick must select, -1 for none.</param>
+    /// <param name="Select">The node selected while the frame is drawn, -1 for none.</param>
+    private sealed record Case(string Name, Func<Scene> Build, SceneView View, Rect Region, Action<Frame, Checks> Check,
+        Func<Size, Point>? PickAt = null, Func<Scene, int>? ExpectNode = null, int Select = -1);
 
     private sealed class Checks(string caseName)
     {
@@ -120,7 +124,7 @@ internal sealed class SelfTest
     private readonly List<Case> _cases;
     private Scene? _scene;
     private int _index = -1, _failed;
-    private bool _captureRequested;
+    private bool _captureRequested, _picking;
 
     public SelfTest(Scene3DControl control, Decorator host, Action<int> finished)
     {
@@ -149,11 +153,24 @@ internal sealed class SelfTest
         _control.VisibleRegion = current.Region;
         _control.View = current.View;
         _control.Scene = _scene;
+        _control.SelectedNode = current.Select;
         previous?.Dispose();
     }
 
     private void OnFrameRendered(object? sender, EventArgs e)
     {
+        if (_picking)
+        {
+            // The frame that took the pick has posted its answer: look at it after that has run.
+            if (_control.PendingPick is null)
+            {
+                _picking = false;
+                Dispatcher.UIThread.Post(CheckPick);
+            }
+
+            return;
+        }
+
         if (_index < 0 || _index >= _cases.Count || _captureRequested || _control.Status != Scene3DStatus.Ready || _control.Statistics.TexturesPending > 0 || _control.IsFindingEdges)
         {
             return;
@@ -167,9 +184,83 @@ internal sealed class SelfTest
             var checks = new Checks(current.Name);
             current.Check(new Frame(pixels, width, height), checks);
             _failed += checks.Failed;
-            Dispatcher.UIThread.Post(Next);
+            Dispatcher.UIThread.Post(current.PickAt is null ? Next : StartPick);
         };
         _control.RequestNextFrameRendering();
+    }
+
+    private void StartPick()
+    {
+        Case current = _cases[_index];
+
+        // Something else selected first, so that even "nothing" (-1) has to come from the pick.
+        _control.SelectedNode = 12345;
+        _control.SelectAt(current.PickAt!(_control.Bounds.Size));
+        if (_control.PendingPick is null)
+        {
+            var checks = new Checks(current.Name);
+            checks.Report(false, "the control took no pick (no scene on the GPU)");
+            _failed += checks.Failed;
+            Next();
+            return;
+        }
+
+        _picking = true;
+
+        // A pick that never comes back fails its case, not the whole run.
+        int index = _index;
+        DispatcherTimer.RunOnce(() =>
+        {
+            if (_picking && _index == index)
+            {
+                _picking = false;
+                var checks = new Checks(current.Name);
+                checks.Report(false, "no answer to the pick within 3 s");
+                _failed += checks.Failed;
+                Next();
+            }
+        }, TimeSpan.FromSeconds(3));
+    }
+
+    private void CheckPick()
+    {
+        Case current = _cases[_index];
+        int expected = current.ExpectNode!(_scene!);
+        var checks = new Checks(current.Name);
+        checks.Report(_control.SelectedNode == expected, $"selected node {_control.SelectedNode}, expected {expected}");
+        _failed += checks.Failed;
+        Next();
+    }
+
+    /// <summary>
+    /// The point of the control where the scene's point (<paramref name="x"/>, <paramref name="y"/>) is drawn in
+    /// <see cref="FrontView"/>: 4 units high, as wide as the whole view's aspect, the control showing <paramref name="region"/> of it.
+    /// </summary>
+    private static Point PointAt(Size bounds, Rect region, float x, float y)
+    {
+        double fullWidth = bounds.Width / region.Width, fullHeight = bounds.Height / region.Height;
+        double fx = 0.5 + x / (4 * fullWidth / fullHeight), fy = 0.5 - y / 4;
+        return new Point((fx - region.X) / region.Width * bounds.Width, (fy - region.Y) / region.Height * bounds.Height);
+    }
+
+    /// <summary>Two unlit squares, 1 unit across, nodes 0 (left, at x = −1.2) and 1 (right, at x = 1.2).</summary>
+    private static Scene TwoSquares() => Build(b =>
+    {
+        AddSquare(b, 0.5f, 0, AddMaterial(b, new Vector3(1, 0, 0)), x: -1.2f);
+        AddSquare(b, 0.5f, 0, AddMaterial(b, new Vector3(0, 0, 1)), x: 1.2f);
+    });
+
+    private static int FirstNodeWithAMesh(Scene scene)
+    {
+        for (int i = 0; i < scene.Nodes.Length; i++)
+        {
+            if (scene.Nodes[i].Mesh >= 0)
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     private void Finish(Scene? lastScene)
@@ -239,7 +330,7 @@ internal sealed class SelfTest
     }
 
     /// <summary>A square in the plane z = <paramref name="z"/>, from −half to +half, facing +Z, with texture coordinates 0 – 1.</summary>
-    private static void AddSquare(SceneBuilder builder, float half, float z, int material)
+    private static void AddSquare(SceneBuilder builder, float half, float z, int material, float x = 0)
     {
         builder.BeginMesh(builder.AddName("square"), SceneMeshFlags.HasNormals | SceneMeshFlags.HasTexCoords);
         SceneVertexSpans v = builder.AllocateVertices(4);
@@ -253,7 +344,7 @@ internal sealed class SelfTest
         int binding = builder.AddBinding(material);
         builder.AddNode(new SceneNode
         {
-            Parent = -1, Local = Matrix4x4.Identity, Kind = SceneNodeKind.Model, Mesh = mesh, Light = -1, Camera = -1,
+            Parent = -1, Local = Matrix4x4.CreateTranslation(x, 0, 0), Kind = SceneNodeKind.Model, Mesh = mesh, Light = -1, Camera = -1,
             FirstBinding = binding, BindingCount = 1, Name = builder.AddName("node"), Visible = true
         });
     }
@@ -484,6 +575,57 @@ internal sealed class SelfTest
                     double expected = (frame.Height / 2.0) * (frame.Height / 2.0) / ((double)frame.Width * frame.Height);
                     checks.Near("covered fraction of the frame", frame.CoverageOver(BackgroundBytes), expected, 0.004);
                 }),
+
+            // Picking: a click selects the node drawn under it, from a one-pixel pass.
+            new Case("picking: left of two squares", TwoSquares, FrontView(), whole, (_, _) => { },
+                bounds => PointAt(bounds, whole, -1.2f, 0), _ => 0),
+            new Case("picking: background", TwoSquares, FrontView(), whole, (_, _) => { },
+                bounds => PointAt(bounds, whole, 0, 1.5f), _ => -1),
+            new Case("picking: visible region", TwoSquares, FrontView(), new Rect(0.5, 0, 0.5, 1), (_, _) => { },
+                bounds => PointAt(bounds, new Rect(0.5, 0, 0.5, 1), 1.2f, 0), _ => 1),
+            new Case("picking: transparent in front",
+                () => Build(b =>
+                {
+                    AddSquare(b, 0.5f, 1, AddMaterial(b, new Vector3(0, 0, 1), opacity: 0.5f));
+                    AddSquare(b, 1, 0, AddMaterial(b, new Vector3(1, 0, 0)));
+                }),
+                FrontView(), whole, (_, _) => { },
+                bounds => PointAt(bounds, whole, 0, 0), _ => 0),
+            new Case("picking: skinned square",
+                () => Build(b => AddSkinnedSquare(b, 1, 1, AddMaterial(b, new Vector3(1, 0, 0)))),
+                FrontView(), whole, (_, _) => { },
+                bounds => PointAt(bounds, whole, 1.5f, 0), FirstNodeWithAMesh),
+
+            // The selected node: tinted towards the highlight colour (the default, #3399FF), its box drawn over everything.
+            new Case("selection: tint",
+                () => Build(b => AddSquare(b, 1, 0, AddMaterial(b, new Vector3(0.5f), lit: true))),
+                FrontView(), whole,
+                (frame, checks) =>
+                {
+                    (int r, _, int b, _) = frame.At(0.5, 0.5);
+                    checks.Report(b >= r + 40, $"centre ({r}, ., {b}): blue at least 40 above red");
+                },
+                Select: 0),
+            new Case("selection: none draws as before",
+                () => Build(b => AddSquare(b, 1, 0, AddMaterial(b, new Vector3(0.5f), lit: true))),
+                FrontView(), whole,
+                (frame, checks) => checks.Colour("centre, as \"lit square\"", frame.At(0.5, 0.5), (115, 115, 128))),
+            new Case("selection: box over the model",
+                () => Build(b =>
+                {
+                    AddSquare(b, 1, 1, AddMaterial(b, new Vector3(1, 0, 0)));
+                    AddSquare(b, 0.5f, 0, AddMaterial(b, new Vector3(0, 1, 0)));
+                }),
+                FrontView(), whole,
+                (frame, checks) =>
+                {
+                    // The back square's box is 1 unit square, hidden by the red one but drawn over it: about a
+                    // pixel wide all round, 4 units of a view 4 units high.
+                    int boxed = frame.Count((51, 153, 255));
+                    checks.Report(boxed >= frame.Height / 2, $"{boxed} pixels in the highlight colour, at least {frame.Height / 2}");
+                    checks.Colour("inside the box, the red square in front", frame.At(0.5, 0.5), (255, 0, 0));
+                },
+                Select: 1),
 
             // A green line 2 units long in a view 4 units high: half the height in pixels, one pixel wide,
             // and green though its material asks for light (a line has no surface to light).

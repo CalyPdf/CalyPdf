@@ -24,6 +24,7 @@ var view3D = new Scene3DControl
 | Materials | Diffuse, specular, emissive, opacity, alpha test, vertex colours; the highlight's exponent is 32 × reflectivity, at least 1 (a quarter of OpenGL's range: broad highlights, as in the pictures the exporters drew of their models); a texture modulates the whole lit colour (emissive included) and the specular highlight is added after it; a texture whose alpha is only ever 0 or 255 cuts the surface out and stays in the opaque pass (depth keeps its triangles in order), a texture with partial alpha puts its material in the transparent pass: drawn last, back to front |
 | Render modes | All fifteen of ISO 32000-2 Table 319, the view's or `RenderModeOverride`: Solid; the wireframes (every edge of every triangle in the edge colour `AC`, or shaded, or with hidden ones removed by a depth-only pass of the surfaces), over lit surfaces or transparent ones; Transparent (opacity × `O`, 0.5); bounding boxes of each node (edges in `AC`, faces lit in the face colour `FC`, the background by default, at opacity `O`); Vertices (points at half the size of a point set) and ShadedVertices; SolidOutline, Illustration (surfaces flat in `FC`) and ShadedIllustration (a third of each surface's colour added as emissive, the standard giving no number) with silhouette edges: drawn where its faces turn opposite ways to the viewer, or meet at the crease angle or more unless the vertex normals run on unchanged across the edge (a smooth surface cut in facets); rims of open sheets always. Edges (both kinds) are found off the UI thread (50 – 200 ms for 150 – 650 k triangles) only when the render mode draws them or `PrepareEdges` is set, and take 64 + 8 bytes each on the GPU |
 | Textures | The base-colour texture of each material (JPEG or PNG, with a separate alpha image if any), decoded off the UI thread after the first frame |
+| Selection | A left click (press and release within 4 px) selects the node drawn under the pointer, `SelectAt(point)` from code: the control draws the draw list once more into a one-pixel target whose projection is narrowed to that pixel, each item in a colour that is its node plus one, and reads the pixel back on the next frame (a click before the scene is on the GPU does nothing). `SelectedNode` (-1 for none) is tinted half towards `HighlightColor` (#3399FF by default), with half of it again as emissive, and its bounding box is drawn in it over everything; one-colour modes paint its edges and points in it. Escape clears it (an Escape with nothing selected is left to the host), and so do a new scene or view. Nothing selected costs nothing per frame |
 | Pointer | Left-drag rotates about the view's orbit point; right-drag or the wheel (while focused) zooms; Ctrl + left-drag or middle-drag pans; double-click or Home returns to the view |
 | Anti-aliasing | 4 samples per pixel in the control's own framebuffer, fewer when that would exceed 96 MB |
 
@@ -106,6 +107,7 @@ coordinates, lines and points.
 | `Internal/DrawList` — what to draw, in which pass and order | `Internal/Gl/RenderTargets` — the multisampled framebuffer and its resolve |
 | `Internal/LightRigs` — the lights of each scheme | `Internal/Gl/SceneRenderer`, `Shaders` — the frame |
 | `Internal/TextureDecoder`, `TextureStreamer` — images to pixels, off-thread | `Scene3DControl` — properties, input, lifetime |
+| `Internal/Picking` — the picking pass's node colours and the pixel under a click | `Internal/Gl/PickTarget` — the one-pixel picking framebuffer |
 
 ## Checking it
 
@@ -117,7 +119,9 @@ dotnet run -c Release --project Caly.3d/Scene3DViewer -- <file.pdf | file.u3d> [
 
 `dotnet test` cannot reach the GL code (there is no headless OpenGL): the viewer's self-test draws
 hand-made scenes, reads the framebuffer back and checks colours, coverage, texture orientation, blending,
-lighting and the visible region, then that no GPU object survives the control leaving the window.
+lighting and the visible region, picks points of them (`picking: …`, including through a visible region, a
+transparent surface and a skinned mesh) and draws a selection (`selection: …`), then that no GPU object
+survives the control leaving the window.
 
 Verified on Windows (ANGLE on Direct3D 11) only. The shaders carry a desktop-GL variant for Linux and
 macOS that has not been run.

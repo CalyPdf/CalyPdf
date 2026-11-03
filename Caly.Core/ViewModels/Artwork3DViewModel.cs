@@ -83,7 +83,6 @@ public sealed partial class Artwork3DViewModel : ViewModelBase, IDisposable
 
     private IReadOnlyList<SceneView> _views = [];
     private ReadOnlyMemory<byte> _payload;
-    private Artwork3DFormat _format;
     private Scene3DStatus _controlStatus;
     private bool _isReading;
     private bool _isDisposed;
@@ -223,6 +222,9 @@ public sealed partial class Artwork3DViewModel : ViewModelBase, IDisposable
     /// <summary>The authored view to show, or <c>null</c> for the whole model.</summary>
     public SceneView? SelectedView => (uint)SelectedViewIndex < (uint)_views.Count ? _views[SelectedViewIndex] : null;
 
+    /// <summary>The format of the model, once it has been read (how its parts are named depends on it).</summary>
+    public Artwork3DFormat Format { get; private set; }
+
     /// <summary>The reading in progress or last done; for tests.</summary>
     internal Task Completion { get; private set; } = Task.CompletedTask;
 
@@ -299,7 +301,7 @@ public sealed partial class Artwork3DViewModel : ViewModelBase, IDisposable
             }
 
             _payload = content.Payload;
-            _format = content.Format;
+            Format = content.Format;
             _views = views;
 
             var names = new string[content.ViewNames.Count + 1];
@@ -338,7 +340,7 @@ public sealed partial class Artwork3DViewModel : ViewModelBase, IDisposable
         }
 
         _isReading = true;
-        Artwork3DFormat format = _format;
+        Artwork3DFormat format = Format;
         ReadOnlyMemory<byte> payload = _payload;
         CancellationToken token = _cts.Token;
         Completion = Task.Run(async () =>
