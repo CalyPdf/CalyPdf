@@ -11,7 +11,7 @@ Entry point. Read this first, then the skill that matches the task (table at the
 
 | What | Where |
 |---|---|
-| How it works (architecture, input, placement, failures) | "3D Artwork" section of Caly's `CLAUDE.md` — authoritative, keep it current |
+| How it works (architecture, input, placement, failures) | `architecture/3d-artwork.md` in Caly — authoritative, keep it current |
 | Decoders: scene model, U3D, PRC, GLB, `scene3d-tool` | NuGet packages `Caly.Rendering.Scene3D`, `Caly.Rendering.Scene3D.U3D` and `Caly.Rendering.Scene3D.Prc`, source `CalyPdf/Caly.Rendering.Scene3D` (branch `3d`); its `README.md` is the best description of the library as built |
 | PDF recognition | `PdfPig` NuGet package (nightly `0.1.17-alpha-202610180035-9c18f` or later) → `UglyToad.PdfPig.Artwork` (`Artwork3D.TryCreate`) |
 | PDF → scene glue | `Caly.Pdf/Artwork/` (`Artwork3DContentReader`, `Artwork3DSceneReader`, `Artwork3DViewConverter`) |
@@ -21,7 +21,7 @@ Entry point. Read this first, then the skill that matches the task (table at the
 | History, rulings, probes, surveys, specs | **Workspace `C:\caly-work\3d\claude`**: start at `README.md`, then the last entry of `JOURNAL.md`; `plans/*.progress.md` are ledgers of every ruling; `OPEN-QUESTIONS.md` is the owner's decisions log |
 | Samples | `C:\caly-work\3d\samples` (+ `samples-u3d-db`, `samples-prc-db`, owner's problem files `samples_issues`) |
 
-The workspace is outside git. If it is missing, the rulings are summarised in `CLAUDE.md`, the Scene3D README and the sibling skills; do not recreate it from guesses.
+The workspace is outside git. If it is missing, the rulings are summarised in `CLAUDE.md` (3D Artwork), `architecture/3d-artwork.md`, the Scene3D README and the sibling skills; do not recreate it from guesses.
 
 ## Standing rules (owner's decisions)
 
@@ -51,4 +51,4 @@ The workspace is outside git. If it is missing, the rulings are summarised in `C
 | Declaring work done, running on screen, AOT, benchmarks | `verifying-3d-changes` |
 | Colours, brushes or contrast of the 3D toolbar, flyouts or badge | `applying-caly-colours` |
 
-At the end of a session of real work, append an entry to the workspace `JOURNAL.md` (what was done, learned, next) and update `CLAUDE.md`/the Scene3D README if behaviour changed.
+At the end of a session of real work, append an entry to the workspace `JOURNAL.md` (what was done, learned, next) and update `architecture/3d-artwork.md`/the Scene3D README if behaviour changed.

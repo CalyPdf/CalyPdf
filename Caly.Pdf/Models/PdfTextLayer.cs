@@ -51,8 +51,6 @@ public sealed record PdfTextLayer : IReadOnlyList<PdfWord>
     /// </summary>
     public IReadOnlyList<PdfArtwork3D>? Artworks3D { get; init; }
 
-    public PdfArtwork3D? FindArtwork3DOver(double x, double y) => FindArtwork3DOver(x, y, out _);
-
     /// <param name="index">The artwork's position in <see cref="Artworks3D"/>; -1 when none is found.</param>
     public PdfArtwork3D? FindArtwork3DOver(double x, double y, out int index)
     {

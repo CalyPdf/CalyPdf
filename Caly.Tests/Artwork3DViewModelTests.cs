@@ -1,3 +1,4 @@
+using System.Buffers;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using Caly.Core;
@@ -305,6 +306,24 @@ public class Artwork3DViewModelTests
         Assert.Equal("This 3D model could not be read: the view dictionary is not a dictionary", Assert.Single(f.Notifications));
     }
 
+    /// <summary>
+    /// A model too large for the memory left ends the view like any failure of the attempt: with a reason,
+    /// and without refusing the model for good (with memory freed, another click may show it).
+    /// </summary>
+    [AvaloniaFact]
+    public async Task RunningOutOfMemoryWhileReadingClosesTheViewAndSaysWhy()
+    {
+        await using var f = new Artwork3DFixture();
+        f.Service.Artwork3DContent = (_, _) => throw new OutOfMemoryException("no room for the model");
+
+        Artwork3DViewModel artwork = f.Activate();
+
+        Assert.True(await WaitUntil(() => f.Document.ActiveArtwork3D is null));
+        await artwork.Completion;
+        Assert.Equal("This 3D model could not be read: no room for the model", Assert.Single(f.Notifications));
+        Assert.Null(f.Document.Pages[0].Artwork3DRefusals);
+    }
+
     [AvaloniaFact]
     public async Task AClosedDocumentClosesTheViewSilently()
     {
@@ -369,6 +388,47 @@ public class Artwork3DViewModelTests
         gate.SetResult();
         Assert.True(await WaitUntil(() => artwork.State == Artwork3DState.Ready));
         Assert.Equal(1, reads);
+    }
+
+    /// <summary>
+    /// Reading the kept data again can run out of memory, which says nothing of the model: the view ends
+    /// with a reason, and the model, which read the first time, is not refused for the rest of the session.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task RunningOutOfMemoryWhileReadingTheModelAgainIsNotHeldAgainstIt()
+    {
+        await using var f = new Artwork3DFixture();
+        var payload = new MemoryThatRunsOut(f.Content.Payload.ToArray());
+        f.Content = With(f.Content, payload.Memory);
+        Artwork3DViewModel artwork = f.Activate();
+        Assert.True(await WaitUntil(() => artwork.State == Artwork3DState.Ready));
+
+        payload.RunsOut = true;
+        artwork.Scene!.ReleaseGeometry();
+        artwork.ControlStatusChangedCommand.Execute(new Artwork3DControlStatus(Scene3DStatus.NeedsScene, null));
+
+        Assert.True(await WaitUntil(() => f.Document.ActiveArtwork3D is null));
+        await artwork.Completion;
+        Assert.Equal("This 3D model could not be read: no room for the model", Assert.Single(f.Notifications));
+        Assert.Null(f.Document.Pages[0].Artwork3DRefusals);
+    }
+
+    /// <summary>Memory that reads until it runs out.</summary>
+    private sealed class MemoryThatRunsOut(byte[] bytes) : MemoryManager<byte>
+    {
+        public bool RunsOut { get; set; }
+
+        public override Span<byte> GetSpan() => RunsOut ? throw new OutOfMemoryException("no room for the model") : bytes;
+
+        public override MemoryHandle Pin(int elementIndex = 0) => throw new NotSupportedException();
+
+        public override void Unpin()
+        {
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+        }
     }
 
     [AvaloniaFact]

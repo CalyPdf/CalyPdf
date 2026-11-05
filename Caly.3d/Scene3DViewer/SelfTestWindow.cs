@@ -27,8 +27,9 @@ internal sealed class SelfTestWindow : Window
 
         control.PropertyChanged += (_, e) =>
         {
-            // Without a GPU there is nothing to test, and that is a failure of this mode.
-            if (e.Property == Scene3DControl.StatusProperty && control.Status is Scene3DStatus.Unavailable or Scene3DStatus.Failed)
+            // Without a GPU there is nothing to test, and that is a failure of this mode; so is a control that
+            // fails, unless the test makes it fail.
+            if (e.Property == Scene3DControl.StatusProperty && control.Status is Scene3DStatus.Unavailable or Scene3DStatus.Failed && !test.FailingOnPurpose)
             {
                 Program.Log($"selftest: FAIL  the control is {control.Status} — {control.StatusMessage}");
                 Program.ExitCode = 4;

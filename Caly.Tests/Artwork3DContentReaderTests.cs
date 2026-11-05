@@ -110,9 +110,9 @@ public class Artwork3DContentReaderTests
                     // The default view is one of the listed views, or is added after them.
                     Assert.InRange(content.Views.Count, artwork.ViewNames.Count, artwork.ViewNames.Count + 1);
                     Assert.InRange(content.DefaultViewIndex, content.Views.Count == 0 ? -1 : 0, content.Views.Count - 1);
-                    if (artwork.DefaultViewName is { } name && content.DefaultViewIndex >= 0)
+                    if (artwork.Artwork.DefaultView is { } defaultView && content.DefaultViewIndex >= 0)
                     {
-                        Assert.Equal(name, content.ViewNames[content.DefaultViewIndex]);
+                        Assert.Equal(PdfArtwork3D.GetName(defaultView), content.ViewNames[content.DefaultViewIndex]);
                     }
                 }
             }

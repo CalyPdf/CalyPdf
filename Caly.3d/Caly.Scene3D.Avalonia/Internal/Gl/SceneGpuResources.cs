@@ -30,8 +30,6 @@ internal sealed class SceneGpuResources
     /// <summary>Bytes of index data held on the GPU.</summary>
     public long IndexBytes { get; private set; }
 
-    public int MeshCount => _vertexArrays.Length;
-
     /// <summary>The vertex array of a mesh, or 0 for a mesh without vertices.</summary>
     public int VertexArray(int mesh) => (uint)mesh < (uint)_vertexArrays.Length ? _vertexArrays[mesh] : 0;
 

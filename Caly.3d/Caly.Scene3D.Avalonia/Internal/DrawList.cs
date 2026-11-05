@@ -355,7 +355,6 @@ internal sealed class DrawList
         Culled = culled;
     }
 
-    /// <summary>The world-space box around a mesh's box under a transform; false if it is not finite.</summary>
     /// <summary>Appends the bone matrices of a skin at a time, and returns where they start.</summary>
     private int AddSkinMatrices(Scene scene, SceneSkin skin, double seconds)
     {

@@ -56,6 +56,10 @@ public enum Artwork3DReadResult : byte
 /// </summary>
 public static class Artwork3DSceneReader
 {
+    // A quarter of Scene3D's default (4 GB of scene data): reading allocates several times what a scene keeps
+    // (1.4 GB for the largest of 732 sample models, which reads within a limit of 320 MB but not of 256 MB).
+    private static readonly SceneLimits Limits = SceneLimits.Default with { MaxTotalBytes = 1L << 30 };
+
     /// <summary>Whether there is a reader for artwork of this format: U3D and PRC.</summary>
     public static bool CanRead(Artwork3DFormat format) => format is Artwork3DFormat.U3D or Artwork3DFormat.Prc;
 
@@ -82,8 +86,8 @@ public static class Artwork3DSceneReader
         try
         {
             read = format == Artwork3DFormat.Prc
-                ? PrcReader.Read(payload, null, cancellationToken)
-                : U3DReader.Read(payload, null, cancellationToken);
+                ? PrcReader.Read(payload, Limits, cancellationToken)
+                : U3DReader.Read(payload, Limits, cancellationToken);
         }
         catch (Scene3DException e)
         {

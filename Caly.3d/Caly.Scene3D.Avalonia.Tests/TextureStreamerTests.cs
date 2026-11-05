@@ -192,6 +192,53 @@ public class TextureStreamerTests
         Assert.False(streamer.TryTake(out _, out _));
     }
 
+    /// <summary>
+    /// Whatever goes wrong on the decoding thread stays there. A fault nobody looked at reaches
+    /// TaskScheduler.UnobservedTaskException when its task is collected, which a host may report as a
+    /// crash (Caly does).
+    /// </summary>
+    [Fact]
+    public void AFailureOnTheDecodingThreadIsNotLeftUnobserved()
+    {
+        const string message = "the host's notification failed";
+        int unobserved = 0;
+        void OnUnobserved(object? sender, UnobservedTaskExceptionEventArgs e)
+        {
+            if (e.Exception.Flatten().InnerExceptions.Any(x => x.Message == message))
+            {
+                Interlocked.Increment(ref unobserved);
+            }
+        }
+
+        using Scene scene = Build([Texture("A", Png(4, 4, SKColors.Red))], [(0, 0)]);
+        TaskScheduler.UnobservedTaskException += OnUnobserved;
+        try
+        {
+            using var decoded = new ManualResetEventSlim();
+            using var streamer = new TextureStreamer(() =>
+            {
+                decoded.Set();
+                throw new InvalidOperationException(message);
+            });
+            streamer.Start(scene);
+            Assert.True(decoded.Wait(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken), "the texture was not decoded");
+
+            // A finished task nobody holds is collected, and collecting it is what reports a fault nobody saw.
+            for (int i = 0; i < 20 && Volatile.Read(ref unobserved) == 0; i++)
+            {
+                Thread.Sleep(50);
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+            }
+        }
+        finally
+        {
+            TaskScheduler.UnobservedTaskException -= OnUnobserved;
+        }
+
+        Assert.Equal(0, unobserved);
+    }
+
     [Fact]
     public void ASceneWithoutTexturesStartsNothing()
     {

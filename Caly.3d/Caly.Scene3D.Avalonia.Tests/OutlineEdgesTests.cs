@@ -27,6 +27,14 @@ public class OutlineEdgesTests
         return builder.Build();
     }
 
+    /// <summary>What the GPU reads from <see cref="OutlineEdges.Pack"/>: the vector and W.</summary>
+    private static (Vector3 Vector, int W) Unpack(int packed)
+    {
+        return (new Vector3(Ten(packed), Ten(packed >> 10), Ten(packed >> 20)), packed >> 30);
+
+        static float Ten(int bits) => Math.Max(-1f, ((bits << 22) >> 22) / 511f);
+    }
+
     private static List<EdgeInfo> Edges(Scene scene)
     {
         OutlineEdges edges = OutlineEdges.Build(scene);
@@ -38,8 +46,8 @@ public class OutlineEdgesTests
             Vector3 Position(int offset) => new(
                 BitConverter.Int32BitsToSingle(words[offset]), BitConverter.Int32BitsToSingle(words[offset + 1]), BitConverter.Int32BitsToSingle(words[offset + 2]));
 
-            (Vector3 normalA, int w) = OutlineEdges.Unpack(words[at + 6]);
-            Vector3 normalB = OutlineEdges.Unpack(words[at + 7]).Vector;
+            (Vector3 normalA, int w) = Unpack(words[at + 6]);
+            Vector3 normalB = Unpack(words[at + 7]).Vector;
             Assert.Equal((Position(at) + Position(at + OutlineEdges.WordsPerVertex)) * 0.5f, Position(at + 3));   // the midpoint
             Assert.Equal(words[at + 6], words[at + OutlineEdges.WordsPerVertex + 6]);                            // both ends alike
             list.Add(new EdgeInfo(Position(at), Position(at + OutlineEdges.WordsPerVertex), normalA, normalB, w == OutlineEdges.SmoothFlag));
@@ -196,7 +204,7 @@ public class OutlineEdgesTests
     [InlineData(0.6f, 0, -0.8f, 1)]
     public void ANormalPackedForTheGpuComesBackClose(float x, float y, float z, int w)
     {
-        (Vector3 vector, int back) = OutlineEdges.Unpack(OutlineEdges.Pack(new Vector3(x, y, z), w));
+        (Vector3 vector, int back) = Unpack(OutlineEdges.Pack(new Vector3(x, y, z), w));
 
         Assert.Equal(w, back);
         Assert.True(Vector3.Distance(new Vector3(x, y, z), vector) < 0.004f);

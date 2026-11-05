@@ -40,6 +40,8 @@ coordinates, lines and points.
   moment, not a verdict: if OpenGL initialises later (a slow start, a busy UI thread) the status moves on
   to `Uploading` and `Ready`, so a host that falls back to a poster must be ready to come back from it.
 - **`Failed` stays** until another scene is set, also across leaving and re-entering the visual tree.
+- **Nothing escapes the OpenGL callbacks.** A driver's failure, running out of memory and an exception
+  from a `FrameRendered` handler all end in `Failed`, with the exception's message in `StatusMessage`.
 - **`Status` changes while a frame is drawn.** Do not change the visual tree from a handler of that
   change; post it.
 - **The scene's geometry moves to the GPU.** After uploading, the control calls `Scene.ReleaseGeometry()`

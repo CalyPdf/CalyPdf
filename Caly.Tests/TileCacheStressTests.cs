@@ -7,7 +7,7 @@ namespace Caly.Tests;
 
 /// <summary>
 /// Pushes <see cref="TileCache"/> well past its memory budget - the scroll/zoom churn the
-/// production 128 MB budget is sized against (see CLAUDE.md) - and checks the two failure modes a
+/// production 128 MB budget is sized against (see architecture/rendering.md) - and checks the two failure modes a
 /// reader would actually notice: an "artefact" (a cached tile hands back the wrong pixels - stale,
 /// corrupted, or belonging to a different key) and a "flicker" (a tile a frame is actively drawing
 /// gets freed out from under it mid-draw).

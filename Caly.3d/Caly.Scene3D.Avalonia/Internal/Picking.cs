@@ -9,9 +9,6 @@ namespace Caly.Scene3D.Avalonia.Internal;
 /// </summary>
 internal static class Picking
 {
-    /// <summary>The largest node a colour can carry.</summary>
-    public const int MaxNode = 0xFFFFFE;
-
     /// <summary>The colour that stands for <paramref name="node"/>, as the shader's 0..1 channels.</summary>
     public static Vector3 Encode(int node)
     {

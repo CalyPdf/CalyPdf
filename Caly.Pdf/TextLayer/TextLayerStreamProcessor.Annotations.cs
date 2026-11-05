@@ -96,9 +96,7 @@ namespace Caly.Pdf.TextLayer
                             PpiScale = _ppiScale,
                             BoundingBox = transformedBox,
                             Artwork = artwork,
-                            ViewNames = PdfArtwork3D.GetViewNames(artwork),
-                            DefaultViewName = PdfArtwork3D.GetDefaultViewName(artwork),
-                            HasNormalAppearance = annotation.HasNormalAppearance
+                            ViewNames = PdfArtwork3D.GetViewNames(artwork)
                         });
                     }
 

@@ -224,9 +224,6 @@ internal sealed class SceneRenderer
         }
     }
 
-    /// <summary>Whether the scene's edges are on the GPU, for the render modes that draw them.</summary>
-    public bool HasEdges => _outlines.IsLoaded || _resources.WireBytes > 0;
-
     /// <summary>Bytes of edges on the GPU: silhouette edges and every edge.</summary>
     public long EdgeBytes => _outlines.Bytes + _resources.WireBytes;
 

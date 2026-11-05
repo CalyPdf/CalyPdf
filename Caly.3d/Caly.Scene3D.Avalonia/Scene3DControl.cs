@@ -405,7 +405,7 @@ public partial class Scene3DControl : OpenGlControlBase, ICustomHitTest
     /// <summary>Figures of the last frame and of the GPU memory held.</summary>
     public Scene3DStatistics Statistics { get; private set; }
 
-    /// <summary>Raised after each frame the control draws.</summary>
+    /// <summary>Raised after each frame the control draws. A handler that throws fails the control, as a failed frame does.</summary>
     public event EventHandler? FrameRendered;
 
     /// <summary>When set, the next frame is read back (RGBA rows, top first) and handed to this.</summary>
@@ -578,7 +578,9 @@ public partial class Scene3DControl : OpenGlControlBase, ICustomHitTest
         ClearSelection();
         CancelEdges();
         Scene? scene = Scene;
-        _scenePending = scene is not null;
+
+        // The next frame puts the scene on the GPU, or without one takes the old one off.
+        _scenePending = true;
         if (scene is null)
         {
             Status = Scene3DStatus.Empty;
@@ -826,7 +828,7 @@ public partial class Scene3DControl : OpenGlControlBase, ICustomHitTest
                 StatusMessage = null;
             }
         }
-        catch (Exception e) when (e is not OutOfMemoryException)
+        catch (Exception e)
         {
             // Nothing may escape into the compositor's callback (as in OnOpenGlRender): a driver or a
             // shader compiler can fail in more ways than the two this used to expect.
@@ -955,16 +957,16 @@ public partial class Scene3DControl : OpenGlControlBase, ICustomHitTest
             {
                 RequestNextFrameRendering();
             }
+
+            FrameRendered?.Invoke(this, EventArgs.Empty);
         }
-        catch (Exception e) when (e is not OutOfMemoryException)
+        catch (Exception e)
         {
-            // Nothing may escape into the compositor's callback.
+            // Nothing may escape into the compositor's callback, where it would end the application: not a
+            // driver's failure, not running out of memory for a large model, not a host's FrameRendered handler.
             Status = Scene3DStatus.Failed;
             StatusMessage = e.Message;
-            return;
         }
-
-        FrameRendered?.Invoke(this, EventArgs.Empty);
     }
 
     private void UploadPendingScene(SceneRenderer renderer)

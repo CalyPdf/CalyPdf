@@ -28,7 +28,7 @@ internal sealed unsafe class GlApi
     public const int Triangles = 0x0004;
     public const int ProgramPointSize = 0x8642;
     public const int DepthBufferBit = 0x0100, ColorBufferBit = 0x4000;
-    public const int Less = 0x0201, LessOrEqual = 0x0203;
+    public const int LessOrEqual = 0x0203;
     public const int One = 1, SrcAlpha = 0x0302, OneMinusSrcAlpha = 0x0303;
     public const int Front = 0x0404, Back = 0x0405;
     public const int CullFace = 0x0B44, DepthTest = 0x0B71, Blend = 0x0BE2, ScissorTest = 0x0C11;
@@ -40,7 +40,7 @@ internal sealed unsafe class GlApi
     public const int Nearest = 0x2600, Linear = 0x2601, LinearMipmapLinear = 0x2703;
     public const int TextureMagFilter = 0x2800, TextureMinFilter = 0x2801, TextureWrapS = 0x2802, TextureWrapT = 0x2803;
     public const int Repeat = 0x2901, ClampToEdge = 0x812F;
-    public const int Vendor = 0x1F00, Renderer = 0x1F01, Version = 0x1F02;
+    public const int Renderer = 0x1F01, Version = 0x1F02;
     public const int ArrayBuffer = 0x8892, ElementArrayBuffer = 0x8893, StaticDraw = 0x88E4;
     public const int FragmentShader = 0x8B30, VertexShader = 0x8B31, CompileStatus = 0x8B81, LinkStatus = 0x8B82, InfoLogLength = 0x8B84;
     public const int ReadFramebuffer = 0x8CA8, DrawFramebuffer = 0x8CA9, Framebuffer = 0x8D40, RenderBuffer = 0x8D41;
@@ -217,8 +217,6 @@ internal sealed unsafe class GlApi
 
     // ---- state ----
 
-    public int GetError() => _getError();
-
     /// <summary>Waits until the GPU has executed everything issued so far. For measurements only.</summary>
     public void Finish() => _finish();
 
@@ -249,8 +247,6 @@ internal sealed unsafe class GlApi
     public void CullFaces(int faces) => _cullFace(faces);
 
     public void BlendFuncSeparate(int sourceColor, int destinationColor, int sourceAlpha, int destinationAlpha) => _blendFuncSeparate(sourceColor, destinationColor, sourceAlpha, destinationAlpha);
-
-    public void PixelStore(int name, int value) => _pixelStorei(name, value);
 
     /// <summary>Reads RGBA bytes from the read framebuffer; rows come bottom to top.</summary>
     public void ReadPixels(int x, int y, int width, int height, Span<byte> rgba)
