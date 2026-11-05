@@ -28,14 +28,15 @@ namespace Caly.Tests;
 
 /// <summary>
 /// Pages set UseLayoutRounding=False, and popups opened on a page inherit it. CalyStyles turns it
-/// back on for flyout content, or Windows truncates the popup and the menu shows scroll arrows.
+/// back on for flyout and tooltip content, or Windows truncates the popup: the menu shows scroll arrows
+/// and a tooltip loses its last word.
 /// </summary>
 public class FlyoutLayoutRoundingTests
 {
     [AvaloniaTheory]
     [InlineData(true)]
     [InlineData(false)]
-    public void FlyoutsOpenedOnAnUnroundedControlAreRounded(bool withCalyStyles)
+    public void PopupsOpenedOnAnUnroundedControlAreRounded(bool withCalyStyles)
     {
         var target = new Border { Width = 200, Height = 300, UseLayoutRounding = false };
         var window = new Window { Content = target };
@@ -66,5 +67,14 @@ public class FlyoutLayoutRoundingTests
         Assert.NotNull(flyoutPresenter);
         Assert.Equal(withCalyStyles, flyoutPresenter.UseLayoutRounding);
         flyout.Hide();
+
+        var tip = new TextBlock { Text = "Reset view" };
+        ToolTip.SetTip(target, tip);
+        ToolTip.SetIsOpen(target, true);
+        Dispatcher.UIThread.RunJobs();
+        var toolTip = tip.FindAncestorOfType<ToolTip>();
+        Assert.NotNull(toolTip);
+        Assert.Equal(withCalyStyles, toolTip.UseLayoutRounding);
+        ToolTip.SetIsOpen(target, false);
     }
 }
