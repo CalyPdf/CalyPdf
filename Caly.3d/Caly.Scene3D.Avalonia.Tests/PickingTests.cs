@@ -18,7 +18,7 @@ public class PickingTests
     [InlineData(255)]
     [InlineData(256)]
     [InlineData(65536)]
-    [InlineData(Picking.MaxNode)]
+    [InlineData(0xFFFFFE)] // the largest node 24 bits of colour carry, as node + 1
     public void EncodeThenDecodeGivesTheNodeBack(int node)
     {
         Assert.Equal(node, Picking.Decode(Bytes(Picking.Encode(node))));

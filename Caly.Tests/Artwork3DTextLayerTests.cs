@@ -34,8 +34,6 @@ public class Artwork3DTextLayerTests
         Assert.Equal(Artwork3DFormat.U3D, artwork.Format);
         Assert.Equal("U3D", artwork.FormatDisplayName);
         Assert.Equal(["DefaultView"], artwork.ViewNames);
-        Assert.Equal("DefaultView", artwork.DefaultViewName);
-        Assert.False(artwork.HasNormalAppearance); // the file's AP has an empty normal appearance
         Assert.Equal(1, artwork.PpiScale);
         Assert.Equal(300, artwork.BoundingBox.Width, 3);
         Assert.Equal(300, artwork.BoundingBox.Height, 3);
@@ -47,9 +45,6 @@ public class Artwork3DTextLayerTests
         var layer = Load("box_base.pdf");
         var artwork = layer.Artworks3D![0];
         var centre = artwork.BoundingBox.Centroid;
-
-        Assert.Same(artwork, layer.FindArtwork3DOver(centre.X, centre.Y));
-        Assert.Null(layer.FindArtwork3DOver(artwork.BoundingBox.Right + 50, centre.Y));
 
         // With its place among the page's artworks, which is what says which one is active.
         Assert.Same(artwork, layer.FindArtwork3DOver(centre.X, centre.Y, out int index));
@@ -73,13 +68,10 @@ public class Artwork3DTextLayerTests
             PpiScale = 1,
             BoundingBox = source.BoundingBox,
             Artwork = source.Artwork,
-            HasNormalAppearance = false,
-            ViewNames = names,
-            DefaultViewName = "B"
+            ViewNames = names
         };
 
         Assert.Same(names, artwork.ViewNames);
-        Assert.Equal("B", artwork.DefaultViewName);
         Assert.Same(source.ViewNames, source.ViewNames);
     }
 
@@ -89,7 +81,7 @@ public class Artwork3DTextLayerTests
         var layer = Load("ICML03-081.pdf");
 
         Assert.Null(layer.Artworks3D);
-        Assert.Null(layer.FindArtwork3DOver(100, 100));
+        Assert.Null(layer.FindArtwork3DOver(100, 100, out _));
     }
 
     [Fact]

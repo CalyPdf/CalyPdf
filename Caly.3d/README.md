@@ -15,7 +15,7 @@ The rest of the feature lives outside this folder:
 - **PDF to scene:** `Caly.Pdf/Artwork` (`Artwork3DContentReader`, `Artwork3DSceneReader`, `Artwork3DViewConverter`).
 - **The page:** `Caly.Core` (`Artwork3DViewModel`, `Artwork3DView`, `PageInteractiveLayerControl`).
 
-The "3D Artwork" section of the repository's `CLAUDE.md` describes how these fit together.
+The repository's `architecture/3d-artwork.md` describes how these fit together.
 
 The control needs the GPU renderer. Under the software renderer, and on Android, it reports `Unavailable` and Caly keeps showing the page's poster.
 

@@ -275,10 +275,10 @@ public sealed partial class Artwork3DViewModel : ViewModelBase, IDisposable
         {
             failure = CouldNotBeRead(e.Message);
         }
-        catch (Exception e) when (e is not OutOfMemoryException)
+        catch (Exception e)
         {
-            // A document broken in a way nothing foresaw. The view must still end, with a reason,
-            // rather than say "Loading" for ever while the exception goes unobserved.
+            // A document broken in a way nothing foresaw, or no memory left for the model. The view must
+            // still end, with a reason, rather than say "Loading" for ever while the exception goes unobserved.
             scene?.Dispose();
             scene = null;
             failure = CouldNotBeRead(e.Message);
@@ -347,14 +347,15 @@ public sealed partial class Artwork3DViewModel : ViewModelBase, IDisposable
         {
             Scene? scene = null;
             string? failure = null;
+            string? refusal = null;
             try
             {
-                failure = Read(format, payload, token, out scene);
+                failure = refusal = Read(format, payload, token, out scene);
             }
             catch (OperationCanceledException)
             {
             }
-            catch (Exception e) when (e is not OutOfMemoryException)
+            catch (Exception e)
             {
                 // As when first read: the view must end with a reason, not stay blank with the task
                 // faulted and nobody to read it again.
@@ -374,7 +375,7 @@ public sealed partial class Artwork3DViewModel : ViewModelBase, IDisposable
 
                 if (scene is null)
                 {
-                    ModelRefusal = failure;
+                    ModelRefusal = refusal;
                     _close(this, failure);
                     return;
                 }

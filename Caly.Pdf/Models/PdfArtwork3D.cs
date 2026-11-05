@@ -53,21 +53,9 @@ public sealed class PdfArtwork3D
     public required Artwork3D Artwork { get; init; }
 
     /// <summary>
-    /// Whether the annotation has a normal appearance, the poster drawn with the page. When
-    /// <see langword="false"/> the page shows nothing at this rectangle.
-    /// </summary>
-    public required bool HasNormalAppearance { get; init; }
-
-    /// <summary>
     /// The names of the authored views, in presentation order.
     /// </summary>
     public required IReadOnlyList<string> ViewNames { get; init; }
-
-    /// <summary>
-    /// The name of the view shown initially, or <see langword="null"/> when the view defined inside the
-    /// 3D data is used.
-    /// </summary>
-    public string? DefaultViewName { get; init; }
 
     public Artwork3DFormat Format => Artwork.Format;
 
@@ -99,14 +87,6 @@ public sealed class PdfArtwork3D
         }
 
         return names;
-    }
-
-    /// <summary>
-    /// Reads the default view's name out of the document. Call while processing the page.
-    /// </summary>
-    internal static string? GetDefaultViewName(Artwork3D artwork)
-    {
-        return artwork.DefaultView is { } view ? GetName(view) : null;
     }
 
     internal static string GetName(Artwork3DView view)

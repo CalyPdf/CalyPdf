@@ -29,7 +29,7 @@ internal sealed class TextureStreamer : IDisposable
 
     private CancellationTokenSource? _cancellation;
     private int _generation;
-    private int _pending, _failed, _dropped;
+    private int _pending, _failed;
 
     /// <param name="notify">Called, on a thread-pool thread, each time a result is ready to be taken.</param>
     public TextureStreamer(Action notify, int maxSide = DefaultMaxSide, long budgetBytes = DefaultBudgetBytes, long maxSourcePixels = DefaultMaxSourcePixels)
@@ -45,9 +45,6 @@ internal sealed class TextureStreamer : IDisposable
 
     /// <summary>Textures of the current scene that could not be decoded.</summary>
     public int Failed => Volatile.Read(ref _failed);
-
-    /// <summary>Results of earlier scenes that arrived late and were thrown away.</summary>
-    public int Dropped => Volatile.Read(ref _dropped);
 
     /// <summary>The longest side textures of the current scene are decoded to, after fitting the budget.</summary>
     public int PlannedMaxSide { get; private set; }
@@ -149,7 +146,11 @@ internal sealed class TextureStreamer : IDisposable
         var cancellation = new CancellationTokenSource();
         _cancellation = cancellation;
         Volatile.Write(ref _pending, wanted.Count);
-        _ = Task.Run(() => Decode(wanted, generation, cancellation.Token));
+
+        // Seen here, or a failure on the decoding thread reaches TaskScheduler.UnobservedTaskException, which
+        // a host may report as a crash; the model is drawn without the textures not decoded.
+        Task.Run(() => Decode(wanted, generation, cancellation.Token), cancellation.Token)
+            .ContinueWith(task => _ = task.Exception, TaskScheduler.Default);
     }
 
     /// <summary>Abandons the current scene's textures: nothing more of it is handed over.</summary>
@@ -165,11 +166,7 @@ internal sealed class TextureStreamer : IDisposable
         // What is queued belongs to the generation just ended.
         while (_results.TryDequeue(out (int Generation, int Texture, DecodedTexture? Pixels) stale))
         {
-            if (stale.Pixels is not null)
-            {
-                stale.Pixels.Dispose();
-                Interlocked.Increment(ref _dropped);
-            }
+            stale.Pixels?.Dispose();
         }
     }
 
@@ -183,12 +180,7 @@ internal sealed class TextureStreamer : IDisposable
         {
             if (result.Generation != _generation)
             {
-                if (result.Pixels is not null)
-                {
-                    result.Pixels.Dispose();
-                    Interlocked.Increment(ref _dropped);
-                }
-
+                result.Pixels?.Dispose();
                 continue;
             }
 
@@ -241,12 +233,7 @@ internal sealed class TextureStreamer : IDisposable
                 if (cancellation.IsCancellationRequested)
                 {
                     // Nobody will take it: the generation ended while it was being decoded.
-                    if (pixels is not null)
-                    {
-                        pixels.Dispose();
-                        Interlocked.Increment(ref _dropped);
-                    }
-
+                    pixels?.Dispose();
                     return;
                 }
 

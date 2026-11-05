@@ -82,14 +82,6 @@ internal sealed class OutlineEdges
         static int Ten(float c) => (int)MathF.Round(Math.Clamp(float.IsFinite(c) ? c : 0, -1f, 1f) * 511f) & 0x3FF;
     }
 
-    /// <summary>What the GPU reads from <see cref="Pack"/>: the vector and W.</summary>
-    public static (Vector3 Vector, int W) Unpack(int packed)
-    {
-        return (new Vector3(Ten(packed), Ten(packed >> 10), Ten(packed >> 20)), packed >> 30);
-
-        static float Ten(int bits) => Math.Max(-1f, ((bits << 22) >> 22) / 511f);
-    }
-
     /// <summary>The cosine the crease angle (in degrees) is compared through; an angle that is not a number is 45.</summary>
     public static float CreaseCosine(float creaseAngle)
     {

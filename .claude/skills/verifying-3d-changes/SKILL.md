@@ -24,7 +24,7 @@ Evidence before claims. Read results before committing; report failures with the
 6. **GL code has no headless test**: run `dotnet run -c Release --project Caly.3d/Scene3DViewer -- --selftest` by hand on a GPU. Also `<file.pdf> --poster`, `--capture out.png`, `--scenario recycle`, `--software --exit-after 2`, `--benchmark 300`.
 7. **Native AOT** when touching reflection/serialization/generics-heavy code: `dotnet publish Caly.Desktop -r win-x64 -c Portable -f net10.0 -o <folder>` (needs `C:\Program Files (x86)\Microsoft Visual Studio\Installer` on PATH for vswhere). Viewer: `dotnet publish Caly.3d/Scene3DViewer -r win-x64 -c Release -p:ViewerAot=true` (never `-p:PublishAot=true`).
 8. **Package versions agree**: one Scene3D version across `Caly.Pdf`, `Caly.Scene3D.Avalonia`, `Caly.Scene3D.Avalonia.Tests` and `Caly.3d/Scene3DViewer`, and the `PdfPig` version in `Caly.Pdf` contains the PdfPig change the work needs.
-9. **Docs true**: Caly `CLAUDE.md` 3D section, Scene3D README, numbers re-measured not remembered; workspace `JOURNAL.md` entry.
+9. **Docs true**: Caly `architecture/3d-artwork.md`, Scene3D README, numbers re-measured not remembered; workspace `JOURNAL.md` entry.
 
 Rendering/perf work: Release only. Benchmarks that show suspiciously fast renders may be drawing blank tiles; screenshot the measured window.
 

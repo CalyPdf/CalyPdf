@@ -13,7 +13,8 @@ namespace Scene3DViewer;
 /// The <c>--selftest</c> mode: the part of the control that <c>dotnet test</c> cannot reach, because it
 /// needs a GPU. Small scenes made by hand are drawn, the framebuffer is read back, and pixels are compared
 /// with what the scene must look like: colours, coverage, texture orientation, blending, the visible
-/// region. Last, the control is taken out of the window and every GPU object must be gone.
+/// region. Last, the scene is taken away (its GPU memory must go with it), a frame handler throws (the
+/// control must only fail), and the control is taken out of the window: every GPU object must be gone.
 /// </summary>
 internal sealed class SelfTest
 {
@@ -136,6 +137,9 @@ internal sealed class SelfTest
     }
 
     public void Start() => Next();
+
+    /// <summary>Whether the test is making the control fail: its <c>Failed</c> status is then a check's, not the end of the run.</summary>
+    public bool FailingOnPurpose { get; private set; }
 
     private void Next()
     {
@@ -265,6 +269,49 @@ internal sealed class SelfTest
 
     private void Finish(Scene? lastScene)
     {
+        // A scene taken away leaves the GPU with the next frame.
+        _control.Scene = null;
+        AfterNextFrame(() =>
+        {
+            lastScene?.Dispose();
+            Scene3DStatistics s = _control.Statistics;
+            var cleared = new Checks("scene taken away");
+            cleared.Report(s.VertexBytes == 0 && s.IndexBytes == 0 && s.TextureBytes == 0,
+                $"{s.VertexBytes} vertex, {s.IndexBytes} index and {s.TextureBytes} texture bytes on the GPU");
+            _failed += cleared.Failed;
+
+            // A host's frame handler that throws, out of memory even, fails the control and nothing else.
+            const string message = "the host's handler failed";
+            void Throw(object? sender, EventArgs e) => throw new OutOfMemoryException(message);
+            AfterNextFrame(() =>
+            {
+                _control.FrameRendered -= Throw;
+                var contained = new Checks("a frame handler that throws");
+                contained.Report(_control.Status == Scene3DStatus.Failed && _control.StatusMessage == message,
+                    $"status {_control.Status}, message \"{_control.StatusMessage}\"");
+                _failed += contained.Failed;
+                Release();
+            });
+            FailingOnPurpose = true;
+            _control.FrameRendered += Throw;
+        });
+    }
+
+    /// <summary>Runs <paramref name="then"/> once the control has drawn another frame.</summary>
+    private void AfterNextFrame(Action then)
+    {
+        void OnFrame(object? sender, EventArgs e)
+        {
+            _control.FrameRendered -= OnFrame;
+            Dispatcher.UIThread.Post(then);
+        }
+
+        _control.FrameRendered += OnFrame;
+        _control.RequestNextFrameRendering();
+    }
+
+    private void Release()
+    {
         // Out of the window: the control must give back every GPU object it made.
         int before = _control.Statistics.LiveGpuObjects;
         _host.Child = null;
@@ -272,7 +319,6 @@ internal sealed class SelfTest
         checks.Report(before > 0, $"{before} GPU objects were alive while drawing");
         checks.Report(_control.LiveGpuObjectsAfterRelease == 0, $"{_control.LiveGpuObjectsAfterRelease} GPU objects alive after leaving the window");
         _failed += checks.Failed;
-        lastScene?.Dispose();
 
         Program.Log(_failed == 0 ? "selftest: all checks passed" : $"selftest: {_failed} CHECKS FAILED");
         _finished(_failed == 0 ? 0 : 4);
