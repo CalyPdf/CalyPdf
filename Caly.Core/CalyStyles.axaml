@@ -20,8 +20,9 @@
     <!-- End change delays for all ScrollViewers -->
 
     <!-- Popups inherit UseLayoutRounding from the control they open on, and pages turn it off.
-         Unrounded, Windows truncates the popup to whole pixels and its content shows scroll arrows. -->
-    <Style Selector="FlyoutPresenter, MenuFlyoutPresenter">
+         Unrounded, Windows truncates the popup to whole pixels: menus show scroll arrows and tooltips lose
+         their last word to a wrapped line that does not fit. -->
+    <Style Selector="FlyoutPresenter, MenuFlyoutPresenter, ToolTip">
         <Setter Property="UseLayoutRounding" Value="True" />
     </Style>
 
