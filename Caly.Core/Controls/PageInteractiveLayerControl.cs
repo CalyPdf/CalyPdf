@@ -25,6 +25,8 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
+using Avalonia.Rendering.SceneGraph;
+using Avalonia.Skia;
 using Avalonia.VisualTree;
 using Caly.Core.Utilities;
 using Caly.Pdf.Models;
@@ -32,6 +34,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Styling;
+using SkiaSharp;
 using UglyToad.PdfPig.Core;
 
 namespace Caly.Core.Controls;
@@ -46,9 +49,6 @@ public sealed class PageInteractiveLayerControl : Control
 
     private static readonly Color SelectionColor = Color.FromArgb(169, 0x33, 0x99, 0xFF);
     private static readonly Color SearchColor = Color.FromArgb(120, 255, 0, 0);
-
-    private static readonly ImmutableSolidColorBrush SelectionBrush = new(SelectionColor);
-    private static readonly ImmutableSolidColorBrush SearchBrush = new(SearchColor);
 
     private const string AnnotationFlyoutClass = "calyAnnotationFlyout";
 
@@ -78,8 +78,8 @@ public sealed class PageInteractiveLayerControl : Control
     public static readonly StyledProperty<IReadOnlyList<PdfRectangle[]>?> SearchResultsProperty =
         AvaloniaProperty.Register<PageInteractiveLayerControl, IReadOnlyList<PdfRectangle[]>?>(nameof(SearchResults));
 
-    private StreamGeometry[]? _selectedWordsGeometry;
-    private StreamGeometry[]? _searchResultsGeometry;
+    private IRef<HighlightPaths>? _selectedWordsPaths;
+    private IRef<HighlightPaths>? _searchResultsPaths;
 
     static PageInteractiveLayerControl()
     {
@@ -243,27 +243,11 @@ public sealed class PageInteractiveLayerControl : Control
 
         if (change.Property == SelectedWordsProperty)
         {
-            _selectedWordsGeometry = null;
-            if (change.NewValue is IReadOnlyList<PdfRectangle[]> lines && lines.Count > 0)
-            {
-                _selectedWordsGeometry = lines.Select(PdfWordHelpers.GetLineGeometry).ToArray();
-            }
-            else
-            {
-                _selectedWordsGeometry = null;
-            }
+            HighlightPaths.Replace(ref _selectedWordsPaths, change.NewValue as IReadOnlyList<PdfRectangle[]>);
         }
         else if (change.Property == SearchResultsProperty)
         {
-            _searchResultsGeometry = null;
-            if (change.NewValue is IReadOnlyList<PdfRectangle[]> lines && lines.Count > 0)
-            {
-                _searchResultsGeometry = lines.Select(PdfWordHelpers.GetLineGeometry).ToArray();
-            }
-            else
-            {
-                _searchResultsGeometry = null;
-            }
+            HighlightPaths.Replace(ref _searchResultsPaths, change.NewValue as IReadOnlyList<PdfRectangle[]>);
         }
 #if DEBUG
         else if (change.Property == PdfTextLayerProperty)
@@ -334,32 +318,150 @@ public sealed class PageInteractiveLayerControl : Control
         RenderDebug(context);
 #endif
 
-        // Draw search results first
-        if (_searchResultsGeometry?.Length > 0)
+        if (_searchResultsPaths is not null || _selectedWordsPaths is not null)
         {
-            foreach (var geometry in _searchResultsGeometry)
-            {
-                if (!geometry.Bounds.Intersects(VisibleArea.Value))
-                {
-                    continue;
-                }
+            // Each operation holds its own references: the paths stay alive while a frame still draws them
+            context.Custom(new HighlightDrawOperation(new Rect(Bounds.Size), VisibleArea.Value.ToSKRect(),
+                _searchResultsPaths?.Clone(), _selectedWordsPaths?.Clone()));
+        }
+    }
 
-                context.DrawGeometry(SearchBrush, null, geometry);
+    /// <summary>
+    /// The Skia paths of the highlighted lines, one per line. Disposed as soon as no frame uses them:
+    /// the GPU back end keeps a cached tessellation per path until the path is deleted.
+    /// </summary>
+    internal sealed class HighlightPaths : IDisposable
+    {
+        private readonly PdfRectangle[][] _lines;
+        private readonly IRef<SKPath>[] _paths;
+
+        private HighlightPaths(PdfRectangle[][] lines, IRef<SKPath>[] paths)
+        {
+            _lines = lines;
+            _paths = paths;
+        }
+
+        public int Count => _paths.Length;
+
+        public SKPath this[int index] => _paths[index].Item;
+
+        public static void Replace(ref IRef<HighlightPaths>? field, IReadOnlyList<PdfRectangle[]>? lines)
+        {
+            var old = field;
+            field = lines is { Count: > 0 } ? RefCountable.Create(Create(lines, old?.Item)) : null;
+            old?.Dispose(); // after Create: the reused paths have their own reference by now
+        }
+
+        /// <summary>
+        /// Builds the paths of <paramref name="lines"/>, reusing those of <paramref name="old"/> for lines that did not change.
+        /// </summary>
+        private static HighlightPaths Create(IReadOnlyList<PdfRectangle[]> lines, HighlightPaths? old)
+        {
+            var newLines = new PdfRectangle[lines.Count][];
+            var paths = new IRef<SKPath>[lines.Count];
+
+            for (int i = 0; i < lines.Count; ++i)
+            {
+                var line = lines[i];
+                newLines[i] = line;
+                paths[i] = old?.FindPath(line, i, lines.Count)?.Clone() ??
+                           RefCountable.Create(PdfWordHelpers.GetLinePath(line));
+            }
+
+            return new HighlightPaths(newLines, paths);
+        }
+
+        /// <summary>
+        /// The path of the old line at the same index counted from the start (a forward drag changes the last
+        /// line), else from the end (a backward drag changes the first line). <c>null</c> if neither matches.
+        /// </summary>
+        private IRef<SKPath>? FindPath(PdfRectangle[] line, int index, int count)
+        {
+            if (index < _lines.Length && _lines[index].AsSpan().SequenceEqual(line))
+            {
+                return _paths[index];
+            }
+
+            int fromEnd = _lines.Length - (count - index);
+            if (fromEnd >= 0 && _lines[fromEnd].AsSpan().SequenceEqual(line))
+            {
+                return _paths[fromEnd];
+            }
+
+            return null;
+        }
+
+        public void Dispose()
+        {
+            foreach (var path in _paths)
+            {
+                path.Dispose();
+            }
+        }
+    }
+
+    private sealed class HighlightDrawOperation : ICustomDrawOperation
+    {
+        private static readonly SKPaint SearchPaint = new() { Color = SearchColor.ToSKColor(), IsAntialias = true };
+        private static readonly SKPaint SelectionPaint = new() { Color = SelectionColor.ToSKColor(), IsAntialias = true };
+
+        private readonly SKRect _visibleArea;
+        private IRef<HighlightPaths>? _search;
+        private IRef<HighlightPaths>? _selection;
+
+        public HighlightDrawOperation(Rect bounds, SKRect visibleArea, IRef<HighlightPaths>? search,
+            IRef<HighlightPaths>? selection)
+        {
+            Bounds = bounds;
+            _visibleArea = visibleArea;
+            _search = search;
+            _selection = selection;
+        }
+
+        public Rect Bounds { get; }
+
+        public bool HitTest(Point p) => false;
+
+        public bool Equals(ICustomDrawOperation? other) => ReferenceEquals(this, other);
+
+        public void Render(ImmediateDrawingContext context)
+        {
+            if (!context.TryGetFeature(out ISkiaSharpApiLeaseFeature? leaseFeature) || leaseFeature is null)
+            {
+                return;
+            }
+
+            using var lease = leaseFeature.Lease();
+
+            // Search results first, so the selection is drawn on top
+            Draw(lease.SkCanvas, _search, SearchPaint);
+            Draw(lease.SkCanvas, _selection, SelectionPaint);
+        }
+
+        private void Draw(SKCanvas canvas, IRef<HighlightPaths>? paths, SKPaint paint)
+        {
+            if (paths is null)
+            {
+                return;
+            }
+
+            var item = paths.Item;
+            for (int i = 0; i < item.Count; ++i)
+            {
+                var path = item[i];
+                if (path.Bounds.IntersectsWith(_visibleArea))
+                {
+                    canvas.DrawPath(path, paint);
+                }
             }
         }
 
-        // Render Selection
-        if (_selectedWordsGeometry?.Length > 0)
+        public void Dispose()
         {
-            foreach (var geometry in _selectedWordsGeometry)
-            {
-                if (!geometry.Bounds.Intersects(VisibleArea.Value))
-                {
-                    continue;
-                }
-
-                context.DrawGeometry(SelectionBrush, null, geometry);
-            }
+            _search?.Dispose();
+            _search = null;
+            _selection?.Dispose();
+            _selection = null;
         }
     }
 

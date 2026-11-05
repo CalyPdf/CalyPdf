@@ -55,6 +55,12 @@ public sealed partial class TextSelection
     public event EventHandler<EventArgs>? TextSelectionReset;
 
     /// <summary>
+    /// <c>true</c> once <see cref="Start"/> has moved the anchor, until the next <see cref="Extend"/>:
+    /// that extend must refresh even if the focus did not move.
+    /// </summary>
+    private bool _startedSinceExtend;
+
+    /// <summary>
     /// The mouse location when selection started.
     /// <para>Used to ignore small selections.</para>
     /// </summary>
@@ -202,6 +208,7 @@ public sealed partial class TextSelection
         AnchorPageIndex = pageNumber;
         AnchorWord = word;
         AnchorPoint = location;
+        _startedSinceExtend = true;
 
         if (location.HasValue)
         {
@@ -244,10 +251,8 @@ public sealed partial class TextSelection
             throw new ArgumentOutOfRangeException(nameof(pageNumber), $"The page number of the focus should be greater or equal to 1. Current value is {pageNumber}");
         }
 
-        int currentFocusPageIndex = FocusPageIndex;
-
-        FocusPageIndex = pageNumber;
-        FocusWord = word;
+        int newFocusOffset = -1;
+        double newFocusOffsetDistance = -1;
 
         if (location.HasValue)
         {
@@ -257,15 +262,27 @@ public sealed partial class TextSelection
             }
 
             // Allow partial select
-            CalculateWordCharIndexAndOffset(word, location.Value, false, out int index, out double offset);
-            FocusOffset = index;
-            FocusOffsetDistance = offset;
+            CalculateWordCharIndexAndOffset(word, location.Value, false, out newFocusOffset, out newFocusOffsetDistance);
         }
-        else
+
+        // Pointer moves within the same letter change nothing that is drawn or copied: skip the refresh
+        bool unchanged = !_startedSinceExtend && pageNumber == FocusPageIndex &&
+                         word == FocusWord && newFocusOffset == FocusOffset;
+
+        FocusOffsetDistance = newFocusOffsetDistance;
+
+        if (unchanged)
         {
-            FocusOffset = -1;
-            FocusOffsetDistance = -1;
+            return;
         }
+
+        _startedSinceExtend = false;
+
+        int currentFocusPageIndex = FocusPageIndex;
+
+        FocusPageIndex = pageNumber;
+        FocusWord = word;
+        FocusOffset = newFocusOffset;
 
         UpdateSelectionDirection();
 
