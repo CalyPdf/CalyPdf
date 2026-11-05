@@ -26,6 +26,7 @@ using Caly.Pdf.Models;
 using UglyToad.PdfPig.Content;
 using UglyToad.PdfPig.Core;
 using UglyToad.PdfPig.DocumentLayoutAnalysis;
+using SkiaSharp;
 
 namespace Caly.Core.Utilities;
 
@@ -153,33 +154,34 @@ internal static class PdfWordHelpers
     /// are painted once (no darker spots with a translucent brush).
     /// </para>
     /// </summary>
-    public static StreamGeometry GetLineGeometry(IReadOnlyList<PdfRectangle> rects)
+    /// <remarks>
+    /// A Skia path rather than a <see cref="StreamGeometry"/>: the GPU back end caches a tessellation per path
+    /// until the path is deleted, and Avalonia never disposes a <see cref="StreamGeometry"/>'s path, so each
+    /// selection change left GPU buffers behind until a full GC. The caller owns and disposes the path.
+    /// </remarks>
+    public static SKPath GetLinePath(IReadOnlyList<PdfRectangle> rects)
     {
         var quads = new List<Quad>(rects.Count * 2);
         GetLineQuads(rects, quads);
 
-        var sg = new StreamGeometry();
-        using (var ctx = sg.Open())
-        {
-            ctx.SetFillRule(FillRule.NonZero);
+        var path = new SKPath { FillType = SKPathFillType.Winding };
 
-            foreach (var q in quads)
-            {
-                ctx.BeginFigure(new Point(q.A.X, q.A.Y), true);
-                ctx.LineTo(new Point(q.B.X, q.B.Y));
-                ctx.LineTo(new Point(q.C.X, q.C.Y));
-                ctx.LineTo(new Point(q.D.X, q.D.Y));
-                ctx.EndFigure(true);
-            }
+        foreach (var q in quads)
+        {
+            path.MoveTo((float)q.A.X, (float)q.A.Y);
+            path.LineTo((float)q.B.X, (float)q.B.Y);
+            path.LineTo((float)q.C.X, (float)q.C.Y);
+            path.LineTo((float)q.D.X, (float)q.D.Y);
+            path.Close();
         }
 
-        return sg;
+        return path;
     }
 
     internal readonly record struct Quad(PdfPoint A, PdfPoint B, PdfPoint C, PdfPoint D);
 
     /// <summary>
-    /// The figures of <see cref="GetLineGeometry"/>: one quad per rectangle, plus one joining quad
+    /// The figures of <see cref="GetLinePath"/>: one quad per rectangle, plus one joining quad
     /// per gap between consecutive rectangles. All quads have a non-negative signed area.
     /// </summary>
     internal static void GetLineQuads(IReadOnlyList<PdfRectangle> rects, List<Quad> quads)
