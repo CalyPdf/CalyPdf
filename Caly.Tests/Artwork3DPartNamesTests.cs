@@ -51,17 +51,17 @@ public class Artwork3DPartNamesTests
         (Scene scene, int leaf) = Chain("Receptacle.40", "Default.38", ".7b5020");
         using (scene)
         {
-            Assert.Equal("3D part: Default", Artwork3DPartNames.Status(scene, leaf, Artwork3DFormat.Prc));
+            Assert.Equal("3D part: Receptacle > Default", Artwork3DPartNames.Status(scene, leaf, Artwork3DFormat.Prc));
         }
     }
 
     [Fact]
-    public void ANamedPieceKeepsItsOwnName()
+    public void ANamedPieceIsShownWithItsAncestors()
     {
         (Scene scene, int leaf) = Chain("Assembly.40", "Bolt.12");
         using (scene)
         {
-            Assert.Equal("3D part: Bolt", Artwork3DPartNames.Status(scene, leaf, Artwork3DFormat.Prc));
+            Assert.Equal("3D part: Assembly > Bolt", Artwork3DPartNames.Status(scene, leaf, Artwork3DFormat.Prc));
         }
     }
 

@@ -18,17 +18,10 @@
 			<Setter Property="Background" Value="Transparent"/>
 			<Setter Property="VerticalAlignment" Value="Center"/>
 		</Style>
-		<Style Selector="Button.tool Path">
+
+		<Style Selector="Button.tool PathIcon">
 			<Setter Property="Width" Value="14"/>
 			<Setter Property="Height" Value="14"/>
-			<Setter Property="StrokeThickness" Value="1.4"/>
-			<Setter Property="StrokeLineCap" Value="Round"/>
-			<Setter Property="StrokeJoin" Value="Round"/>
-			<Setter Property="Stroke" Value="{Binding $parent[Button].Foreground}"/>
-		</Style>
-		<Style Selector="Button.tool Path.filled">
-			<Setter Property="Fill" Value="{Binding $parent[Button].Foreground}"/>
-			<Setter Property="StrokeThickness" Value="1"/>
 		</Style>
 
 		<!-- The lighting panel's rows: a name, a slider, its value. -->
@@ -118,13 +111,10 @@
 						</MultiBinding>
 					</Button.IsVisible>
 					<Panel Width="14" Height="14">
-						<Path Classes="filled"
-						      Data="M 3.5 2 L 11.5 7 L 3.5 12 Z"
-						      IsVisible="{Binding !#View3D.IsAnimationPlaying}"/>
-						<Path Data="M 4 2 L 4 12 M 10 2 L 10 12"
-						      StrokeThickness="2.2"
-						      StrokeLineCap="Flat"
-						      IsVisible="{Binding #View3D.IsAnimationPlaying}"/>
+						<PathIcon Data="{StaticResource play_regular}"
+								  IsVisible="{Binding !#View3D.IsAnimationPlaying}"/>
+						<PathIcon Data="{StaticResource pause_regular}"
+								  IsVisible="{Binding #View3D.IsAnimationPlaying}"/>
 					</Panel>
 				</Button>
 
@@ -138,7 +128,7 @@
 							<Binding Path="#View3D.HasAnimation"/>
 						</MultiBinding>
 					</Button.IsVisible>
-					<Path Data="M 3 2 L 3 12 M 12 2 L 5.5 7 L 12 12 Z"/>
+					<PathIcon Data="{StaticResource previous_regular}"/>
 				</Button>
 
 				<Button Classes="tool"
@@ -146,7 +136,7 @@
 				        IsVisible="{Binding !IsLoading}"
 				        ToolTip.Tip="Reset view"
 				        AutomationProperties.Name="Reset view">
-					<Path Data="M 11.2 4.2 A 5 5 0 1 0 12 7.5 M 11.6 1 L 11.6 4.6 L 8 4.6"/>
+					<PathIcon Data="{StaticResource arrow_clockwise_regular}"/>
 				</Button>
 
 				<!-- Lights and materials, changed by the reader; the file's values each time an artwork is opened. -->
@@ -154,7 +144,7 @@
 				        IsVisible="{Binding !IsLoading}"
 				        ToolTip.Tip="Lighting"
 				        AutomationProperties.Name="Lighting">
-					<Path Data="M 9.5 7 A 2.5 2.5 0 1 1 4.5 7 A 2.5 2.5 0 1 1 9.5 7 Z M 7 0.8 L 7 2.4 M 7 11.6 L 7 13.2 M 0.8 7 L 2.4 7 M 11.6 7 L 13.2 7 M 2.6 2.6 L 3.7 3.7 M 10.3 10.3 L 11.4 11.4 M 2.6 11.4 L 3.7 10.3 M 10.3 3.7 L 11.4 2.6"/>
+					<PathIcon Data="{StaticResource weather_sunny_regular}"/>
 					<Button.Flyout>
 						<!-- Above the toolbar, off the model, so that the model can be watched while a slider moves. -->
 						<Flyout Placement="TopEdgeAlignedLeft">
@@ -210,7 +200,7 @@
 				        Command="{Binding CloseCommand}"
 				        ToolTip.Tip="Close 3D view"
 				        AutomationProperties.Name="Close 3D view">
-					<Path Data="M 3 3 L 11 11 M 11 3 L 3 11"/>
+					<PathIcon Data="{StaticResource dismiss_regular}"/>
 				</Button>
 
 			</StackPanel>
