@@ -121,6 +121,11 @@ public partial class TiledPdfPageControl
                 RenderTimings.RecordGpuCache(lease?.GrContext);
             }
 
+            if (MemoryProbe.IsEnabled)
+            {
+                MemoryProbe.RecordGpuCache(lease?.GrContext);
+            }
+
 #if DEBUG
             using var borderPaint = new SKPaint();
             borderPaint.Style = SKPaintStyle.Stroke;

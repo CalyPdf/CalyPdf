@@ -8,6 +8,15 @@ namespace Caly.Tests;
 /// memory budget, and blank tiles - tiles that rendered to nothing - which are recorded as bare
 /// keys outside the budget, the LRU and the ref-counting machinery.
 /// </summary>
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class TileCacheTotalsCollection
+{
+    public const string Name = "TileCache process-wide totals";
+}
+
+// Runs alone: TileCache.TotalMemoryBytes is a process-wide sum, so a cache created by a test running
+// at the same time would move it under the totals test below.
+[Collection(TileCacheTotalsCollection.Name)]
 public class TileCacheTests
 {
     private const int TileSide = 64;
@@ -28,6 +37,28 @@ public class TileCacheTests
 
     private static TileKey Key(int page = 1, int level = 0, int col = 0, int row = 0)
         => new(page, level, col, row);
+
+    [Fact]
+    public void TotalMemoryBytes_TracksAddClearAndDispose()
+    {
+        long before = TileCache.TotalMemoryBytes;
+
+        var cache = new TileCache();
+        cache.Add(Key(col: 0), CreateTile());
+        cache.Add(Key(col: 1), CreateTile());
+        Assert.Equal(before + 2 * TileBytes, TileCache.TotalMemoryBytes);
+
+        cache.InvalidatePage(1);
+        Assert.Equal(before, TileCache.TotalMemoryBytes);
+
+        cache.Add(Key(col: 0), CreateTile());
+        cache.Clear();
+        Assert.Equal(before, TileCache.TotalMemoryBytes);
+
+        cache.Add(Key(col: 0), CreateTile());
+        cache.Dispose();
+        Assert.Equal(before, TileCache.TotalMemoryBytes);
+    }
 
     #region Image tiles: existing behaviour
 

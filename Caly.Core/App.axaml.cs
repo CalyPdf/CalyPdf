@@ -85,6 +85,8 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        Caly.Core.Services.Rendering.MemoryProbe.StartIfEnabled();
+
         // Initialise dependencies
         var services = new ServiceCollection();
 

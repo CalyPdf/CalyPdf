@@ -123,6 +123,7 @@ internal static class Helpers
 
         System.Diagnostics.Debug.WriteLine($"-> RequestGcCollect({DateTime.UtcNow})");
         GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, true, true);
+        Services.Rendering.MemoryProbe.Mark("close-gc");
     }
     #endregion
 

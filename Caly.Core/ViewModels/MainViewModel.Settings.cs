@@ -88,6 +88,12 @@ public sealed partial class MainViewModel
         set => SetSetting(static (s, v) => (s.Debug ??= new CalySettings.CalySettingsDebug()).LogRenderTimings = v, value);
     }
 
+    public bool LogMemory
+    {
+        get => GetSetting(static s => s.Debug?.LogMemory ?? false, false);
+        set => SetSetting(static (s, v) => (s.Debug ??= new CalySettings.CalySettingsDebug()).LogMemory = v, value);
+    }
+
     public bool ShowPdfLogs
     {
         get => GetSetting(static s => s.ShowPdfLogs, false);

@@ -153,6 +153,24 @@ public sealed class TileCache : IDisposable
 
     private long _currentMemoryBytes;
 
+    private static long s_totalMemoryBytes;
+
+    /// <summary>
+    /// Bytes held by the tiles of every live cache (one per open document). Read by
+    /// <see cref="MemoryProbe"/>; the per-cache budget never looks at it.
+    /// </summary>
+    internal static long TotalMemoryBytes => Interlocked.Read(ref s_totalMemoryBytes);
+
+    /// <summary>
+    /// Changes this cache's byte count and the process-wide total together. Must be called under
+    /// <see cref="_lock"/>.
+    /// </summary>
+    private void AdjustMemoryLocked(long delta)
+    {
+        _currentMemoryBytes += delta;
+        Interlocked.Add(ref s_totalMemoryBytes, delta);
+    }
+
     internal long MaxMemoryBytes => _maxMemoryBytes;
 
     /// <summary>
@@ -279,7 +297,7 @@ public sealed class TileCache : IDisposable
             newEntry.LruNode = _lruList.AddFirst(key);
 
             _entries[key] = newEntry;
-            _currentMemoryBytes += memorySize;
+            AdjustMemoryLocked(memorySize);
 
             // Update secondary indexes
             if (!_pageKeys.TryGetValue(key.PageNumber, out var keys))
@@ -363,7 +381,7 @@ public sealed class TileCache : IDisposable
             _pageKeys.Clear();
             _pageLevels.Clear();
             _blankKeys.Clear();
-            _currentMemoryBytes = 0;
+            AdjustMemoryLocked(-_currentMemoryBytes);
         }
 
         // Dispose outside the lock
@@ -625,7 +643,7 @@ public sealed class TileCache : IDisposable
             entry.LruNode = null;
         }
 
-        _currentMemoryBytes -= entry.MemorySize;
+        AdjustMemoryLocked(-entry.MemorySize);
     }
 
     public void Dispose()
@@ -642,7 +660,7 @@ public sealed class TileCache : IDisposable
             _pageKeys.Clear();
             _pageLevels.Clear();
             _blankKeys.Clear();
-            _currentMemoryBytes = 0;
+            AdjustMemoryLocked(-_currentMemoryBytes);
         }
     }
 }

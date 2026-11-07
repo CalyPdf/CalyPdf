@@ -93,6 +93,11 @@ public sealed class CalySettings
         /// Dumps render-path timings to the logs folder at exit. Absent means off.
         /// </summary>
         public bool LogRenderTimings { get; set; }
+
+        /// <summary>
+        /// Writes a memory sample to the logs folder every half second. Absent means off.
+        /// </summary>
+        public bool LogMemory { get; set; }
     }
     
     public enum CalySettingsProperty

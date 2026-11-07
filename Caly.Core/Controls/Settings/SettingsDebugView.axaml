@@ -14,6 +14,10 @@
                   IsChecked="{Binding LogRenderTimings, Mode=TwoWay}"
                   ToolTip.Tip="Writes render-path timings to the logs folder when Caly exits."/>
 
+        <CheckBox Content="Log memory"
+                  IsChecked="{Binding LogMemory, Mode=TwoWay}"
+                  ToolTip.Tip="Writes memory samples to the logs folder every half second."/>
+
         <TextBlock Text="Applies after restarting Caly."
                    FontSize="11"
                    TextWrapping="Wrap"
