@@ -125,6 +125,24 @@ What the baseline already shows (to confirm in dotMemory, not yet explained): me
 
 Noise: two runs of the same build differed by about 10 % in working set at single steps (Windows GPU `A-baseline` 224 and 244, `D-closed-1` 526 and 514). Treat smaller differences as noise. Native Linux (GPU and software) baselines are not recorded yet: run both drivers there and add the column.
 
+**After the GPU purge on close** — same machine and scenario, commit after `0c1b6f44` ("Empty the GPU texture cache after a document closes"), working set in MiB, Windows GPU is the median-ish of three runs (283–287 at `D-closed-1`):
+
+| Step | Windows GPU before → after | WSL2 software before → after |
+|---|---|---|
+| A-baseline | 244 → 224 | 123 → 123 |
+| B-one-doc | 478 → 468 | 358 → 341 |
+| C-peak | 620 → 386–524 | 664 → 609 |
+| D-closed-1 | 514 → 283–287 | 665 → 668 |
+| D-closed-3 | 440 → 295–300 | 639 → 607 |
+| peak over the run | 825 → 688–697 | 891 → 876 |
+| `gpu_cache` after close | 79.6 → 35.5 | n/a (no GPU) |
+| `gc_heap` after the first post-close GC | 85–104 → 14–16 | 102 → 129 |
+
+The purge helps the GPU renderer only; the software renderer (and Linux under WSLg) still keep about 100–130 MiB of large `byte[]` alive after the first post-close collection (they are gone after a later one). From this commit `gpu_cache` is also recorded outside tile draws, so its `A-baseline` reads ~36 MiB (the compositor's floor) where older runs read 0.
+
 ## Rules this work established
 
-(filled in at the end of the project)
+- **Closing a document purges the GPU cache** (`GpuCachePurge.Request()` at the end of `Helpers.GcTimerCallback`, taken by `GpuCachePurgeHost` on the render thread). Why: Skia only shrinks that cache under pressure, so closed documents' textures stayed at ~80 MiB; measured −230 MiB working set after closing everything on Windows GPU. Do not move the purge into `TiledPdfPageControl`'s draw: nothing draws after the last document closes.
+- **`UseCompactTileFormat` stays opt-in.** It saves 50–80 MiB of working set but loses precision (≤ 5/255 per channel, no alpha); the owner decided on 2026-11-07 that it must not become the default.
+- **No idle trimming, no native tricks** (owner's constraints for this work): fixes are managed code or SkiaSharp public API; GC settings tried (`GCConserveMemory=5`, non-concurrent GC) gave no measurable gain and were not adopted.
+- **Measure with the scripted session before and after any change** that touches caches, document lifetime, Skia objects or GC settings, and keep a change only if the numbers improve and scrolling and zooming look unchanged.
