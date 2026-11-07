@@ -8,8 +8,9 @@ namespace Caly.Tests;
 /// <summary>
 /// The k-nearest-neighbour query of <see cref="CalyKdTree"/> returns every point at one of the k smallest
 /// distinct distances (so more than k when points are equidistant), nearest first, ties in the order the search
-/// found them. The text layout (Docstrum, clustering) relies on exactly that, so these tests pin it: against a
-/// brute force, against a recorded result of the original implementation, and for how little a query allocates.
+/// visited them. The text layout (Docstrum, clustering) relies on that: clustering takes the first neighbour that
+/// passes its filters, so the order of equidistant neighbours matters. These tests pin it against a brute force,
+/// against a recorded result, and for how little a query allocates.
 /// </summary>
 public class CalyKdTreeKNearestTests
 {
@@ -46,18 +47,69 @@ public class CalyKdTreeKNearestTests
         return points;
     }
 
+    /// <summary>Like the bottom-left corners of words: lines of constant y with irregular gaps in x.</summary>
+    private static List<PdfPoint> TextLikePoints(int seed, int lines, int wordsPerLine)
+    {
+        var random = new Random(seed);
+        var points = new List<PdfPoint>();
+        for (int line = 0; line < lines; line++)
+        {
+            double x = 50;
+            for (int word = 0; word < wordsPerLine; word++)
+            {
+                points.Add(new PdfPoint(Math.Round(x, 2), 700 - line * 14));
+                x += 15 + Math.Round(random.NextDouble() * 40, 2);
+            }
+        }
+
+        return points;
+    }
+
     private static IEnumerable<(string Name, List<PdfPoint> Points, int[] Ks)> DataSets()
     {
         yield return ("random", RandomPoints(7, 300), [1, 2, 5]);
+        yield return ("random-500", RandomPoints(21, 500), [2]);
         yield return ("grid", GridPoints(15), [1, 2, 3, 6]);
+        yield return ("text", TextLikePoints(3, 30, 12), [1, 2, 4]);
     }
 
     /// <summary>
-    /// What must hold whatever the search order: no pivot, no duplicate, nearest first, each distance the real one,
-    /// at most k distinct distances. It does not hold that the result is the true k nearest: the search is not
-    /// exact (on the random set with k = 1, pivot 16 returns 3.40 where the nearest is 0.53). That is a separate
-    /// bug; the recorded-result test pins the behaviour as it is.
+    /// Every point at one of the k smallest distinct distances, whichever order the search finds them in. The search used
+    /// to cut off the far side of a split while fewer than k distinct distances were held, using the largest distance
+    /// held so far as the limit: it returned a wrong neighbour for about one query in six on text-like and random points
+    /// (567 of 3,380 here, e.g. 3.40 where the nearest was 0.53).
     /// </summary>
+    [Fact]
+    public void FindNearestNeighbours_ReturnsEveryPointAtTheKSmallestDistinctDistances()
+    {
+        foreach (var (name, points, ks) in DataSets())
+        {
+            var tree = new CalyKdTree(points);
+
+            foreach (int k in ks)
+            {
+                for (int i = 0; i < points.Count; i++)
+                {
+                    PdfPoint pivot = points[i];
+
+                    var expected = Enumerable.Range(0, points.Count)
+                        .Where(j => j != i)
+                        .Select(j => (Index: j, Distance: CalyDistances.Euclidean(points[j], pivot)))
+                        .ToList();
+                    float limit = expected.Select(e => e.Distance).Distinct().OrderBy(d => d).Take(k).Last();
+                    var expectedSet = expected.Where(e => e.Distance <= limit).OrderBy(e => e.Distance).ThenBy(e => e.Index).ToList();
+
+                    var actual = tree.FindNearestNeighbours(pivot, k, CalyDistances.Euclidean)
+                        .Select(r => (Index: r.Item2, Distance: r.Item3))
+                        .OrderBy(e => e.Distance).ThenBy(e => e.Index).ToList();
+
+                    Assert.True(expectedSet.SequenceEqual(actual), $"{name}, k={k}, pivot {i}: wrong neighbours");
+                }
+            }
+        }
+    }
+
+    /// <summary>What must hold whatever the search order: no pivot, no duplicate, nearest first, each distance the real one.</summary>
     [Fact]
     public void FindNearestNeighbours_ReturnsOrderedDistinctNeighboursWithTheirRealDistances()
     {
@@ -86,14 +138,18 @@ public class CalyKdTreeKNearestTests
                             Assert.True(result[r].Item3 >= result[r - 1].Item3, where);
                         }
                     }
-
                 }
             }
         }
     }
 
+    /// <summary>
+    /// The exact order, ties included. Recorded from the corrected search; checked once against a copy of the original
+    /// search, which gave the identical sequence for every query it answered correctly (2,813 of 3,380 on these data
+    /// sets), so equidistant neighbours come out in the order the layout code was already getting.
+    /// </summary>
     [Fact]
-    public void FindNearestNeighbours_KeepsTheOrderOfTheOriginalImplementation()
+    public void FindNearestNeighbours_KeepsTheRecordedOrder()
     {
         var sb = new StringBuilder();
         foreach (var (name, points, ks) in DataSets())
@@ -116,8 +172,7 @@ public class CalyKdTreeKNearestTests
 
         string hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString())));
 
-        // Recorded from the implementation before the allocation work (SortedList of HashSets).
-        Assert.Equal("A9DA05559A64BC070C52DECB3352D4A272AA0FA51876BC93B50DC4E3A805C235", hash);
+        Assert.Equal("A5F1A4EA149677C2C9DE19AD694867C96D79B9DBD9945987637F3A2649C670E8", hash);
     }
 
     [Fact]
@@ -143,8 +198,7 @@ public class CalyKdTreeKNearestTests
 
         double perQuery = (GC.GetAllocatedBytesForCurrentThread() - before) / (5.0 * points.Count);
 
-        Assert.True(perQuery < MaxBytesPerQuery, $"a k=2 query allocated {perQuery:F0} bytes");
+        // The original implementation allocated about 3,000 bytes per k = 2 query
+        Assert.True(perQuery < 400, $"a k=2 query allocated {perQuery:F0} bytes");
     }
-
-    private const double MaxBytesPerQuery = 400;
 }

@@ -1,4 +1,4 @@
-﻿namespace Caly.Pdf.Layout
+namespace Caly.Pdf.Layout
 {
     /*
      * From PdfPig
@@ -333,7 +333,7 @@
         {
             var pivotPoint = pivotPointFunc(pivot);
             var kdTreeNodes = new KNearestNeighboursQueue(k);
-            FindNearestNeighbours(Root, pivot, k, pivotPoint, distanceMeasure, kdTreeNodes);
+            FindNearestNeighbours(Root, pivot, pivotPoint, distanceMeasure, kdTreeNodes);
 
             var results = new List<(T, int, float)>(kdTreeNodes.Count);
             for (int i = 0; i < kdTreeNodes.Count; i++)
@@ -344,92 +344,39 @@
             return results;
         }
 
-        private static (CalyKdTreeNode<T>, float) FindNearestNeighbours(CalyKdTreeNode<T> node, T pivot, int k,
-            PdfPoint pivotPoint, Func<PdfPoint, PdfPoint, float> distance, KNearestNeighboursQueue queue)
+        /// <summary>
+        /// Depth-first search visiting the node, then the child on the pivot's side, then the other child unless the
+        /// splitting plane is farther than the largest distance held (and K distinct distances are held already).
+        /// A node at exactly that distance is held too, hence the plane being allowed to be as far as it.
+        /// </summary>
+        private static void FindNearestNeighbours(CalyKdTreeNode<T> node, T pivot, PdfPoint pivotPoint,
+            Func<PdfPoint, PdfPoint, float> distance, KNearestNeighboursQueue queue)
         {
-            if (node == null)
+            // The pivot is not a candidate, otherwise it could be returned as its own neighbour
+            if (!EqualityComparer<T>.Default.Equals(node.Element, pivot))
             {
-                return (null, float.NaN);
+                queue.Add(distance(node.Value, pivotPoint), node);
             }
-            
-            if (node.IsLeaf)
+
+            double pointValue = node.IsAxisCutX ? pivotPoint.X : pivotPoint.Y;
+            bool startLeft = pointValue < node.L;
+            CalyKdTreeNode<T>? near = startLeft ? node.LeftChild : node.RightChild;
+            CalyKdTreeNode<T>? far = startLeft ? node.RightChild : node.LeftChild;
+
+            if (near != null)
             {
-                if (EqualityComparer<T>.Default.Equals(node.Element, pivot))
-                {
-                    return (null, float.NaN);
-                }
-
-                var currentDistance = distance(node.Value, pivotPoint);
-                var currentNearestNode = node;
-
-                if (!queue.IsFull || currentDistance <= queue.LastDistance)
-                {
-                    queue.Add(currentDistance, currentNearestNode);
-                    currentDistance = queue.LastDistance;
-                    currentNearestNode = queue.LastElement;
-                }
-
-                return (currentNearestNode, currentDistance);
+                FindNearestNeighbours(near, pivot, pivotPoint, distance, queue);
             }
-            else
+
+            if (far != null)
             {
-                var currentNearestNode = node;
-                var currentDistance = distance(node.Value, pivotPoint);
-                if ((!queue.IsFull || currentDistance <= queue.LastDistance) && !EqualityComparer<T>.Default.Equals(node.Element, pivot))
+                // The distance is a float, the plane is a double: a relative margin keeps a node whose distance
+                // equals the largest held one (after rounding) from being cut off.
+                double plane = node.IsAxisCutX ? node.Value.X : node.Value.Y;
+                if (!queue.IsFull || Math.Abs(pointValue - plane) <= queue.LastDistance * (1.0 + 1e-6))
                 {
-                    queue.Add(currentDistance, currentNearestNode);
-                    currentDistance = queue.LastDistance;
-                    currentNearestNode = queue.LastElement;
+                    FindNearestNeighbours(far, pivot, pivotPoint, distance, queue);
                 }
-
-                CalyKdTreeNode<T> newNode = null;
-                float newDist = float.NaN;
-
-                var pointValue = node.IsAxisCutX ? pivotPoint.X : pivotPoint.Y;
-
-                if (pointValue < node.L)
-                {
-                    // start left
-                    (newNode, newDist) = FindNearestNeighbours(node.LeftChild, pivot, k, pivotPoint, distance, queue);
-
-                    if (!double.IsNaN(newDist) && newDist <= currentDistance && !EqualityComparer<T>.Default.Equals(newNode.Element, pivot))
-                    {
-                        queue.Add(newDist, newNode);
-                        currentDistance = queue.LastDistance;
-                        currentNearestNode = queue.LastElement;
-                    }
-
-                    if (node.RightChild != null && pointValue + currentDistance >= node.L)
-                    {
-                        (newNode, newDist) = FindNearestNeighbours(node.RightChild, pivot, k, pivotPoint, distance, queue);
-                    }
-                }
-                else
-                {
-                    // start right
-                    (newNode, newDist) = FindNearestNeighbours(node.RightChild, pivot, k, pivotPoint, distance, queue);
-
-                    if (!double.IsNaN(newDist) && newDist <= currentDistance && !EqualityComparer<T>.Default.Equals(newNode.Element, pivot))
-                    {
-                        queue.Add(newDist, newNode);
-                        currentDistance = queue.LastDistance;
-                        currentNearestNode = queue.LastElement;
-                    }
-
-                    if (node.LeftChild != null && pointValue - currentDistance <= node.L)
-                    {
-                        (newNode, newDist) = FindNearestNeighbours(node.LeftChild, pivot, k, pivotPoint, distance, queue);
-                    }
-                }
-
-                if (!double.IsNaN(newDist) && newDist <= currentDistance && !EqualityComparer<T>.Default.Equals(newNode.Element, pivot))
-                {
-                    queue.Add(newDist, newNode);
-                    currentDistance = queue.LastDistance;
-                    currentNearestNode = queue.LastElement;
-                }
-
-                return (currentNearestNode, currentDistance);
             }
         }
 
