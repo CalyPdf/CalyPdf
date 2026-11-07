@@ -61,3 +61,6 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+
+# Shell scripts must keep LF on Windows checkouts, or bash cannot run them.
+*.sh text eol=lf

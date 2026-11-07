@@ -23,6 +23,7 @@ using Caly.Core.Models;
 using SkiaSharp;
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 
@@ -182,11 +183,25 @@ public static class RenderTimings
         EnsureExitHook();
     }
 
+    private static PosixSignalRegistration? _sigtermRegistration;
+
     private static void EnsureExitHook()
     {
         if (Interlocked.Exchange(ref _exitHookInstalled, 1) == 0)
         {
             AppDomain.CurrentDomain.ProcessExit += static (_, _) => Dump();
+
+            // .NET raises ProcessExit for SIGTERM only when the app registers for the signal, and the
+            // Linux memory scenario driver ends Caly with SIGTERM. Cancel is left false: the default
+            // action (exit) still follows once the summary is written.
+            try
+            {
+                _sigtermRegistration = PosixSignalRegistration.Create(PosixSignal.SIGTERM, static _ => Dump());
+            }
+            catch (Exception e) when (e is PlatformNotSupportedException or InvalidOperationException)
+            {
+                // No SIGTERM support on this platform: the ProcessExit hook above is all there is.
+            }
         }
     }
 
