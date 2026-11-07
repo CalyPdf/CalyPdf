@@ -335,14 +335,11 @@
             var kdTreeNodes = new KNearestNeighboursQueue(k);
             FindNearestNeighbours(Root, pivot, k, pivotPoint, distanceMeasure, kdTreeNodes);
 
-            var results = new List<(T, int, float)>();
+            var results = new List<(T, int, float)>(kdTreeNodes.Count);
             for (int i = 0; i < kdTreeNodes.Count; i++)
             {
-                float dist = kdTreeNodes.Keys[i];
-                foreach (var e in kdTreeNodes.Values[i])
-                {
-                    results.Add((e.Element, e.Index, dist));
-                }
+                var (distance, node) = kdTreeNodes[i];
+                results.Add((node.Element, node.Index, distance));
             }
             return results;
         }
@@ -357,7 +354,7 @@
             
             if (node.IsLeaf)
             {
-                if (node.Element.Equals(pivot))
+                if (EqualityComparer<T>.Default.Equals(node.Element, pivot))
                 {
                     return (null, float.NaN);
                 }
@@ -378,7 +375,7 @@
             {
                 var currentNearestNode = node;
                 var currentDistance = distance(node.Value, pivotPoint);
-                if ((!queue.IsFull || currentDistance <= queue.LastDistance) && !node.Element.Equals(pivot))
+                if ((!queue.IsFull || currentDistance <= queue.LastDistance) && !EqualityComparer<T>.Default.Equals(node.Element, pivot))
                 {
                     queue.Add(currentDistance, currentNearestNode);
                     currentDistance = queue.LastDistance;
@@ -395,7 +392,7 @@
                     // start left
                     (newNode, newDist) = FindNearestNeighbours(node.LeftChild, pivot, k, pivotPoint, distance, queue);
 
-                    if (!double.IsNaN(newDist) && newDist <= currentDistance && !newNode.Element.Equals(pivot))
+                    if (!double.IsNaN(newDist) && newDist <= currentDistance && !EqualityComparer<T>.Default.Equals(newNode.Element, pivot))
                     {
                         queue.Add(newDist, newNode);
                         currentDistance = queue.LastDistance;
@@ -412,7 +409,7 @@
                     // start right
                     (newNode, newDist) = FindNearestNeighbours(node.RightChild, pivot, k, pivotPoint, distance, queue);
 
-                    if (!double.IsNaN(newDist) && newDist <= currentDistance && !newNode.Element.Equals(pivot))
+                    if (!double.IsNaN(newDist) && newDist <= currentDistance && !EqualityComparer<T>.Default.Equals(newNode.Element, pivot))
                     {
                         queue.Add(newDist, newNode);
                         currentDistance = queue.LastDistance;
@@ -425,7 +422,7 @@
                     }
                 }
 
-                if (!double.IsNaN(newDist) && newDist <= currentDistance && !newNode.Element.Equals(pivot))
+                if (!double.IsNaN(newDist) && newDist <= currentDistance && !EqualityComparer<T>.Default.Equals(newNode.Element, pivot))
                 {
                     queue.Add(newDist, newNode);
                     currentDistance = queue.LastDistance;
@@ -436,49 +433,92 @@
             }
         }
 
-        private sealed class KNearestNeighboursQueue : SortedList<float, HashSet<CalyKdTreeNode<T>>>
+        /// <summary>
+        /// The nodes found so far, nearest first, holding every node at each of the <c>K</c> smallest distinct
+        /// distances (so more than K nodes when points are equidistant). Nodes at one distance are kept in the order
+        /// they were added, and a node is only kept once per distance.
+        /// <para>One flat sorted array, not a sorted list of sets: a query used to allocate a hash set per distinct
+        /// distance, which made it the largest allocator of the text layout.</para>
+        /// </summary>
+        private sealed class KNearestNeighboursQueue
         {
             private readonly int K;
+            private (float Distance, CalyKdTreeNode<T> Node)[] _entries;
+            private int _distinctDistances;
 
+            /// <summary>Number of nodes held, which can exceed K.</summary>
+            public int Count { get; private set; }
+
+            /// <summary>The node added last at the largest distance held.</summary>
             public CalyKdTreeNode<T>? LastElement { get; private set; }
 
+            /// <summary>The largest distance held, <see cref="float.PositiveInfinity"/> while empty.</summary>
             public float LastDistance { get; private set; }
 
-            public bool IsFull => Count >= K;
+            /// <summary>True once K distinct distances are held.</summary>
+            public bool IsFull => _distinctDistances >= K;
 
-            public KNearestNeighboursQueue(int k) : base(k)
+            public (float Distance, CalyKdTreeNode<T> Node) this[int index] => _entries[index];
+
+            public KNearestNeighboursQueue(int k)
             {
                 K = k;
+                _entries = new (float, CalyKdTreeNode<T>)[Math.Max(k, 0) + 1];
                 LastDistance = float.PositiveInfinity;
             }
 
-            public void Add(float key, CalyKdTreeNode<T> value)
+            public void Add(float distance, CalyKdTreeNode<T> node)
             {
-                if (key > LastDistance && IsFull)
+                if (distance > LastDistance && IsFull)
                 {
                     return;
                 }
 
-                if (!ContainsKey(key))
+                // Insert after the nodes at the same distance, so ties stay in the order they were added
+                int position = Count;
+                bool distanceHeld = false;
+                for (int i = 0; i < Count; i++)
                 {
-                    base.Add(key, new HashSet<CalyKdTreeNode<T>>());
-                    if (Count > K)
+                    int comparison = _entries[i].Distance.CompareTo(distance);
+                    if (comparison == 0)
                     {
-                        RemoveAt(Count - 1);
+                        if (ReferenceEquals(_entries[i].Node, node))
+                        {
+                            return;
+                        }
+
+                        distanceHeld = true;
+                    }
+                    else if (comparison > 0)
+                    {
+                        position = i;
+                        break;
                     }
                 }
 
-                if (this[key].Add(value))
+                if (Count == _entries.Length)
                 {
-                    LastDistance = Keys[Count - 1];
-                    var lastSet = Values[Count - 1];
-                    CalyKdTreeNode<T> lastElement = null;
-                    foreach (var e in lastSet)
-                    {
-                        lastElement = e;
-                    }
-                    LastElement = lastElement;
+                    Array.Resize(ref _entries, Count * 2);
                 }
+
+                Array.Copy(_entries, position, _entries, position + 1, Count - position);
+                _entries[position] = (distance, node);
+                Count++;
+
+                if (!distanceHeld && ++_distinctDistances > K)
+                {
+                    // Over K distinct distances: drop every node at the largest one
+                    float largest = _entries[Count - 1].Distance;
+                    while (Count > 0 && _entries[Count - 1].Distance.CompareTo(largest) == 0)
+                    {
+                        _entries[--Count] = default;
+                    }
+
+                    _distinctDistances--;
+                }
+
+                LastDistance = _entries[Count - 1].Distance;
+                LastElement = _entries[Count - 1].Node;
             }
         }
         #endregion
