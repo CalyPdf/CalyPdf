@@ -66,10 +66,20 @@ using System;
 using System.Runtime.InteropServices;
 public static class CalyMemWin32 {
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
-    [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
     [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+    [DllImport("user32.dll")] public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool attach);
+    [DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr h);
+    [DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
     public static uint ForegroundPid() { uint pid; GetWindowThreadProcessId(GetForegroundWindow(), out pid); return pid; }
+    // Windows only lets the foreground thread hand the foreground over. Sharing its input queue for the call
+    // does that without sending any key to the window the user is in (an Alt tap, the usual trick, would).
+    public static void ForceForeground(IntPtr h) {
+        uint pid; uint me = GetCurrentThreadId();
+        uint fgThread = GetWindowThreadProcessId(GetForegroundWindow(), out pid);
+        bool attached = fgThread != 0 && fgThread != me && AttachThreadInput(me, fgThread, true);
+        try { BringWindowToTop(h); SetForegroundWindow(h); } finally { if (attached) AttachThreadInput(me, fgThread, false); }
+    }
 }
 '@
 }
@@ -116,10 +126,7 @@ $script:dmLines = $null     # its stdout lines
 function Focus {
     $h = (Get-Process -Id $script:calyPid).MainWindowHandle
     if ($h -eq [IntPtr]::Zero) { throw 'Caly window not found.' }
-    # An Alt tap lifts Windows' foreground lock, which otherwise ignores SetForegroundWindow from a background process.
-    [CalyMemWin32]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero)
-    [CalyMemWin32]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
-    [CalyMemWin32]::SetForegroundWindow($h) | Out-Null
+    [CalyMemWin32]::ForceForeground($h)
     Start-Sleep -Milliseconds 200
 }
 
@@ -143,6 +150,10 @@ function Repeat([string] $keys, [int] $count, [int] $pauseMs) {
 function Open-Pdf([string] $path) {
     # A new Caly.exe hands its file to the running single instance over a named pipe, which opens it as a tab.
     Write-Host "  open $(Split-Path $path -Leaf)"
+    # If Caly has crashed, a new launch would start a second, untracked copy that cleanup would never stop.
+    if ($script:calyPid -le 0 -or -not (Get-Process -Id $script:calyPid -ErrorAction SilentlyContinue)) {
+        throw 'Caly is no longer running (crashed?); stopping instead of starting an untracked copy.'
+    }
     Start-Process $CalyExe -ArgumentList "`"$path`"" | Out-Null
     Start-Sleep -Seconds 5
     Focus
@@ -294,14 +305,17 @@ finally {
     if ($script:dm -and -not $script:dm.HasExited) {
         try { $script:dm.StandardInput.WriteLine('##dotMemory["disconnect"]'); $script:dm.WaitForExit(10000) | Out-Null } catch { }
     }
-    $left = Get-Process -Id $script:calyPid -ErrorAction SilentlyContinue
-    if ($left) { $left.Kill() }
-    if ($script:dm -and -not $script:dm.HasExited) { $script:dm.Kill() }
+    # Nothing here may throw: the settings restore below must always run, and only after Caly is gone
+    # (Caly rewrites caly_settings as it exits). Pid 0 is the Idle process, never a Caly.
+    if ($script:calyPid -gt 0) {
+        try { Get-Process -Id $script:calyPid -ErrorAction SilentlyContinue | ForEach-Object { $_.Kill() } } catch { }
+    }
+    try { if ($script:dm -and -not $script:dm.HasExited) { $script:dm.Kill() } } catch { }
     Get-EventSubscriber -ErrorAction SilentlyContinue | Unregister-Event -ErrorAction SilentlyContinue
 
     if ($backup) { [System.IO.File]::WriteAllBytes($settingsPath, $backup) } else { Remove-Item $settingsPath -ErrorAction SilentlyContinue }
 
-    Collect-Logs
+    try { Collect-Logs } catch { Write-Warning "Could not copy the logs: $_" }
 
     $commit = try { (git -C $repo rev-parse --short HEAD 2>$null) } catch { '' }
     [ordered]@{

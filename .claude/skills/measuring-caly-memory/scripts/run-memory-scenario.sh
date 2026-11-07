@@ -122,9 +122,15 @@ focus() {
 # True when keystrokes would reach Caly: the focused window is Caly's, or, when the display has no
 # usable focus (WSLg reports PointerRoot), the window under the pointer is.
 caly_has_focus() {
-  local fp WINDOW=""
-  fp=$(xd getwindowfocus getwindowpid 2>/dev/null) || fp=""
-  if [ -n "$fp" ]; then [ "$fp" = "$calypid" ]; return; fi
+  local fw fp WINDOW=""
+  # A real focus window decides, and when its process cannot be read the answer is no: the pointer being
+  # over Caly says nothing about where keystrokes go under click-to-focus.
+  if fw=$(xd getwindowfocus 2>/dev/null) && [ -n "$fw" ]; then
+    fp=$(xd getwindowpid "$fw" 2>/dev/null) || return 1
+    [ "$fp" = "$calypid" ]
+    return
+  fi
+  # No usable X focus at all (WSLg reports PointerRoot): keystrokes go to the window under the pointer
   eval "$(xd getmouselocation --shell 2>/dev/null)"
   [ -n "$WINDOW" ] && caly_windows | grep -qx "$WINDOW"
 }
@@ -145,6 +151,8 @@ repeat_keys() { local n=$1 pause=$2; shift 2; local i; for ((i = 0; i < n; i++))
 
 open_pdf() {
   echo "  open $(basename "$1")"
+  # If Caly has crashed, a new launch would start a second, untracked copy that cleanup would never stop.
+  kill -0 "$calypid" 2>/dev/null || die "Caly is no longer running (crashed?); stopping instead of starting an untracked copy."
   "$caly" "$1" >/dev/null 2>&1 &   # the new process hands its file to the running instance, then exits
   sleep 5
   focus

@@ -84,6 +84,35 @@ public class MemoryProbeTests : IDisposable
     }
 
     [Fact]
+    public void Probe_StopsQuietly_WhenAWriteFailsAfterStart()
+    {
+        string file = Path.Combine(_directory, "not-a-folder");
+        File.WriteAllText(file, "x");
+        string previousLogDirectory = Caly.Core.Debug.LogDirectory;
+
+        Assert.True(MemoryProbe.TryStart(_directory));
+        Thread.Sleep(200); // lets the first timer sample finish; the next is 300 ms away
+
+        // A failed write (disk full, folder gone) is simulated by disposing the log's writer. The crash log
+        // cannot be written either: it would go below a file.
+        var writer = (StreamWriter)typeof(MemoryProbe)
+            .GetField("_writer", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!
+            .GetValue(null)!;
+        Caly.Core.Debug.LogDirectory = Path.Combine(file, "logs");
+        try
+        {
+            writer.Dispose();
+
+            MemoryProbe.Mark("x"); // must not throw: it runs on the GC timer's thread, where an exception ends the process
+            MemoryProbe.Mark("y"); // the probe stopped itself, so this is a no-op
+        }
+        finally
+        {
+            Caly.Core.Debug.LogDirectory = previousLogDirectory;
+        }
+    }
+
+    [Fact]
     public void Probe_DoesNothing_WhenDisabled()
     {
         // Not started: Mark is a no-op and creates nothing.

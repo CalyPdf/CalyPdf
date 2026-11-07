@@ -210,10 +210,11 @@ public static class MemoryProbe
 
                 _writer.WriteLine(FormatLine(sample));
             }
-            catch (Exception e)
+            catch (Exception)
             {
+                // Stop without logging: the crash log is written to the same disk and folder that just failed,
+                // and this runs on a timer thread, where an exception from the log would end the process.
                 StopLocked();
-                Debug.WriteExceptionToFile(e);
             }
         }
     }
