@@ -59,6 +59,8 @@ Linux (X11 or WSLg):
 .claude/skills/measuring-caly-memory/scripts/run-memory-scenario.sh --caly <dir>/caly [--out <dir>] [--software] [--dotmemory <dotMemory.sh>] [--extra-pdf-dir <dir>] [--cycles 3] [--xdotool <path>]
 ```
 
+Windows extras: `-ExtraSettings @{ UseCompactTileFormat = $true }` sets other `caly_settings` keys for the run (restored afterwards); `-OnMark { param($label, $calyPid) ... }` runs a script block after each step, for extra captures (see "Without the dotMemory app").
+
 Both refuse to run while any Caly is running, back up and restore `caly_settings` (also on Ctrl+C), and write `<out>/<yyyyMMdd_HHmmss>-<machine>-<gpu|software>/` with `steps.csv`, `memory.csv`, `render_timings.txt`, `run.json` and, with dotMemory, one `.dmw` holding a named snapshot per step. Default out dir: `%TEMP%\caly-memory` / `/tmp/caly-memory`. The last line printed is `Results: <path>`: that sub-folder (not `-OutDir`) is what the compare tool takes. The folder name carries the *requested* renderer; the real back end is on the `Backend` line of `render_timings.txt`. `run.json` records the commit, to confirm which code a run measured.
 
 Linux setup:
@@ -72,6 +74,10 @@ Linux setup:
 - Use the **command-line profiler**, not the GUI. NuGet packages `JetBrains.dotMemory.Console.windows-x64` and `JetBrains.dotMemory.Console.linux-x64` (free; version 2026.2.4.1 was used): unzip the `.nupkg`, the tool is `tools/dotMemory.exe` / `tools/dotMemory.sh`. The `dotMemory.exe` inside the JetBrains install folder is the GUI and prints nothing useful. On Linux use `dotMemory.sh` (documented protocol); the newer `dotmemory` launcher next to it speaks a different one.
 - The driver starts Caly as `dotMemory start --save-to-dir=<results> --service-output --service-input=stdin <Caly>` and writes `##dotMemory["get-snapshot", {pid:N, name:"<step>"}]` to its stdin; it waits for `snapshot-saved`. The single `.dmw` is written when Caly exits. Profiling slows Caly: use dotMemory runs to find *what holds memory*, plain runs for *numbers*.
 - Analyse in the dotMemory app (Rider/dotUltimate): open the `.dmw` (from WSL: `\\wsl.localhost\<distro>\home\...`). Compare `A-baseline` with `D-closed-1`: *Survived objects* in namespaces `Caly.*`, `UglyToad.PdfPig.*`, `SkiaSharp` (`SKPicture`, `SKImage`), type `TileImage`; open *Key retention paths* on a survivor (`DocumentViewModel`, `PageViewModel`, `PdfDocument`). Look at *Memory allocation* between `A-baseline` and `B-one-doc` for allocation sources and the large object heap.
+
+## Without the dotMemory app (scriptable heap checks)
+
+For "does anything of a closed document survive?" without opening the GUI: `dotnet tool install dotnet-dump --tool-path <dir>` (and `dotnet-gcdump`), then pass an `-OnMark` hook that runs `dotnet-dump collect -p $calyPid --type Heap -o <file>` at `D-closed-1`, and read it with `dotnet-dump analyze <file> -c "dumpheap -stat" -c "dumpheap -stat -live" -c "dumpheap -stat -dead" -c exit`. Lessons from using it: `dotnet-gcdump` warns it may be incomplete on large heaps for .NET 10 targets and under-reported here, prefer the heap dump; `gcroot` found no roots for arrays the runtime still counted live (a heap dump has no thread stacks), so judge liveness from the probe's post-GC `gc_heap` at the `close-gc` rows, not from `-dead`. A closed document that is retained shows up as surviving `DocumentViewModel`, `PageViewModel`, `PdfDocument`, `SKPicture` or `TileImage` instances.
 
 ## Reading the results
 

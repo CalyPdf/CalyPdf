@@ -33,6 +33,15 @@
 .PARAMETER Cycles
     Number of open/close cycles after step 3; D-closed-1 is step 4, the rest repeat algo.pdf.
 
+.PARAMETER ExtraSettings
+    Top-level caly_settings keys to set for this run, for example @{ UseCompactTileFormat = $true }.
+    They are merged over the driver's own settings; the original file is restored afterwards.
+
+.PARAMETER OnMark
+    A script block called after each step is recorded, as & $OnMark $label $calyPid. For extra
+    captures at the named steps, for example dotnet-gcdump collect -p $calyPid. Runs after the
+    step's timestamp is written, so its duration does not move the memory samples.
+
 .EXAMPLE
     pwsh .claude/skills/measuring-caly-memory/scripts/run-memory-scenario.ps1 -CalyExe C:\caly-work\memory\bin\Caly.exe
 #>
@@ -43,7 +52,9 @@ param(
     [switch] $Software,
     [string] $DotMemory,
     [string] $ExtraPdfDir,
-    [int] $Cycles = 3
+    [int] $Cycles = 3,
+    [scriptblock] $OnMark,
+    [hashtable] $ExtraSettings
 )
 
 $ErrorActionPreference = 'Stop'
@@ -164,6 +175,7 @@ function Mark([string] $label) {
     Start-Sleep -Seconds 3   # settle: let renders and the close-time collection finish before sampling
     Add-Content $stepsFile "$([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()),$label"
     if ($script:dm) { Take-Snapshot $label }
+    if ($OnMark) { & $OnMark $label $script:calyPid }
 }
 
 function Start-Caly {
@@ -209,11 +221,13 @@ New-Item -ItemType Directory -Force $calyDir | Out-Null
 $script:startedAt = Get-Date
 
 try {
-    $settings = [ordered]@{
+    $settingsTable = [ordered]@{
         Width = 1600; Height = 1000; IsMaximised = $false; PaneSize = 323
         UseSoftwareRendering = [bool]$Software
         Debug = [ordered]@{ LogMemory = $true; LogRenderTimings = $true }
-    } | ConvertTo-Json -Compress
+    }
+    if ($ExtraSettings) { foreach ($k in $ExtraSettings.Keys) { $settingsTable[$k] = $ExtraSettings[$k] } }
+    $settings = $settingsTable | ConvertTo-Json -Compress
     [System.IO.File]::WriteAllText($settingsPath, $settings)
 
     # 1. Baseline: Caly up, no document.
