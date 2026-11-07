@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:Caly.Core.ViewModels"
              xmlns:controls="clr-namespace:Caly.Core.Controls"
+             xmlns:rendering="clr-namespace:Caly.Core.Controls.Rendering"
              xmlns:settings="clr-namespace:Caly.Core.Controls.Settings"
              xmlns:utilities="clr-namespace:Caly.Core.Utilities"
              xmlns:converters="clr-namespace:Caly.Core.Converters"
@@ -28,6 +29,13 @@
 	</UserControl.KeyBindings>
 
 	<Grid RowDefinitions="*,22">
+
+		<!-- Empties the GPU texture cache after a document closes; draws nothing -->
+		<rendering:GpuCachePurgeHost Grid.Row="1"
+                                     Width="1"
+                                     Height="1"
+                                     HorizontalAlignment="Left"
+                                     VerticalAlignment="Top"/>
 
 		<SplitView Grid.Row="0"
                    IsPaneOpen="{Binding IsSettingsPaneOpen, Mode=TwoWay}"

@@ -123,6 +123,10 @@ internal static class Helpers
 
         System.Diagnostics.Debug.WriteLine($"-> RequestGcCollect({DateTime.UtcNow})");
         GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, true, true);
+
+        // The collection has just freed the closed documents' tile images: the GPU textures made from
+        // them are now unreferenced and can go. Unlike the collection this needs the render thread.
+        Services.Rendering.GpuCachePurge.Request();
         Services.Rendering.MemoryProbe.Mark("close-gc");
     }
     #endregion
