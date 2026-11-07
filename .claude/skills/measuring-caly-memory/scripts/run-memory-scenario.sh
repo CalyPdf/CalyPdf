@@ -7,6 +7,10 @@
 #   run-memory-scenario.sh --caly <path to the Caly executable> [--out <dir>] [--software]
 #       [--dotmemory <dotMemory.sh>] [--extra-pdf-dir <dir>] [--cycles <n>] [--xdotool <path>]
 #
+# --dotmemory takes the dotMemory.sh of the command-line profiler (NuGet package
+# JetBrains.dotMemory.Console.linux-x64). Use dotMemory.sh, not the newer 'dotmemory' launcher beside it:
+# that one speaks a different protocol (no 'connected' / 'snapshot-saved' service messages).
+#
 # Build the executable first (from the repo root):
 #   dotnet publish Caly.Desktop -r linux-x64 -c Release -f net10.0 -o <dir>
 set -uo pipefail
@@ -103,25 +107,35 @@ trap 'exit 130' INT TERM
 # ---------------------------------------------------------------- helpers
 xd() { "$xdotool_bin" "$@"; }
 
-caly_window() { xd search --pid "$calypid" --onlyvisible 2>/dev/null | tail -n 1; }
+caly_windows() { xd search --pid "$calypid" --onlyvisible 2>/dev/null; }
 
 focus() {
   local w
-  w=$(caly_window)
+  w=$(caly_windows | tail -n 1)
   [ -n "$w" ] || die "Caly window not found"
   xd windowactivate --sync "$w" 2>/dev/null || xd windowfocus "$w" 2>/dev/null || true
+  # Without a window manager (WSLg) the X input focus follows the pointer: park the pointer over Caly (no click).
+  xd mousemove --window "$w" 300 300 2>/dev/null || true
   sleep 0.3
 }
 
-focused_pid() { xd getwindowfocus getwindowpid 2>/dev/null || true; }
+# True when keystrokes would reach Caly: the focused window is Caly's, or, when the display has no
+# usable focus (WSLg reports PointerRoot), the window under the pointer is.
+caly_has_focus() {
+  local fp WINDOW=""
+  fp=$(xd getwindowfocus getwindowpid 2>/dev/null) || fp=""
+  if [ -n "$fp" ]; then [ "$fp" = "$calypid" ]; return; fi
+  eval "$(xd getmouselocation --shell 2>/dev/null)"
+  [ -n "$WINDOW" ] && caly_windows | grep -qx "$WINDOW"
+}
 
 # Keystrokes (Ctrl+F4 closes documents in many apps) must never reach another window: bring Caly back
 # once, and stop the run rather than type into the user's work.
 keys() {
   local pause=$1; shift
-  if [ "$(focused_pid)" != "$calypid" ]; then
+  if ! caly_has_focus; then
     focus
-    [ "$(focused_pid)" = "$calypid" ] || die "Caly lost the keyboard focus and could not take it back; stopping so no keys reach another window."
+    caly_has_focus || die "Caly lost the keyboard focus and could not take it back; stopping so no keys reach another window."
   fi
   xd key --delay 25 "$@"
   sleep "$pause"
@@ -176,8 +190,10 @@ start_caly() {
   dm_pid=$!
   local line
   line=$(wait_dm 'connected' 0 90) || die "dotMemory did not report the profiled process. Output: $(tr '\n' '|' < "$dm_out")"
-  calypid=$(printf '%s' "$line" | sed -n 's/.*pid: *\([0-9][0-9]*\).*/\1/p')
-  [ -n "$calypid" ] || die "could not read the profiled pid from: $line"
+  local pid
+  pid=$(printf '%s' "$line" | sed -n 's/.*[Pp][Ii][Dd]: *\([0-9][0-9]*\).*/\1/p')
+  [ -n "$pid" ] || die "could not read the profiled pid from: $line"
+  calypid=$pid
 }
 
 # ---------------------------------------------------------------- run
