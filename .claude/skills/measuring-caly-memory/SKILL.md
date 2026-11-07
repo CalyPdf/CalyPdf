@@ -146,3 +146,9 @@ The purge helps the GPU renderer only; the software renderer (and Linux under WS
 - **`UseCompactTileFormat` stays opt-in.** It saves 50–80 MiB of working set but loses precision (≤ 5/255 per channel, no alpha); the owner decided on 2026-11-07 that it must not become the default.
 - **No idle trimming, no native tricks** (owner's constraints for this work): fixes are managed code or SkiaSharp public API; GC settings tried (`GCConserveMemory=5`, non-concurrent GC) gave no measurable gain and were not adopted.
 - **Measure with the scripted session before and after any change** that touches caches, document lifetime, Skia objects or GC settings, and keep a change only if the numbers improve and scrolling and zooming look unchanged.
+
+## Who allocates? (allocation trace)
+
+For "where does this garbage come from": attach `dotnet-trace` at the `A-baseline` step through an `-OnMark` hook:
+`dotnet-trace collect -p $calyPid --providers Microsoft-Windows-DotNETRuntime:0x1:5 -o <file>.nettrace --duration 00:00:08:00` (start it with `Start-Process`, it ends when Caly quits), then
+`dotnet run .claude/skills/measuring-caly-memory/scripts/analyze-alloc.cs -- <file>.nettrace "System.Byte[]" 12`. It prints the top types and, for the type you name, the top call stacks, split into LOH (`[LOH]`) and small-object-heap allocations (about 100 KB sampling). The analyzer is a file-based app with a NuGet reference (TraceEvent); run it from a folder outside the repo if `Directory.Build.props` interferes.
