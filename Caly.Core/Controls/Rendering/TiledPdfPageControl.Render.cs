@@ -120,7 +120,7 @@ public partial class TiledPdfPageControl
         }
 
         var cullRect = _ppiScaleMatrix.MapRect(picture.Item.CullRect);
-        int tileLevel = TileGrid.ComputeTileLevel(ZoomLevel);
+        int tileLevel = CurrentTileLevel;
         int pageNumber = PageNumber;
 
         // Detect tile level changes and mark stale levels for deferred eviction.

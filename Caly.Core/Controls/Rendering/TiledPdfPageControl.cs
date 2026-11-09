@@ -160,6 +160,17 @@ public sealed partial class TiledPdfPageControl : Control
     private int _invalidateScheduled;
 
     /// <summary>
+    /// Read for its <see cref="TopLevel.RenderScaling"/>; set while attached.
+    /// </summary>
+    private TopLevel? _topLevel;
+
+    /// <summary>
+    /// The screen shows <see cref="ZoomLevel"/> × its render scaling device pixels per display unit,
+    /// so the level must come from both, or a 150% screen at 100% zoom stretches 1x tiles and blurs.
+    /// </summary>
+    private int CurrentTileLevel => TileGrid.ComputeTileLevel(ZoomLevel * (_topLevel?.RenderScaling ?? 1));
+
+    /// <summary>
     /// Cached page number for thread-safe access from the <see cref="OnTileReady"/> callback,
     /// which fires on a background thread and cannot read styled properties.
     /// </summary>
@@ -313,7 +324,7 @@ public sealed partial class TiledPdfPageControl : Control
         var workItem = new PrefetchWorkItem(
             service,
             PageNumber,
-            TileGrid.ComputeTileLevel(ZoomLevel),
+            CurrentTileLevel,
             VisibleArea.Value,
             pageDisplaySize,
             PpiScale,
@@ -410,7 +421,7 @@ public sealed partial class TiledPdfPageControl : Control
             return;
         }
 
-        int tileLevel = TileGrid.ComputeTileLevel(ZoomLevel);
+        int tileLevel = CurrentTileLevel;
         if (!GetTileRange(visibleArea.Value, in pageDisplaySize, tileLevel, RenderTileMargin,
                 out int startCol, out int startRow, out int endCol, out int endRow))
         {
@@ -451,6 +462,13 @@ public sealed partial class TiledPdfPageControl : Control
     {
         base.OnAttachedToVisualTree(e);
 
+        // A window moved to a screen of another scaling needs other tiles, and nothing else changes then.
+        _topLevel = TopLevel.GetTopLevel(this);
+        if (_topLevel is not null)
+        {
+            _topLevel.ScalingChanged += OnScalingChanged;
+        }
+
         if (TileRenderService is not null)
         {
             TileRenderService.TileReady -= OnTileReady;
@@ -467,6 +485,12 @@ public sealed partial class TiledPdfPageControl : Control
     {
         base.OnDetachedFromVisualTree(e);
 
+        if (_topLevel is not null)
+        {
+            _topLevel.ScalingChanged -= OnScalingChanged;
+            _topLevel = null;
+        }
+
         if (TileRenderService is not null)
         {
             TileRenderService.TileReady -= OnTileReady;
@@ -475,6 +499,12 @@ public sealed partial class TiledPdfPageControl : Control
 
         _settleTimer?.Stop();
         _isInteracting = false;
+    }
+
+    private void OnScalingChanged(object? sender, EventArgs e)
+    {
+        RequestVisibleTiles();
+        InvalidateVisual();
     }
 
     /// <summary>

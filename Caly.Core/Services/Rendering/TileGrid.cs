@@ -34,7 +34,8 @@ public static class TileGrid
     public const int MinTileLevel = -4;
 
     /// <summary>
-    /// Computes the tile level for a given zoom level.
+    /// Computes the tile level for a given zoom level. Callers pass the zoom times the screen's
+    /// render scaling (device pixels per display unit), or tiles are stretched on scaled screens.
     /// <para>
     /// Tile level is <c>ceil(log2(zoomLevel))</c>, so tiles are rendered at or above the
     /// needed display resolution in both directions:
