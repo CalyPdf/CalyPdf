@@ -10,7 +10,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="PdfPig" Version="0.1.17-alpha-202611020029-95f4f" />
+		<PackageReference Include="PdfPig" Version="0.1.17-alpha-202611070026-8c703" />
 		<PackageReference Include="Caly.Rendering.Scene3D" Version="1.4.0" />
 		<PackageReference Include="Caly.Rendering.Scene3D.Prc" Version="1.4.0" />
 		<PackageReference Include="Caly.Rendering.Scene3D.U3D" Version="1.4.0" />
