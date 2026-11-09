@@ -275,45 +275,53 @@ namespace Caly.Pdf.Layout
         private static void FindNearestNeighbour(CalyKdTreeNode<T> node, T pivot, PdfPoint pivotPoint, Func<PdfPoint, PdfPoint, float> distance,
             ref CalyKdTreeNode<T>? nearest, ref float nearestDistance)
         {
-            // The pivot is not a candidate, otherwise it could be returned as its own neighbour
-            if (!EqualityComparer<T>.Default.Equals(node.Element, pivot))
+            // The far child is the last thing done, so it is visited by looping instead of recursing
+            while (true)
             {
-                float nodeDistance = distance(node.Value, pivotPoint);
-                if (nodeDistance <= nearestDistance)
+                // The pivot is not a candidate, otherwise it could be returned as its own neighbour
+                if (!EqualityComparer<T>.Default.Equals(node.Element, pivot))
                 {
-                    nearest = node;
-                    nearestDistance = nodeDistance;
-                }
-            }
-
-            var pointValue = node.IsAxisCutX ? pivotPoint.X : pivotPoint.Y;
-            var split = node.L;
-
-            if (pointValue < split)
-            {
-                // start left
-                if (node.LeftChild != null)
-                {
-                    FindNearestNeighbour(node.LeftChild, pivot, pivotPoint, distance, ref nearest, ref nearestDistance);
+                    float nodeDistance = distance(node.Value, pivotPoint);
+                    if (nodeDistance <= nearestDistance)
+                    {
+                        nearest = node;
+                        nearestDistance = nodeDistance;
+                    }
                 }
 
-                if (node.RightChild != null && pointValue + nearestDistance >= split)
+                var pointValue = node.IsAxisCutX ? pivotPoint.X : pivotPoint.Y;
+                var split = node.L;
+
+                if (pointValue < split)
                 {
-                    FindNearestNeighbour(node.RightChild, pivot, pivotPoint, distance, ref nearest, ref nearestDistance);
+                    // start left
+                    if (node.LeftChild != null)
+                    {
+                        FindNearestNeighbour(node.LeftChild, pivot, pivotPoint, distance, ref nearest, ref nearestDistance);
+                    }
+
+                    if (node.RightChild != null && pointValue + nearestDistance >= split)
+                    {
+                        node = node.RightChild;
+                        continue;
+                    }
                 }
-            }
-            else
-            {
-                // start right
-                if (node.RightChild != null)
+                else
                 {
-                    FindNearestNeighbour(node.RightChild, pivot, pivotPoint, distance, ref nearest, ref nearestDistance);
+                    // start right
+                    if (node.RightChild != null)
+                    {
+                        FindNearestNeighbour(node.RightChild, pivot, pivotPoint, distance, ref nearest, ref nearestDistance);
+                    }
+
+                    if (node.LeftChild != null && pointValue - nearestDistance <= split)
+                    {
+                        node = node.LeftChild;
+                        continue;
+                    }
                 }
 
-                if (node.LeftChild != null && pointValue - nearestDistance <= split)
-                {
-                    FindNearestNeighbour(node.LeftChild, pivot, pivotPoint, distance, ref nearest, ref nearestDistance);
-                }
+                break;
             }
         }
         #endregion
@@ -352,31 +360,38 @@ namespace Caly.Pdf.Layout
         private static void FindNearestNeighbours(CalyKdTreeNode<T> node, T pivot, PdfPoint pivotPoint,
             Func<PdfPoint, PdfPoint, float> distance, KNearestNeighboursQueue queue)
         {
-            // The pivot is not a candidate, otherwise it could be returned as its own neighbour
-            if (!EqualityComparer<T>.Default.Equals(node.Element, pivot))
+            // The far child is the last thing done, so it is visited by looping instead of recursing
+            while (true)
             {
-                queue.Add(distance(node.Value, pivotPoint), node);
-            }
-
-            double pointValue = node.IsAxisCutX ? pivotPoint.X : pivotPoint.Y;
-            bool startLeft = pointValue < node.L;
-            CalyKdTreeNode<T>? near = startLeft ? node.LeftChild : node.RightChild;
-            CalyKdTreeNode<T>? far = startLeft ? node.RightChild : node.LeftChild;
-
-            if (near != null)
-            {
-                FindNearestNeighbours(near, pivot, pivotPoint, distance, queue);
-            }
-
-            if (far != null)
-            {
-                // The distance is a float, the plane is a double: a relative margin keeps a node whose distance
-                // equals the largest held one (after rounding) from being cut off.
-                double plane = node.IsAxisCutX ? node.Value.X : node.Value.Y;
-                if (!queue.IsFull || Math.Abs(pointValue - plane) <= queue.LastDistance * (1.0 + 1e-6))
+                // The pivot is not a candidate, otherwise it could be returned as its own neighbour
+                if (!EqualityComparer<T>.Default.Equals(node.Element, pivot))
                 {
-                    FindNearestNeighbours(far, pivot, pivotPoint, distance, queue);
+                    queue.Add(distance(node.Value, pivotPoint), node);
                 }
+
+                double pointValue = node.IsAxisCutX ? pivotPoint.X : pivotPoint.Y;
+                bool startLeft = pointValue < node.L;
+                CalyKdTreeNode<T>? near = startLeft ? node.LeftChild : node.RightChild;
+                CalyKdTreeNode<T>? far = startLeft ? node.RightChild : node.LeftChild;
+
+                if (near != null)
+                {
+                    FindNearestNeighbours(near, pivot, pivotPoint, distance, queue);
+                }
+
+                if (far != null)
+                {
+                    // The distance is a float, the plane is a double: a relative margin keeps a node whose distance
+                    // equals the largest held one (after rounding) from being cut off.
+                    double plane = node.IsAxisCutX ? node.Value.X : node.Value.Y;
+                    if (!queue.IsFull || Math.Abs(pointValue - plane) <= queue.LastDistance * (1.0 + 1e-6))
+                    {
+                        node = far;
+                        continue;
+                    }
+                }
+
+                break;
             }
         }
 
