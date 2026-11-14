@@ -103,7 +103,10 @@ public partial class Scene3DControl
                 // Seen here, or it reaches TaskScheduler.UnobservedTaskException: a scene disposed while
                 // its edges are found throws ObjectDisposedException, and the model is drawn without them.
                 _ = task.Exception;
-                Dispatcher.UIThread.Post(() => OnEdgesFound(scene, cancel, task));
+                // The control's own dispatcher, not the static UIThread: this runs on a pool thread, and the
+                // static creates and binds a dispatcher to this thread when none is set (a headless test whose
+                // application is already torn down), breaking the next test's setup.
+                Dispatcher.Post(() => OnEdgesFound(scene, cancel, task));
             }, TaskScheduler.Default);
     }
 
