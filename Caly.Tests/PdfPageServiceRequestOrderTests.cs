@@ -40,5 +40,7 @@ public class PdfPageServiceRequestOrderTests
 
         Assert.True(await WaitUntil(() => document.Pages[1].PdfPicture is not null));
         Assert.Equal([3, 2], pdfService.RenderOrder.Take(2));
+
+        await WaitForThumbnails(document, 3, 7); // Still being drawn behind the page
     }
 }
