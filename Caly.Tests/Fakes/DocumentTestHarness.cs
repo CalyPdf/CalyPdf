@@ -167,6 +167,19 @@ internal static class DocumentTestHarness
     }
 
     /// <summary>
+    /// Waits until pages <paramref name="firstPage"/> to <paramref name="lastPage"/> (1-based, inclusive)
+    /// have their thumbnail. A test that requests thumbnails must call this before it ends: each one is
+    /// drawn on the thread pool and then handed to <c>Dispatcher.UIThread</c>. Left running past the
+    /// test, that reaches the static after the headless application is torn down, where it binds a pool
+    /// thread as the UI thread and fails the next test's setup with "a different thread owns it".
+    /// </summary>
+    public static async Task WaitForThumbnails(DocumentViewModel document, int firstPage, int lastPage)
+    {
+        Assert.True(await WaitUntil(() =>
+            document.Pages.Skip(firstPage - 1).Take(lastPage - firstPage + 1).All(p => p.Thumbnail is not null)));
+    }
+
+    /// <summary>
     /// Renders run on the thread pool but hand their result back through the dispatcher,
     /// which only drains while the test thread pumps it.
     /// </summary>

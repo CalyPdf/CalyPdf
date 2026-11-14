@@ -75,5 +75,7 @@ public class DocumentViewModelPageDisplayModeTests
         Assert.True(await WaitUntil(() => document.Pages[0].PdfPicture is not null));
 
         Assert.Equal(1, pdfService.RenderCountFor(1));
+
+        await WaitForThumbnails(document, 8, 8);
     }
 }
