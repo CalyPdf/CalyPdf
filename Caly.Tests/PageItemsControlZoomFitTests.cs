@@ -11,8 +11,8 @@ namespace Caly.Tests;
 
 /// <summary>
 /// Picking a zoom fit mode fits the current page and lands the view on it. The viewer is 400×400
-/// with 16 px scroll bars that take room from the viewport, as in PageItemsControl.axaml; the
-/// expected zooms are those worked out in <see cref="ZoomFitTests"/>.
+/// with Fluent 2's 12 px scroll bars and their 1 px margins (14 px of room) taken from the viewport, as in PageItemsControl.axaml; the
+/// expected zooms follow the arithmetic of <see cref="ZoomFitTests"/> with that room.
 /// </summary>
 public class PageItemsControlZoomFitTests
 {
@@ -36,8 +36,8 @@ public class PageItemsControlZoomFitTests
         control.ZoomMode = ZoomMode.FitWidth;
         RunLayout();
 
-        Assert.Equal(3.63, control.ZoomLevel, 6);
-        Assert.Equal(384, control.Scroll!.Viewport.Width, 1.0);
+        Assert.Equal(3.65, control.ZoomLevel, 6);
+        Assert.Equal(386, control.Scroll!.Viewport.Width, 1.0);
         Assert.True(control.Scroll.Extent.Width <= control.Scroll.Viewport.Width,
             $"no horizontal overflow, extent {control.Scroll.Extent.Width} > viewport {control.Scroll.Viewport.Width}");
     }
@@ -156,9 +156,9 @@ public class PageItemsControlZoomFitTests
         control.ZoomMode = ZoomMode.FitContentWidth;
         RunLayout();
 
-        Assert.Equal(7.26, control.ZoomLevel, 6);
+        Assert.Equal(7.30, control.ZoomLevel, 6);
         // The box's left edge, 25 page units in, sits 10 px from the viewport's left edge.
-        Assert.Equal(10, 25 * 7.26 - control.Scroll!.Offset.X, 1.0);
+        Assert.Equal(10, 25 * 7.30 - control.Scroll!.Offset.X, 1.0);
     }
 
     [AvaloniaFact]
@@ -182,8 +182,8 @@ public class PageItemsControlZoomFitTests
         // Page 1 is fitted, not its wider neighbour. The panel is as wide as the widest realised
         // page (200), so page 1 starts 50 units in: its left edge goes 10 px from the viewport's,
         // where fit content width puts the content box's.
-        Assert.Equal(3.63, control.ZoomLevel, 6);
-        Assert.Equal(50 * 3.63 - ZoomFit.FitMargin, control.Scroll!.Offset.X, 1.0);
+        Assert.Equal(3.65, control.ZoomLevel, 6);
+        Assert.Equal(50 * 3.65 - ZoomFit.FitMargin, control.Scroll!.Offset.X, 1.0);
     }
 
     [AvaloniaFact]
@@ -200,10 +200,10 @@ public class PageItemsControlZoomFitTests
         control.ZoomMode = ZoomMode.FitPage;
         RunLayout();
 
-        // Limited by the width, as fit width: (400 - 16 - 2 × 10 - 1) / 100. The view lands on
+        // Limited by the width, as fit width: (400 - 14 - 2 × 10 - 1) / 100. The view lands on
         // the top of page 1, its left edge 10 px from the viewport's.
-        Assert.Equal(3.63, control.ZoomLevel, 6);
-        Assert.Equal(50 * 3.63 - ZoomFit.FitMargin, control.Scroll!.Offset.X, 1.0);
+        Assert.Equal(3.65, control.ZoomLevel, 6);
+        Assert.Equal(50 * 3.65 - ZoomFit.FitMargin, control.Scroll!.Offset.X, 1.0);
         Assert.Equal(0, control.Scroll.Offset.Y, 1.0);
     }
 
@@ -236,7 +236,7 @@ public class PageItemsControlZoomFitTests
         RunLayout();
 
         Assert.Equal(ZoomMode.Manual, control.ZoomMode);
-        Assert.Equal(3.63 * 1.1, control.ZoomLevel, 6);
+        Assert.Equal(3.65 * 1.1, control.ZoomLevel, 6);
     }
 
     [AvaloniaFact]
@@ -249,6 +249,6 @@ public class PageItemsControlZoomFitTests
         control.ZoomMode = ZoomMode.FitWidth;
         RunLayout();
 
-        Assert.Equal(3.63, control.ZoomLevel, 6);
+        Assert.Equal(3.65, control.ZoomLevel, 6);
     }
 }

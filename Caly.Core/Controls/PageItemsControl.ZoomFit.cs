@@ -382,7 +382,8 @@ public sealed partial class PageItemsControl
     /// <summary>
     /// The room a shown scroll bar takes from the viewport. 0 when the bars overlay the content
     /// (<see cref="ScrollViewer.AllowAutoHide"/>). The bar's own width while it shows, else its
-    /// minimum width, which the Fluent theme sets to its size even while it is hidden.
+    /// minimum width, which the Fluent theme sets to its size even while it is hidden, plus its
+    /// margin (Fluent 2 sets 1 px on each side, so its 12 px bar takes 14 px).
     /// </summary>
     private double GetScrollBarThickness()
     {
@@ -400,7 +401,8 @@ public sealed partial class PageItemsControl
             return 0;
         }
 
-        return scrollBar.IsVisible && scrollBar.Bounds.Width > 0 ? scrollBar.Bounds.Width : scrollBar.MinWidth;
+        double width = scrollBar.IsVisible && scrollBar.Bounds.Width > 0 ? scrollBar.Bounds.Width : scrollBar.MinWidth;
+        return width + scrollBar.Margin.Left + scrollBar.Margin.Right;
     }
 
     /// <summary>

@@ -91,7 +91,7 @@ public class PageItemsControlZoomFitMaintenanceTests
         var (control, window) = ShowFitHost(Pages(20, 100, 100));
         control.ZoomMode = ZoomMode.FitWidth;
         RunLayout();
-        Assert.Equal(3.63, control.ZoomLevel, 6);
+        Assert.Equal(3.65, control.ZoomLevel, 6);
 
         // The headless window resizes after a frame at the old size (it emulates X11), and the
         // compositor would hold the frame at the new size back until that one is taken: take it as
@@ -99,8 +99,8 @@ public class PageItemsControlZoomFitMaintenanceTests
         window.Resized += (_, _) => AvaloniaHeadlessPlatform.ForceRenderTimerTick();
         var frame = FirstFrameAfter(control, () => window.Width = 300, () => window.ClientSize.Width == 300);
 
-        // (300 - 16 - 2 × 10 - 1) / 100
-        Assert.Equal(2.63, frame.Zoom, 6);
+        // (300 - 14 - 2 × 10 - 1) / 100
+        Assert.Equal(2.65, frame.Zoom, 6);
         Assert.False(frame.OverflowsSideways);
     }
 
@@ -120,12 +120,12 @@ public class PageItemsControlZoomFitMaintenanceTests
         // A first step, fitted but with its zoom not settled: layout passes and frames only.
         window.Width = 300;
         Dispatcher.UIThread.RunJobs(DispatcherPriority.Render);
-        Assert.Equal(2.63, control.ZoomLevel, 6);
+        Assert.Equal(2.65, control.ZoomLevel, 6);
 
         var frame = FirstFrameAfter(control, () => window.Width = 250, () => window.ClientSize.Width == 250);
 
-        // (250 - 16 - 2 × 10 - 1) / 100
-        Assert.Equal(2.13, frame.Zoom, 6);
+        // (250 - 14 - 2 × 10 - 1) / 100
+        Assert.Equal(2.15, frame.Zoom, 6);
         Assert.False(frame.OverflowsSideways);
     }
 
@@ -136,12 +136,12 @@ public class PageItemsControlZoomFitMaintenanceTests
         var (control, _) = ShowFitHost(pages);
         control.ZoomMode = ZoomMode.FitWidth;
         RunLayout();
-        Assert.Equal(3.63, control.ZoomLevel, 6);
+        Assert.Equal(3.65, control.ZoomLevel, 6);
 
         var frame = FirstFrameAfter(control, () => pages[0] = new Size(200, 100));
 
-        // (400 - 16 - 2 × 10 - 1) / 200
-        Assert.Equal(1.815, frame.Zoom, 6);
+        // (400 - 14 - 2 × 10 - 1) / 200
+        Assert.Equal(1.825, frame.Zoom, 6);
         Assert.False(frame.OverflowsSideways);
     }
 
@@ -155,8 +155,8 @@ public class PageItemsControlZoomFitMaintenanceTests
         window.Width = 600;
         RunLayout();
 
-        // (600 - 16 - 2 × 10 - 1) / 100
-        Assert.Equal(5.63, control.ZoomLevel, 6);
+        // (600 - 14 - 2 × 10 - 1) / 100
+        Assert.Equal(5.65, control.ZoomLevel, 6);
     }
 
     /// <summary>
@@ -175,7 +175,7 @@ public class PageItemsControlZoomFitMaintenanceTests
         window.Width = 600;
         RunLayout();
 
-        Assert.Equal(5.63, control.ZoomLevel, 6);
+        Assert.Equal(5.65, control.ZoomLevel, 6);
         Assert.Equal(1, control.SelectedPageNumber);
         Assert.Equal(0, control.Scroll.Offset.Y, 1.0);
     }
@@ -204,7 +204,7 @@ public class PageItemsControlZoomFitMaintenanceTests
         RunLayout();
         control.ZoomMode = ZoomMode.FitWidth;
         RunLayout();
-        Assert.Equal(3.63, control.ZoomLevel, 6);
+        Assert.Equal(3.65, control.ZoomLevel, 6);
 
         control.GoToPage(6);
         RunLayout();
@@ -214,7 +214,7 @@ public class PageItemsControlZoomFitMaintenanceTests
         RunLayout();
 
         Assert.Equal(6, control.SelectedPageNumber);
-        Assert.Equal(3.63, control.ZoomLevel, 6);
+        Assert.Equal(3.65, control.ZoomLevel, 6);
     }
 
     [AvaloniaFact]
@@ -236,9 +236,9 @@ public class PageItemsControlZoomFitMaintenanceTests
             RunLayout();
         }
 
-        // At 3.63 the page no longer needs the vertical bar, which hides; the viewport widens, and
+        // At 3.65 the page no longer needs the vertical bar, which hides; the viewport widens, and
         // a fit that followed the viewport would zoom back in (3.79), bring the bar back, and so on.
-        Assert.Equal(3.63, control.ZoomLevel, 6);
+        Assert.Equal(3.65, control.ZoomLevel, 6);
         Assert.Equal(1, zoomChanges);
     }
 
@@ -280,10 +280,10 @@ public class PageItemsControlZoomFitMaintenanceTests
         RunLayout();
         Assert.Equal(1, control.ZoomLevel, 6);
 
-        SwitchTab(control, Pages(20, 100, 100), ZoomMode.FitWidth, 3.63, 7, new Vector(0, 20));
+        SwitchTab(control, Pages(20, 100, 100), ZoomMode.FitWidth, 3.65, 7, new Vector(0, 20));
         RunLayout();
 
-        Assert.Equal(5.63, control.ZoomLevel, 6);
+        Assert.Equal(5.65, control.ZoomLevel, 6);
         Assert.Equal(7, control.SelectedPageNumber);
     }
 
@@ -327,14 +327,14 @@ public class PageItemsControlZoomFitMaintenanceTests
         var (control, _) = ShowFitHost(pages);
         control.ZoomMode = ZoomMode.FitWidth;
         RunLayout();
-        Assert.Equal(3.63, control.ZoomLevel, 6);
+        Assert.Equal(3.65, control.ZoomLevel, 6);
 
         // The fitted page's real size arrives (or the page is rotated): twice as wide.
         pages[0] = new Size(200, 100);
         RunLayout();
 
-        // (400 - 16 - 2 × 10 - 1) / 200
-        Assert.Equal(1.815, control.ZoomLevel, 6);
+        // (400 - 14 - 2 × 10 - 1) / 200
+        Assert.Equal(1.825, control.ZoomLevel, 6);
     }
 
     [AvaloniaFact]
@@ -355,7 +355,7 @@ public class PageItemsControlZoomFitMaintenanceTests
 
         RunLayout();
 
-        Assert.Equal(3.63, control.ZoomLevel, 6);
+        Assert.Equal(3.65, control.ZoomLevel, 6);
         Assert.True(control.Scroll!.Extent.Width <= control.Scroll.Viewport.Width,
             $"no horizontal overflow, extent {control.Scroll.Extent.Width} > viewport {control.Scroll.Viewport.Width}");
     }
@@ -399,7 +399,7 @@ public class PageItemsControlZoomFitMaintenanceTests
 
         RunLayout();
 
-        Assert.Equal((400 - 16 - 2 * 10 - 1) / pageWidth, control.ZoomLevel, 6);
+        Assert.Equal((400 - 14 - 2 * 10 - 1) / pageWidth, control.ZoomLevel, 6);
         Assert.Equal(1, control.SelectedPageNumber);
         Assert.Equal(0, control.Scroll!.Offset.Y, 1.0);
     }
@@ -410,7 +410,7 @@ public class PageItemsControlZoomFitMaintenanceTests
         var (control, _) = ShowFitHost([new Size(100, 200), new Size(200, 200)], singlePage: true);
         control.ZoomMode = ZoomMode.FitWidth;
         RunLayout();
-        Assert.Equal(3.63, control.ZoomLevel, 6);
+        Assert.Equal(3.65, control.ZoomLevel, 6);
 
         control.GoToPage(2);
         RunLayout();
