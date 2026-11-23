@@ -217,6 +217,7 @@ namespace Caly.Desktop
                 if (software)
                 {
                     x11.RenderingMode = [X11RenderingMode.Software];
+                    x11.UseXShmFramebuffer = true; // Avalonia ignores it when the X server lacks MIT-SHM
                 }
 
                 var builder = AppBuilder.Configure<DesktopApp>()
