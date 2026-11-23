@@ -120,7 +120,8 @@
 		<IlcGenerateMapFile>true</IlcGenerateMapFile>
 		<IlcGenerateMetadataLog>true</IlcGenerateMetadataLog>
 		<IlcGenerateMstatFile>true</IlcGenerateMstatFile>
-		<IlcGenerateDgmlFile>true</IlcGenerateDgmlFile>
+		<!-- Off: Avalonia.Themes.Fluent 12.2.0 has compact XAML names with control characters, and ILC fails writing them to the DGML log. -->
+		<IlcGenerateDgmlFile>false</IlcGenerateDgmlFile>
 	</PropertyGroup>
 	
 	<PropertyGroup Label="Avalonia">
@@ -137,7 +138,7 @@
 	</Target>
 
 	<ItemGroup>
-		<PackageReference Include="Avalonia.Desktop" Version="12.1.6" />
+		<PackageReference Include="Avalonia.Desktop" Version="12.2.0" />
 		<PackageReference Condition="'$(Configuration)'=='Debug'" Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3" />
 	</ItemGroup>
 
