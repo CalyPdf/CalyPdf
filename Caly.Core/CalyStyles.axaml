@@ -19,6 +19,29 @@
     </Style>
     <!-- End change delays for all ScrollViewers -->
 
+    <!-- Fluent 2 draws the selected tab's pill under the header even with TabStripPlacement=Left: its placement styles
+         target Border#PART_SelectedPipe, but the pipe is a Rectangle (Avalonia 12.2.0). Caly's side panes keep Fluent's
+         vertical pipe, 2 px wide at the left edge, and Fluent 2's animation turned upright: it grows from 4 to 24 px
+         when its tab is selected. Fluent 2 pads the header 10 px above and 7 below: the 3 px top margin centres the pipe
+         on the header rather than on the padded row. -->
+    <Style Selector="TabItem[TabStripPlacement=Left] /template/ Rectangle#PART_SelectedPipe">
+        <Setter Property="Grid.Row" Value="0" />
+        <Setter Property="Width" Value="2" />
+        <Setter Property="Height" Value="4" />
+        <Setter Property="Margin" Value="0,3,0,0" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <!-- Fluent 2's own Width transition (TabItemScaleAnimationDuration), on Height. -->
+        <Setter Property="Transitions">
+            <Transitions>
+                <DoubleTransition Property="Height" Duration="0:0:0.167" Easing="0,0,0,1" />
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="TabItem[TabStripPlacement=Left]:selected /template/ Rectangle#PART_SelectedPipe">
+        <Setter Property="Height" Value="24" />
+    </Style>
+
     <!-- Popups inherit UseLayoutRounding from the control they open on, and pages turn it off.
          Unrounded, Windows truncates the popup to whole pixels: menus show scroll arrows and tooltips lose
          their last word to a wrapped line that does not fit. -->
