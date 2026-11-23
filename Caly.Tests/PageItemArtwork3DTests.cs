@@ -34,7 +34,7 @@ public class PageItemArtwork3DTests
     }
 
     private static Panel Host(PageItem item) =>
-        Assert.IsType<Panel>(item.GetTemplateChildren().Single(c => c.Name == "PART_Artwork3DHost"));
+        Assert.IsType<Panel>(item.GetTemplateDescendants().Single(c => c.Name == "PART_Artwork3DHost"));
 
     private static PageItem ShowPageItem(out Panel parent)
     {

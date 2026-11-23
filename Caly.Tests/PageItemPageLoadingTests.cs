@@ -55,7 +55,7 @@ public class PageItemPageLoadingTests
     }
 
     private static Panel Host(PageItem item) =>
-        Assert.IsType<Panel>(item.GetTemplateChildren().Single(c => c.Name == "PART_PageLoadingHost"));
+        Assert.IsType<Panel>(item.GetTemplateDescendants().Single(c => c.Name == "PART_PageLoadingHost"));
 
     private static PageItem ShowPageItem(out Panel parent)
     {
