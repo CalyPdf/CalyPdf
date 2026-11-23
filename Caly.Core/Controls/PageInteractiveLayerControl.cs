@@ -54,30 +54,6 @@ public sealed partial class PageInteractiveLayerControl : Control
 
     private const string AnnotationFlyoutBackgroundKey = "CalyAnnotationFlyoutBackground";
 
-    public static readonly StyledProperty<PdfTextLayer?> PdfTextLayerProperty =
-        AvaloniaProperty.Register<PageInteractiveLayerControl, PdfTextLayer?>(nameof(PdfTextLayer));
-
-    public static readonly StyledProperty<int?> PageNumberProperty =
-        AvaloniaProperty.Register<PageInteractiveLayerControl, int?>(nameof(PageNumber));
-
-    /// <summary>
-    /// Defines the <see cref="VisibleArea"/> property.
-    /// </summary>
-    public static readonly StyledProperty<Rect?> VisibleAreaProperty =
-        AvaloniaProperty.Register<PageInteractiveLayerControl, Rect?>(nameof(VisibleArea));
-
-    /// <summary>
-    /// Defines the <see cref="SelectedWords"/> property.
-    /// </summary>
-    public static readonly StyledProperty<IReadOnlyList<PdfRectangle[]>?> SelectedWordsProperty =
-        AvaloniaProperty.Register<PageInteractiveLayerControl, IReadOnlyList<PdfRectangle[]>?>(nameof(SelectedWords));
-
-    /// <summary>
-    /// Defines the <see cref="SearchResults"/> property.
-    /// </summary>
-    public static readonly StyledProperty<IReadOnlyList<PdfRectangle[]>?> SearchResultsProperty =
-        AvaloniaProperty.Register<PageInteractiveLayerControl, IReadOnlyList<PdfRectangle[]>?>(nameof(SearchResults));
-
     private IRef<HighlightPaths>? _selectedWordsPaths;
     private IRef<HighlightPaths>? _searchResultsPaths;
 
@@ -98,35 +74,20 @@ public sealed partial class PageInteractiveLayerControl : Control
         });
     }
 
-    public IReadOnlyList<PdfRectangle[]>? SelectedWords
-    {
-        get => GetValue(SelectedWordsProperty);
-        set => SetValue(SelectedWordsProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial IReadOnlyList<PdfRectangle[]>? SelectedWords { get; set; }
 
-    public IReadOnlyList<PdfRectangle[]>? SearchResults
-    {
-        get => GetValue(SearchResultsProperty);
-        set => SetValue(SearchResultsProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial IReadOnlyList<PdfRectangle[]>? SearchResults { get; set; }
 
-    public PdfTextLayer? PdfTextLayer
-    {
-        get => GetValue(PdfTextLayerProperty);
-        set => SetValue(PdfTextLayerProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial PdfTextLayer? PdfTextLayer { get; set; }
 
-    public int? PageNumber
-    {
-        get => GetValue(PageNumberProperty);
-        set => SetValue(PageNumberProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial int? PageNumber { get; set; }
 
-    public Rect? VisibleArea
-    {
-        get => GetValue(VisibleAreaProperty);
-        set => SetValue(VisibleAreaProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial Rect? VisibleArea { get; set; }
 
     internal Matrix GetLayoutTransformMatrix()
     {

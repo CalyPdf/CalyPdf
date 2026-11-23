@@ -92,107 +92,6 @@ public sealed partial class PageItemsControl : ItemsControl
     private readonly EventHandler<ScrollChangedEventArgs> _scrollChangedHandler;
     private readonly EventHandler<SizeChangedEventArgs> _sizeChangedHandler;
 
-    /// <summary>
-    /// Defines the <see cref="Scroll"/> property.
-    /// </summary>
-    public static readonly DirectProperty<PageItemsControl, ScrollViewer?> ScrollProperty =
-        AvaloniaProperty.RegisterDirect<PageItemsControl, ScrollViewer?>(nameof(Scroll),
-            o => o.Scroll);
-
-    /// <summary>
-    /// Defines the <see cref="LayoutTransform"/> property.
-    /// </summary>
-    public static readonly DirectProperty<PageItemsControl, LayoutTransformControl?> LayoutTransformControlProperty =
-        AvaloniaProperty.RegisterDirect<PageItemsControl, LayoutTransformControl?>(nameof(LayoutTransform),
-            o => o.LayoutTransform);
-
-    /// <summary>
-    /// Defines the <see cref="InteractiveActionOver"/> property. Starts at 1.
-    /// </summary>
-    public static readonly StyledProperty<string?> InteractiveActionOverProperty =
-        AvaloniaProperty.Register<PageItemsControl, string?>(nameof(InteractiveActionOver),
-            defaultBindingMode: BindingMode.OneWayToSource);
-
-    /// <summary>
-    /// Defines the <see cref="PageCount"/> property.
-    /// </summary>
-    public static readonly StyledProperty<int> PageCountProperty =
-        AvaloniaProperty.Register<PageItemsControl, int>(nameof(PageCount));
-
-    /// <summary>
-    /// Defines the <see cref="SelectedPageNumber"/> property. Starts at 1.
-    /// </summary>
-    public static readonly StyledProperty<int?> SelectedPageNumberProperty =
-        AvaloniaProperty.Register<PageItemsControl, int?>(nameof(SelectedPageNumber), defaultBindingMode: BindingMode.TwoWay);
-
-    /// <summary>
-    /// Defines the <see cref="MinZoomLevel"/> property.
-    /// </summary>
-    public static readonly StyledProperty<double> MinZoomLevelProperty =
-        AvaloniaProperty.Register<PageItemsControl, double>(nameof(MinZoomLevel));
-
-    /// <summary>
-    /// Defines the <see cref="MaxZoomLevel"/> property.
-    /// </summary>
-    public static readonly StyledProperty<double> MaxZoomLevelProperty =
-        AvaloniaProperty.Register<PageItemsControl, double>(nameof(MaxZoomLevel), 1);
-
-    /// <summary>
-    /// Defines the <see cref="ZoomLevel"/> property.
-    /// </summary>
-    public static readonly StyledProperty<double> ZoomLevelProperty =
-        AvaloniaProperty.Register<PageItemsControl, double>(nameof(ZoomLevel), 1, defaultBindingMode: BindingMode.TwoWay);
-
-    /// <summary>
-    /// Defines the <see cref="ScrollOffset"/> property.
-    /// </summary>
-    public static readonly StyledProperty<Vector> ScrollOffsetProperty =
-        AvaloniaProperty.Register<PageItemsControl, Vector>(nameof(ScrollOffset),
-            defaultBindingMode: BindingMode.TwoWay);
-
-    /// <summary>
-    /// Defines the <see cref="ReadingPoint"/> property.
-    /// </summary>
-    public static readonly StyledProperty<PageReadingPoint?> ReadingPointProperty =
-        AvaloniaProperty.Register<PageItemsControl, PageReadingPoint?>(nameof(ReadingPoint),
-            defaultBindingMode: BindingMode.OneWayToSource);
-
-    /// <summary>
-    /// Defines the <see cref="TextSelection"/> property.
-    /// </summary>
-    public static readonly StyledProperty<TextSelection?> TextSelectionProperty =
-        AvaloniaProperty.Register<PageItemsControl, TextSelection?>(nameof(TextSelection));
-
-    /// <summary>
-    /// Defines the <see cref="RealisedPages"/> property. Starts at 1.
-    /// </summary>
-    public static readonly StyledProperty<Range?> RealisedPagesProperty =
-        AvaloniaProperty.Register<PageItemsControl, Range?>(nameof(RealisedPages), defaultBindingMode: BindingMode.TwoWay);
-
-    /// <summary>
-    /// Defines the <see cref="VisiblePages"/> property. Starts at 1.
-    /// </summary>
-    public static readonly StyledProperty<Range?> VisiblePagesProperty =
-        AvaloniaProperty.Register<PageItemsControl, Range?>(nameof(VisiblePages), defaultBindingMode: BindingMode.TwoWay);
-
-    /// <summary>
-    /// Defines the <see cref="PageDisplayMode"/> property.
-    /// </summary>
-    public static readonly StyledProperty<PageDisplayMode> PageDisplayModeProperty =
-        AvaloniaProperty.Register<PageItemsControl, PageDisplayMode>(nameof(PageDisplayMode));
-
-    public static readonly StyledProperty<ICommand?> RefreshPagesProperty =
-        AvaloniaProperty.Register<PageItemsControl, ICommand?>(nameof(RefreshPages));
-
-    public static readonly StyledProperty<ICommand?> ClearSelectionProperty =
-        AvaloniaProperty.Register<PageItemsControl, ICommand?>(nameof(ClearSelection));
-
-    /// <summary>
-    /// Defines the <see cref="ActivateArtwork3D"/> property.
-    /// </summary>
-    public static readonly StyledProperty<ICommand?> ActivateArtwork3DProperty =
-        AvaloniaProperty.Register<PageItemsControl, ICommand?>(nameof(ActivateArtwork3D));
-
     static PageItemsControl()
     {
         ItemsPanelProperty.OverrideDefaultValue<PageItemsControl>(DefaultPanel);
@@ -200,41 +99,26 @@ public sealed partial class PageItemsControl : ItemsControl
             KeyboardNavigationMode.Once);
     }
 
-    public PageDisplayMode PageDisplayMode
-    {
-        get => GetValue(PageDisplayModeProperty);
-        set => SetValue(PageDisplayModeProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial PageDisplayMode PageDisplayMode { get; set; }
 
     private bool IsSinglePage => PageDisplayMode == PageDisplayMode.SinglePage;
 
-    public ICommand? RefreshPages
-    {
-        get => GetValue(RefreshPagesProperty);
-        set => SetValue(RefreshPagesProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial ICommand? RefreshPages { get; set; }
 
-    public TextSelection? TextSelection
-    {
-        get => GetValue(TextSelectionProperty);
-        set => SetValue(TextSelectionProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial TextSelection? TextSelection { get; set; }
 
-    public ICommand? ClearSelection
-    {
-        get => GetValue(ClearSelectionProperty);
-        set => SetValue(ClearSelectionProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial ICommand? ClearSelection { get; set; }
 
     /// <summary>
     /// Executed with an <see cref="Models.Artwork3DActivationRequest"/> when the user clicks 3D artwork
     /// that is not being viewed.
     /// </summary>
-    public ICommand? ActivateArtwork3D
-    {
-        get => GetValue(ActivateArtwork3DProperty);
-        set => SetValue(ActivateArtwork3DProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial ICommand? ActivateArtwork3D { get; set; }
 
     public PageItemsControl()
     {
@@ -302,97 +186,62 @@ public sealed partial class PageItemsControl : ItemsControl
     /// <summary>
     /// Gets the scroll information for the <see cref="ListBox"/>.
     /// </summary>
-    public ScrollViewer? Scroll
-    {
-        get;
-        private set => SetAndRaise(ScrollProperty, ref field, value);
-    }
+    [GeneratedDirectProperty]
+    public partial ScrollViewer? Scroll { get; private set; }
 
     /// <summary>
     /// Gets the scroll information for the <see cref="ListBox"/>.
     /// </summary>
-    public LayoutTransformControl? LayoutTransform
-    {
-        get;
-        private set => SetAndRaise(LayoutTransformControlProperty, ref field, value);
-    }
+    [GeneratedDirectProperty]
+    public partial LayoutTransformControl? LayoutTransform { get; private set; }
 
-    public string? InteractiveActionOver
-    {
-        get => GetValue(InteractiveActionOverProperty);
-        set => SetValue(InteractiveActionOverProperty, value);
-    }
-    public int PageCount
-    {
-        get => GetValue(PageCountProperty);
-        set => SetValue(PageCountProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultBindingMode = BindingMode.OneWayToSource)]
+    public partial string? InteractiveActionOver { get; set; }
+
+    [GeneratedStyledProperty]
+    public partial int PageCount { get; set; }
 
     /// <summary>
     /// Starts at 1.
     /// </summary>
-    public int? SelectedPageNumber
-    {
-        get => GetValue(SelectedPageNumberProperty);
-        set => SetValue(SelectedPageNumberProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultBindingMode = BindingMode.TwoWay)]
+    public partial int? SelectedPageNumber { get; set; }
 
-    public double MinZoomLevel
-    {
-        get => GetValue(MinZoomLevelProperty);
-        set => SetValue(MinZoomLevelProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial double MinZoomLevel { get; set; }
 
-    public double MaxZoomLevel
-    {
-        get => GetValue(MaxZoomLevelProperty);
-        set => SetValue(MaxZoomLevelProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultValue = 1)]
+    public partial double MaxZoomLevel { get; set; }
 
-    public double ZoomLevel
-    {
-        get => GetValue(ZoomLevelProperty);
-        set => SetValue(ZoomLevelProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultValue = 1, DefaultBindingMode = BindingMode.TwoWay)]
+    public partial double ZoomLevel { get; set; }
 
     /// <summary>
     /// Scroll offset to persist across tab switches. Y is relative to
     /// <see cref="SelectedPageNumber"/>'s top; both components are in unscaled
     /// document coordinates.
     /// </summary>
-    public Vector ScrollOffset
-    {
-        get => GetValue(ScrollOffsetProperty);
-        set => SetValue(ScrollOffsetProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultBindingMode = BindingMode.TwoWay)]
+    public partial Vector ScrollOffset { get; set; }
 
     /// <summary>
     /// The point of the document under the viewport centre, or <c>null</c> when no page is visible.
     /// Updated with the page visibility.
     /// </summary>
-    public PageReadingPoint? ReadingPoint
-    {
-        get => GetValue(ReadingPointProperty);
-        set => SetValue(ReadingPointProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultBindingMode = BindingMode.OneWayToSource)]
+    public partial PageReadingPoint? ReadingPoint { get; set; }
 
     /// <summary>
     /// Starts at 1.
     /// </summary>
-    public Range? RealisedPages
-    {
-        get => GetValue(RealisedPagesProperty);
-        set => SetValue(RealisedPagesProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultBindingMode = BindingMode.TwoWay)]
+    public partial Range? RealisedPages { get; set; }
 
     /// <summary>
     /// Starts at 1.
     /// </summary>
-    public Range? VisiblePages
-    {
-        get => GetValue(VisiblePagesProperty);
-        set => SetValue(VisiblePagesProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultBindingMode = BindingMode.TwoWay)]
+    public partial Range? VisiblePages { get; set; }
 
     /// <summary>
     /// Get the page control for the page number.

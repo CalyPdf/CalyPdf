@@ -24,7 +24,7 @@ namespace Caly.Tests;
 /// the sidebar silently stops responding — a runtime binding failure, not a build error.
 /// </para>
 /// </summary>
-public class DocumentTabViewPaneBindingTests
+public partial class DocumentTabViewPaneBindingTests
 {
     private sealed class TabModel
     {
@@ -186,16 +186,10 @@ public class DocumentTabViewPaneBindingTests
     /// Stand-in with the same shape as <c>DocumentTabView</c>: a styled bool property that the
     /// XAML binds to the host window's view model, with an inner control bound to that property.
     /// </summary>
-    private sealed class PaneHost : UserControl
+    private sealed partial class PaneHost : UserControl
     {
-        public static readonly StyledProperty<bool> IsPaneOpenProperty =
-            AvaloniaProperty.Register<PaneHost, bool>(nameof(IsPaneOpen), defaultBindingMode: BindingMode.TwoWay);
-
-        public bool IsPaneOpen
-        {
-            get => GetValue(IsPaneOpenProperty);
-            set => SetValue(IsPaneOpenProperty, value);
-        }
+        [GeneratedStyledProperty(DefaultBindingMode = BindingMode.TwoWay)]
+        public partial bool IsPaneOpen { get; set; }
 
         public ToggleButton Toggle { get; }
 

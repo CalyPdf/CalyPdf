@@ -53,22 +53,6 @@ namespace Caly.Core.Controls.Artwork3D;
 /// </summary>
 public sealed partial class Artwork3DView : UserControl
 {
-    /// <summary>Defines the <see cref="VisibleArea"/> property.</summary>
-    public static readonly StyledProperty<Rect?> VisibleAreaProperty =
-        AvaloniaProperty.Register<Artwork3DView, Rect?>(nameof(VisibleArea));
-
-    /// <summary>Defines the <see cref="ZoomLevel"/> property.</summary>
-    public static readonly StyledProperty<double> ZoomLevelProperty =
-        AvaloniaProperty.Register<Artwork3DView, double>(nameof(ZoomLevel), 1.0);
-
-    /// <summary>Defines the <see cref="StatusCommand"/> property.</summary>
-    public static readonly StyledProperty<ICommand?> StatusCommandProperty =
-        AvaloniaProperty.Register<Artwork3DView, ICommand?>(nameof(StatusCommand));
-
-    /// <summary>Defines the <see cref="CameraState"/> property.</summary>
-    public static readonly StyledProperty<Scene3DCameraState?> CameraStateProperty =
-        AvaloniaProperty.Register<Artwork3DView, Scene3DCameraState?>(nameof(CameraState), defaultBindingMode: BindingMode.TwoWay);
-
     /// <summary>
     /// The 3D control's background for its scene: transparent while there is none, so that the page (the
     /// artwork's poster) shows through until the model is read; white once there is one.
@@ -130,38 +114,26 @@ public sealed partial class Artwork3DView : UserControl
     }
 
     /// <summary>The part of the page on screen, in page units; null when none is.</summary>
-    public Rect? VisibleArea
-    {
-        get => GetValue(VisibleAreaProperty);
-        set => SetValue(VisibleAreaProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial Rect? VisibleArea { get; set; }
 
     /// <summary>The page zoom.</summary>
-    public double ZoomLevel
-    {
-        get => GetValue(ZoomLevelProperty);
-        set => SetValue(ZoomLevelProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultValue = 1.0)]
+    public partial double ZoomLevel { get; set; }
 
     /// <summary>
     /// Executed with an <see cref="Artwork3DControlStatus"/> each time the 3D control's status changes
     /// while this view is on a page, and once more when it leaves the page.
     /// </summary>
-    public ICommand? StatusCommand
-    {
-        get => GetValue(StatusCommandProperty);
-        set => SetValue(StatusCommandProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial ICommand? StatusCommand { get; set; }
 
     /// <summary>
     /// The camera and animation playhead the user left the view with; written when this view leaves the
     /// page, read by the view built when the page comes back (a tab switch, a scroll away and back).
     /// </summary>
-    public Scene3DCameraState? CameraState
-    {
-        get => GetValue(CameraStateProperty);
-        set => SetValue(CameraStateProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultBindingMode = BindingMode.TwoWay)]
+    public partial Scene3DCameraState? CameraState { get; set; }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {

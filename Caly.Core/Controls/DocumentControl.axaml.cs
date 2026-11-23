@@ -42,78 +42,33 @@ namespace Caly.Core.Controls;
 /// </summary>
 [TemplatePart("PART_PageItemsControl", typeof(PageItemsControl))]
 [TemplatePart("PART_TextBoxPassword", typeof(TextBox))]
-public sealed class DocumentControl : CalyTemplatedControl
+public sealed partial class DocumentControl : CalyTemplatedControl
 {
     private PageItemsControl? _pageItemsControl;
     private TextBox? _textBoxPassword;
 
-    /// <summary>
-    /// Defines the <see cref="SelectedPageNumber"/> property. Starts at 1.
-    /// </summary>
-    public static readonly StyledProperty<int?> SelectedPageNumberProperty =
-        AvaloniaProperty.Register<DocumentControl, int?>(nameof(SelectedPageNumber));
-
-    /// <summary>
-    /// Defines the <see cref="SelectedBookmark"/> property.
-    /// </summary>
-    public static readonly StyledProperty<PdfBookmarkNode?> SelectedBookmarkProperty =
-        AvaloniaProperty.Register<DocumentControl, PdfBookmarkNode?>(nameof(SelectedBookmark));
-
-    /// <summary>
-    /// Defines the <see cref="SelectedTextSearchResult"/> property.
-    /// </summary>
-    public static readonly StyledProperty<TextSearchResult?> SelectedTextSearchResultProperty =
-        AvaloniaProperty.Register<DocumentControl, TextSearchResult?>(nameof(SelectedTextSearchResult));
-
-    /// <summary>
-    /// Defines the <see cref="ClearSelection"/> property.
-    /// </summary>
-    public static readonly StyledProperty<ICommand?> ClearSelectionProperty =
-        AvaloniaProperty.Register<DocumentControl, ICommand?>(nameof(ClearSelection));
-
-    /// <summary>
-    /// Defines the <see cref="IsAwaitingPassword"/> property.
-    /// </summary>
-    public static readonly StyledProperty<bool> IsAwaitingPasswordProperty =
-        AvaloniaProperty.Register<DocumentControl, bool>(nameof(IsAwaitingPassword));
-
-    public ICommand? ClearSelection
-    {
-        get => GetValue(ClearSelectionProperty);
-        set => SetValue(ClearSelectionProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial ICommand? ClearSelection { get; set; }
 
     /// <summary>
     /// Whether the inline password prompt is currently shown. Mirrors
     /// <see cref="ViewModels.DocumentViewModel.IsAwaitingPassword"/> so the control can move
     /// focus into the password box as soon as it appears.
     /// </summary>
-    public bool IsAwaitingPassword
-    {
-        get => GetValue(IsAwaitingPasswordProperty);
-        set => SetValue(IsAwaitingPasswordProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial bool IsAwaitingPassword { get; set; }
 
     /// <summary>
     /// Starts at 1.
     /// </summary>
-    public int? SelectedPageNumber
-    {
-        get => GetValue(SelectedPageNumberProperty);
-        set => SetValue(SelectedPageNumberProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial int? SelectedPageNumber { get; set; }
 
-    public PdfBookmarkNode? SelectedBookmark
-    {
-        get => GetValue(SelectedBookmarkProperty);
-        set => SetValue(SelectedBookmarkProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial PdfBookmarkNode? SelectedBookmark { get; set; }
 
-    public TextSearchResult? SelectedTextSearchResult
-    {
-        get => GetValue(SelectedTextSearchResultProperty);
-        set => SetValue(SelectedTextSearchResultProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial TextSearchResult? SelectedTextSearchResult { get; set; }
 
     public DocumentControl()
     {

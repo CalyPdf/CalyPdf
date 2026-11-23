@@ -85,77 +85,29 @@ public sealed partial class TiledPdfPageControl : Control
         public void Dispose() => _tileImageRef.Dispose();
     }
     
-    public static readonly StyledProperty<double> PpiScaleProperty =
-        AvaloniaProperty.Register<TiledPdfPageControl, double>(nameof(PpiScale));
+    [GeneratedStyledProperty]
+    public partial double PpiScale { get; set; }
 
-    public static readonly StyledProperty<double> ZoomLevelProperty =
-        AvaloniaProperty.Register<TiledPdfPageControl, double>(nameof(ZoomLevel), 1.0);
+    [GeneratedStyledProperty(DefaultValue = 1.0)]
+    public partial double ZoomLevel { get; set; }
 
-    public static readonly StyledProperty<IRef<SKPicture>?> PictureProperty =
-        AvaloniaProperty.Register<TiledPdfPageControl, IRef<SKPicture>?>(nameof(Picture));
+    [GeneratedStyledProperty]
+    public partial IRef<SKPicture>? Picture { get; set; }
 
-    public static readonly StyledProperty<Rect?> VisibleAreaProperty =
-        AvaloniaProperty.Register<TiledPdfPageControl, Rect?>(nameof(VisibleArea));
+    [GeneratedStyledProperty]
+    public partial Rect? VisibleArea { get; set; }
 
-    public static readonly StyledProperty<bool> IsPageVisibleProperty =
-        AvaloniaProperty.Register<TiledPdfPageControl, bool>(nameof(IsPageVisible));
+    [GeneratedStyledProperty]
+    public partial bool IsPageVisible { get; set; }
 
-    public static readonly StyledProperty<int> PageNumberProperty =
-        AvaloniaProperty.Register<TiledPdfPageControl, int>(nameof(PageNumber));
+    [GeneratedStyledProperty]
+    public partial int PageNumber { get; set; }
 
-    public static readonly StyledProperty<Size> PageDisplaySizeProperty =
-        AvaloniaProperty.Register<TiledPdfPageControl, Size>(nameof(PageDisplaySize));
+    [GeneratedStyledProperty]
+    public partial Size PageDisplaySize { get; set; }
 
-    public static readonly StyledProperty<TileRenderService?> TileRenderServiceProperty =
-        AvaloniaProperty.Register<TiledPdfPageControl, TileRenderService?>(nameof(TileRenderService));
-
-    public double PpiScale
-    {
-        get => GetValue(PpiScaleProperty);
-        set => SetValue(PpiScaleProperty, value);
-    }
-
-    public double ZoomLevel
-    {
-        get => GetValue(ZoomLevelProperty);
-        set => SetValue(ZoomLevelProperty, value);
-    }
-
-    public IRef<SKPicture>? Picture
-    {
-        get => GetValue(PictureProperty);
-        set => SetValue(PictureProperty, value);
-    }
-
-    public Rect? VisibleArea
-    {
-        get => GetValue(VisibleAreaProperty);
-        set => SetValue(VisibleAreaProperty, value);
-    }
-
-    public bool IsPageVisible
-    {
-        get => GetValue(IsPageVisibleProperty);
-        set => SetValue(IsPageVisibleProperty, value);
-    }
-
-    public int PageNumber
-    {
-        get => GetValue(PageNumberProperty);
-        set => SetValue(PageNumberProperty, value);
-    }
-
-    public Size PageDisplaySize
-    {
-        get => GetValue(PageDisplaySizeProperty);
-        set => SetValue(PageDisplaySizeProperty, value);
-    }
-
-    public TileRenderService? TileRenderService
-    {
-        get => GetValue(TileRenderServiceProperty);
-        set => SetValue(TileRenderServiceProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial TileRenderService? TileRenderService { get; set; }
 
     private int _invalidateScheduled;
 

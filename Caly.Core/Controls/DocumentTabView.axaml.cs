@@ -46,27 +46,15 @@ public sealed partial class DocumentTabView : UserControl
     /// <see cref="MainViewModel.IsDocumentPaneOpen"/>, so the setting follows the window
     /// rather than the document - a document moves between windows when its tab is dragged.
     /// </summary>
-    public static readonly StyledProperty<bool> IsPaneOpenProperty =
-        AvaloniaProperty.Register<DocumentTabView, bool>(nameof(IsPaneOpen), defaultBindingMode: BindingMode.TwoWay);
-
-    public bool IsPaneOpen
-    {
-        get => GetValue(IsPaneOpenProperty);
-        set => SetValue(IsPaneOpenProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultBindingMode = BindingMode.TwoWay)]
+    public partial bool IsPaneOpen { get; set; }
 
     /// <summary>
     /// Width of this tab's side pane. Bound in XAML to the host window's
     /// <see cref="MainViewModel.PaneSize"/>, so it follows the window.
     /// </summary>
-    public static readonly StyledProperty<double> PaneSizeProperty =
-        AvaloniaProperty.Register<DocumentTabView, double>(nameof(PaneSize), defaultBindingMode: BindingMode.TwoWay);
-
-    public double PaneSize
-    {
-        get => GetValue(PaneSizeProperty);
-        set => SetValue(PaneSizeProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultBindingMode = BindingMode.TwoWay)]
+    public partial double PaneSize { get; set; }
 
     private const int MaxPaneLength = 500;
     private const int MinPaneLength = 200;

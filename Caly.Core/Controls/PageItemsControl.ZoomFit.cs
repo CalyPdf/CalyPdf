@@ -47,13 +47,6 @@ namespace Caly.Core.Controls;
 public sealed partial class PageItemsControl
 {
     /// <summary>
-    /// Defines the <see cref="ZoomMode"/> property.
-    /// </summary>
-    public static readonly StyledProperty<ZoomMode> ZoomModeProperty =
-        AvaloniaProperty.Register<PageItemsControl, ZoomMode>(nameof(ZoomMode),
-            defaultBindingMode: BindingMode.TwoWay);
-
-    /// <summary>
     /// Relative zoom change below which a fit that nobody asked for (see <see cref="RequestFit"/>)
     /// leaves the view alone.
     /// </summary>
@@ -100,11 +93,8 @@ public sealed partial class PageItemsControl
     /// viewer changes size; a zoom picked by hand (wheel, pinch) switches back to
     /// <see cref="ZoomMode.Manual"/>.
     /// </summary>
-    public ZoomMode ZoomMode
-    {
-        get => GetValue(ZoomModeProperty);
-        set => SetValue(ZoomModeProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultBindingMode = BindingMode.TwoWay)]
+    public partial ZoomMode ZoomMode { get; set; }
 
     private void OnZoomModeChanged(ZoomMode mode)
     {

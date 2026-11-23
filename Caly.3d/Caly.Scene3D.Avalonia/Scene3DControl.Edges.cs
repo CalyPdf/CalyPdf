@@ -12,14 +12,6 @@ namespace Caly.Scene3D.Avalonia;
 // uploaded first; then they go to the GPU.
 public partial class Scene3DControl
 {
-    /// <summary>Defines the <see cref="PrepareEdges"/> property.</summary>
-    public static readonly StyledProperty<bool> PrepareEdgesProperty =
-        AvaloniaProperty.Register<Scene3DControl, bool>(nameof(PrepareEdges));
-
-    /// <summary>Defines the <see cref="RenderModeOverride"/> property.</summary>
-    public static readonly StyledProperty<SceneRenderMode?> RenderModeOverrideProperty =
-        AvaloniaProperty.Register<Scene3DControl, SceneRenderMode?>(nameof(RenderModeOverride));
-
     private Scene? _edgeScene;                  // the scene the edges below are for (or being found for)
     private CancellationTokenSource? _edgeCancel;
     private bool _edgesBuilding;
@@ -40,18 +32,12 @@ public partial class Scene3DControl
     /// by then, the control reports <see cref="Scene3DStatus.NeedsScene"/>, and gives the camera and the
     /// animations' playhead back to the scene set in answer.
     /// </summary>
-    public bool PrepareEdges
-    {
-        get => GetValue(PrepareEdgesProperty);
-        set => SetValue(PrepareEdgesProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial bool PrepareEdges { get; set; }
 
     /// <summary>The render mode to draw in instead of the view's; null for the view's own (Solid without a view).</summary>
-    public SceneRenderMode? RenderModeOverride
-    {
-        get => GetValue(RenderModeOverrideProperty);
-        set => SetValue(RenderModeOverrideProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial SceneRenderMode? RenderModeOverride { get; set; }
 
     /// <summary>The render mode drawn: <see cref="RenderModeOverride"/>, or the view's.</summary>
     public SceneRenderMode RenderMode => RenderModeOverride ?? View?.RenderMode ?? SceneRenderMode.Solid;

@@ -78,52 +78,25 @@ public sealed partial class PageInteractiveLayerControl
     private PdfArtwork3D? _shownArtwork3D;
 
     /// <summary>
-    /// Defines the <see cref="ActiveArtwork3DIndex"/> property.
-    /// </summary>
-    public static readonly StyledProperty<int> ActiveArtwork3DIndexProperty =
-        AvaloniaProperty.Register<PageInteractiveLayerControl, int>(nameof(ActiveArtwork3DIndex), -1);
-
-    /// <summary>
-    /// Defines the <see cref="ZoomLevel"/> property.
-    /// </summary>
-    public static readonly StyledProperty<double> ZoomLevelProperty =
-        AvaloniaProperty.Register<PageInteractiveLayerControl, double>(nameof(ZoomLevel), 1.0);
-
-    /// <summary>
     /// The page zoom. Only tells the layer when to redraw its 3D badges, which keep their size on screen;
     /// the scale they are drawn at is read from the layout transform.
     /// </summary>
-    public double ZoomLevel
-    {
-        get => GetValue(ZoomLevelProperty);
-        set => SetValue(ZoomLevelProperty, value);
-    }
-
-    /// <summary>
-    /// Defines the <see cref="Artwork3DRefusals"/> property.
-    /// </summary>
-    public static readonly StyledProperty<IReadOnlyDictionary<int, string>?> Artwork3DRefusalsProperty =
-        AvaloniaProperty.Register<PageInteractiveLayerControl, IReadOnlyDictionary<int, string>?>(nameof(Artwork3DRefusals));
+    [GeneratedStyledProperty(DefaultValue = 1.0)]
+    public partial double ZoomLevel { get; set; }
 
     /// <summary>
     /// Position, in the text layer's 3D artworks, of the one being viewed in place; -1 when none is.
     /// Its view has a toolbar where the badge would be.
     /// </summary>
-    public int ActiveArtwork3DIndex
-    {
-        get => GetValue(ActiveArtwork3DIndexProperty);
-        set => SetValue(ActiveArtwork3DIndexProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultValue = -1)]
+    public partial int ActiveArtwork3DIndex { get; set; }
 
     /// <summary>
     /// Why 3D artworks of the page that were read cannot be shown, by their position in the text
     /// layer's 3D artworks; null when none was refused. Hovering one says its reason.
     /// </summary>
-    public IReadOnlyDictionary<int, string>? Artwork3DRefusals
-    {
-        get => GetValue(Artwork3DRefusalsProperty);
-        set => SetValue(Artwork3DRefusalsProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial IReadOnlyDictionary<int, string>? Artwork3DRefusals { get; set; }
 
     /// <summary>
     /// The rectangle of the "3D" badge for artwork occupying <paramref name="box"/>, in layer coordinates:

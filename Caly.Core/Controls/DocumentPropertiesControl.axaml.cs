@@ -26,19 +26,10 @@ namespace Caly.Core.Controls;
 /// <summary>
 /// Control that represents the properties of a PDF document.
 /// </summary>
-public sealed class DocumentPropertiesControl : TemplatedControl
+public sealed partial class DocumentPropertiesControl : TemplatedControl
 {
     private const int DefaultFirstColumnWidth = 95;
 
-    /// <summary>
-    /// Defines the <see cref="FirstColumnWidth"/> property.
-    /// </summary>
-    public static readonly StyledProperty<int> FirstColumnWidthProperty =
-        AvaloniaProperty.Register<DocumentPropertiesControl, int>(nameof(FirstColumnWidth), DefaultFirstColumnWidth);
-
-    public int FirstColumnWidth
-    {
-        get => GetValue(FirstColumnWidthProperty);
-        set => SetValue(FirstColumnWidthProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultValue = DefaultFirstColumnWidth)]
+    public partial int FirstColumnWidth { get; set; }
 }

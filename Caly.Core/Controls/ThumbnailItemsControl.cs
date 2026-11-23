@@ -29,7 +29,7 @@ using System.Windows.Input;
 
 namespace Caly.Core.Controls;
 
-public sealed class ThumbnailItemsControl : ListBox
+public sealed partial class ThumbnailItemsControl : ListBox
 {
     private bool _isScrollingToPage;
 
@@ -43,47 +43,20 @@ public sealed class ThumbnailItemsControl : ListBox
 
     protected override Type StyleKeyOverride => typeof(ListBox);
 
-    /// <summary>
-    /// Defines the <see cref="RealisedThumbnails"/> property. Starts at 1.
-    /// </summary>
-    public static readonly StyledProperty<Range?> RealisedThumbnailsProperty =
-        AvaloniaProperty.Register<ThumbnailItemsControl, Range?>(nameof(RealisedThumbnails), defaultBindingMode: BindingMode.TwoWay);
-
-    /// <summary>
-    /// Defines the <see cref="VisibleThumbnails"/> property. Starts at 1.
-    /// </summary>
-    public static readonly StyledProperty<Range?> VisibleThumbnailsProperty =
-        AvaloniaProperty.Register<ThumbnailItemsControl, Range?>(nameof(VisibleThumbnails), defaultBindingMode: BindingMode.TwoWay);
-
-    /// <summary>
-    /// Defines the <see cref="RefreshThumbnails"/> property.
-    /// </summary>
-    public static readonly StyledProperty<ICommand?> RefreshThumbnailsProperty =
-        AvaloniaProperty.Register<ThumbnailItemsControl, ICommand?>(nameof(RefreshThumbnails));
-
-    public ICommand? RefreshThumbnails
-    {
-        get => GetValue(RefreshThumbnailsProperty);
-        set => SetValue(RefreshThumbnailsProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial ICommand? RefreshThumbnails { get; set; }
 
     /// <summary>
     /// Starts at 1.
     /// </summary>
-    public Range? RealisedThumbnails
-    {
-        get => GetValue(RealisedThumbnailsProperty);
-        set => SetValue(RealisedThumbnailsProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultBindingMode = BindingMode.TwoWay)]
+    public partial Range? RealisedThumbnails { get; set; }
 
     /// <summary>
     /// Starts at 1.
     /// </summary>
-    public Range? VisibleThumbnails
-    {
-        get => GetValue(VisibleThumbnailsProperty);
-        set => SetValue(VisibleThumbnailsProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultBindingMode = BindingMode.TwoWay)]
+    public partial Range? VisibleThumbnails { get; set; }
     
     public ThumbnailItemsControl()
     {
