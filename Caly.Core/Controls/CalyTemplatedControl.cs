@@ -25,18 +25,8 @@ using Caly.Core.ViewModels;
 
 namespace Caly.Core.Controls;
 
-public class CalyTemplatedControl : TemplatedControl
+public partial class CalyTemplatedControl : TemplatedControl
 {
-    /// <summary>
-    /// Defines the <see cref="Exception"/> property.
-    /// </summary>
-    public static readonly StyledProperty<ExceptionViewModel?> ExceptionProperty =
-        AvaloniaProperty.Register<CalyTemplatedControl, ExceptionViewModel?>(nameof(Exception),
-            defaultBindingMode: BindingMode.TwoWay);
-
-    public ExceptionViewModel? Exception
-    {
-        get => GetValue(ExceptionProperty);
-        set => SetValue(ExceptionProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultBindingMode = BindingMode.TwoWay)]
+    public partial ExceptionViewModel? Exception { get; set; }
 }

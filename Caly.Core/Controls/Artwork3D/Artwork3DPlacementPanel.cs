@@ -37,20 +37,8 @@ namespace Caly.Core.Controls.Artwork3D;
 /// part of the artwork the 3D control covers is decided by <see cref="Artwork3DPlacement"/>.
 /// </para>
 /// </summary>
-internal sealed class Artwork3DPlacementPanel : Panel
+internal sealed partial class Artwork3DPlacementPanel : Panel
 {
-    /// <summary>Defines the <see cref="ArtworkBounds"/> property.</summary>
-    public static readonly StyledProperty<Rect> ArtworkBoundsProperty =
-        AvaloniaProperty.Register<Artwork3DPlacementPanel, Rect>(nameof(ArtworkBounds));
-
-    /// <summary>Defines the <see cref="VisibleArea"/> property.</summary>
-    public static readonly StyledProperty<Rect?> VisibleAreaProperty =
-        AvaloniaProperty.Register<Artwork3DPlacementPanel, Rect?>(nameof(VisibleArea));
-
-    /// <summary>Defines the <see cref="ZoomLevel"/> property.</summary>
-    public static readonly StyledProperty<double> ZoomLevelProperty =
-        AvaloniaProperty.Register<Artwork3DPlacementPanel, double>(nameof(ZoomLevel), 1.0);
-
     private readonly ScaleTransform _inverseZoom = new(1, 1);
     private TopLevel? _topLevel;
 
@@ -60,25 +48,16 @@ internal sealed class Artwork3DPlacementPanel : Panel
     }
 
     /// <summary>The artwork's rectangle on the page, in page units.</summary>
-    public Rect ArtworkBounds
-    {
-        get => GetValue(ArtworkBoundsProperty);
-        set => SetValue(ArtworkBoundsProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial Rect ArtworkBounds { get; set; }
 
     /// <summary>The part of the page on screen, in page units; null when none is.</summary>
-    public Rect? VisibleArea
-    {
-        get => GetValue(VisibleAreaProperty);
-        set => SetValue(VisibleAreaProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial Rect? VisibleArea { get; set; }
 
     /// <summary>The page zoom.</summary>
-    public double ZoomLevel
-    {
-        get => GetValue(ZoomLevelProperty);
-        set => SetValue(ZoomLevelProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultValue = 1.0)]
+    public partial double ZoomLevel { get; set; }
 
     protected override Size MeasureOverride(Size availableSize)
     {

@@ -38,57 +38,6 @@ namespace Caly.Core.Controls;
 [TemplatePart("PART_PageLoadingHost", typeof(Panel))]
 public sealed partial class PageItem : ContentControl
 {
-    /// <summary>
-    /// Defines the <see cref="IsPageLoading"/> property.
-    /// </summary>
-    public static readonly StyledProperty<bool> IsPageLoadingProperty =
-        AvaloniaProperty.Register<PageItem, bool>(nameof(IsPageLoading));
-
-    /// <summary>
-    /// Defines the <see cref="Picture"/> property.
-    /// </summary>
-    public static readonly StyledProperty<IRef<SKPicture>?> PictureProperty =
-        AvaloniaProperty.Register<PageItem, IRef<SKPicture>?>(nameof(Picture),
-            defaultBindingMode: BindingMode.OneWay);
-
-    /// <summary>
-    /// Defines the <see cref="IsPageVisible"/> property.
-    /// </summary>
-    public static readonly StyledProperty<bool> IsPageVisibleProperty =
-        AvaloniaProperty.Register<PageItem, bool>(nameof(IsPageVisible));
-
-    /// <summary>
-    /// Defines the <see cref="VisibleArea"/> property.
-    /// </summary>
-    public static readonly StyledProperty<Rect?> VisibleAreaProperty =
-        AvaloniaProperty.Register<PageItem, Rect?>(nameof(VisibleArea),
-            defaultBindingMode: BindingMode.TwoWay);
-
-    /// <summary>
-    /// Defines the <see cref="Exception"/> property.
-    /// </summary>
-    public static readonly StyledProperty<ExceptionViewModel?> ExceptionProperty =
-        AvaloniaProperty.Register<PageItem, ExceptionViewModel?>(nameof(Exception),
-            defaultBindingMode: BindingMode.TwoWay);
-
-    /// <summary>
-    /// Defines the <see cref="Rotation"/> property.
-    /// </summary>
-    public static readonly StyledProperty<int> RotationProperty =
-        AvaloniaProperty.Register<PageItem, int>(nameof(Rotation));
-
-    /// <summary>
-    /// Defines the <see cref="IsRotating"/> property.
-    /// </summary>
-    public static readonly StyledProperty<bool> IsRotatingProperty =
-        AvaloniaProperty.Register<PageItem, bool>(nameof(IsRotating));
-
-    /// <summary>
-    /// Defines the <see cref="ContentBounds"/> property.
-    /// </summary>
-    public static readonly StyledProperty<Rect?> ContentBoundsProperty =
-        AvaloniaProperty.Register<PageItem, Rect?>(nameof(ContentBounds));
-
     static PageItem()
     {
         AffectsRender<PageItem>(PictureProperty, IsPageVisibleProperty,
@@ -134,53 +83,29 @@ public sealed partial class PageItem : ContentControl
     /// The bounds of what the page draws, in the unrotated page's coordinates. <c>null</c> when
     /// unknown. See <see cref="PageViewModel.ContentBounds"/>.
     /// </summary>
-    public Rect? ContentBounds
-    {
-        get => GetValue(ContentBoundsProperty);
-        set => SetValue(ContentBoundsProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial Rect? ContentBounds { get; set; }
 
-    public int Rotation
-    {
-        get => GetValue(RotationProperty);
-        set => SetValue(RotationProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial int Rotation { get; set; }
 
-    public bool IsRotating
-    {
-        get => GetValue(IsRotatingProperty);
-        set => SetValue(IsRotatingProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial bool IsRotating { get; set; }
 
-    public bool IsPageLoading
-    {
-        get => GetValue(IsPageLoadingProperty);
-        set => SetValue(IsPageLoadingProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial bool IsPageLoading { get; set; }
 
-    public IRef<SKPicture>? Picture
-    {
-        get => GetValue(PictureProperty);
-        set => SetValue(PictureProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultBindingMode = BindingMode.OneWay)]
+    public partial IRef<SKPicture>? Picture { get; set; }
 
-    public bool IsPageVisible
-    {
-        get => GetValue(IsPageVisibleProperty);
-        set => SetValue(IsPageVisibleProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial bool IsPageVisible { get; set; }
 
-    public Rect? VisibleArea
-    {
-        get => GetValue(VisibleAreaProperty);
-        set => SetValue(VisibleAreaProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultBindingMode = BindingMode.TwoWay)]
+    public partial Rect? VisibleArea { get; set; }
 
-    public ExceptionViewModel? Exception
-    {
-        get => GetValue(ExceptionProperty);
-        set => SetValue(ExceptionProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultBindingMode = BindingMode.TwoWay)]
+    public partial ExceptionViewModel? Exception { get; set; }
 
     /// <summary>
     /// Gets the interactive layer. Set in OnApplyTemplate.

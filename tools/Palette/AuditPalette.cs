@@ -1,6 +1,6 @@
-// Audits the Fluent palettes in Caly.Core/App.axaml and the brush bindings in Caly.Core/CalyTheme.axaml
-// against the rules in GUIDELINES.md: WCAG 2.1 contrast and colour-blindness (protanopia, deuteranopia,
-// tritanopia) checks.
+// Audits the Fluent palettes in Caly.Core/App.axaml, the brush bindings in Caly.Core/CalyTheme.axaml and the
+// Fluent 2 fills Caly's colours meet, against the rules in GUIDELINES.md: WCAG 2.1 contrast and colour-blindness
+// (protanopia, deuteranopia, tritanopia) checks.
 //
 //   dotnet run --file tools/Palette/AuditPalette.cs             print failures only, exit 1 if any
 //   dotnet run --file tools/Palette/AuditPalette.cs -- --all    print every check
@@ -20,6 +20,36 @@ bool all = args.Contains("--all");
 // Page overlay colours drawn in Caly.Core/Controls/PageInteractiveLayerControl.cs (SelectionColor, SearchColor).
 Rgba selectionOverlay = new(0x33, 0x99, 0xFF, 169);
 Rgba searchOverlay = new(255, 0, 0, 120);
+
+// Fluent 2 tokens that do not follow the palette (Avalonia.Themes.Fluent2 12.2.0: Accents/Fluent2ColorPalette.axaml,
+// Fluent2TokenResources.axaml). Re-read them when Avalonia is updated.
+Dictionary<string, Dictionary<string, Rgba>> fluent2 = new()
+{
+    ["Light"] = new()
+    {
+        ["Flyout"] = Hex("FFF9F9F9"),                        // AcrylicInAppFillColorDefault: flyouts, menus, scrollbar track
+        ["TextOnAccentFillColorPrimary"] = Hex("FFFFFFFF"),  // accent button text
+        ["SubtleFillColorSecondary"] = Hex("09000000"),      // list, menu and drop-down hover and selection
+        ["ControlStrongFillColorDefault"] = Hex("72000000"), // scrollbar thumb
+        ["ControlSolidFillColorDefault"] = Hex("FFFFFFFF"),  // slider thumb disc
+    },
+    ["Dark"] = new()
+    {
+        ["Flyout"] = Hex("FF2C2C2C"),
+        ["TextOnAccentFillColorPrimary"] = Hex("FF000000"),
+        ["SubtleFillColorSecondary"] = Hex("0FFFFFFF"),
+        ["ControlStrongFillColorDefault"] = Hex("8BFFFFFF"),
+        ["ControlSolidFillColorDefault"] = Hex("FF454545"),
+    }
+};
+
+// Fluent 2 tokens derived from the palette: the palette colour with the token's alpha per theme
+// (Avalonia.Themes.Fluent2 12.2.0, ColorPaletteResources.s_tokenDerivations).
+(string Token, string Source, byte LightAlpha, byte DarkAlpha)[] derivedTokens =
+{
+    ("TextFillColorPrimary", "BaseHigh", 0xE4, 0xFF),     // control text, selected tab title
+    ("ControlFillColorDefault", "BaseLow", 0xB3, 0x0F),   // button, drop-down and text box fill
+};
 
 // CalyTheme.axaml: brush key -> palette attribute name.
 Dictionary<string, string> bindings = Regex
@@ -48,13 +78,34 @@ foreach (string theme in new[] { "Light", "Dark" })
 {
     Dictionary<string, Rgba> palette = ReadPalette(appXaml, theme);
     Rgba region = palette["RegionColor"];
+    Dictionary<string, Rgba> tokens = new(fluent2[theme]);
+    foreach (var (token, source, lightAlpha, darkAlpha) in derivedTokens)
+        tokens[token] = palette[source] with { A = theme == "Light" ? lightAlpha : darkAlpha };
+    Rgba flyout = tokens["Flyout"];
 
-    Rgba Get(string name)
+    // Fluent 2's AccentFillColorDefault: the palette accent darkened (Light) or lightened (Dark), as
+    // Avalonia's SystemAccentColors.CalculateAccentShades does (SystemAccentColorDark1 / SystemAccentColorLight2).
+    Rgba accentFill = Shade(palette["Accent"], theme == "Light" ? -28.5 / 255 : 70 / 255.0);
+
+    // A palette colour, a CalyTheme.axaml brush, a Fluent 2 token or the accent fill, not composited.
+    Rgba Raw(string name)
     {
+        if (name == "AccentFillColorDefault") return accentFill;
+        if (tokens.TryGetValue(name, out Rgba t)) return t;
         string key = bindings.TryGetValue(name, out string? bound) ? bound : name;
         if (!palette.TryGetValue(key, out Rgba c)) throw new InvalidDataException($"Unknown colour '{name}' ({theme}).");
-        return Over(c, region);
+        return c;
     }
+
+    Rgba Get(string name) => Over(Raw(name), region);
+
+    void ContrastOn(string id, Rgba fg, Rgba bg, double min, string what)
+    {
+        double r = Ratio(fg, bg);
+        Report(theme, id, what, $"{r:N2}:1 (min {min:N1})", r >= min);
+    }
+
+    (string Name, Rgba Colour)[] surfaces = { ("RegionColor", region), ("Flyout", flyout) };
 
     Rgba Literal(string name) => name switch
     {
@@ -98,15 +149,17 @@ foreach (string theme in new[] { "Light", "Dark" })
         && bindings["TabItemHeaderBackgroundUnselectedPointerOverWindowInactive"] == "ChromeGray");
 
     // ---- Text, 4.5:1 (T) ----
-    foreach (string bg in new[] { "RegionColor", "ChromeLow", "ChromeMediumLow" }) Contrast("T1", "BaseHigh", bg, 4.5, "text");
-    foreach (string bg in new[] { "RegionColor", "ChromeLow" })
+    // Tooltips are ChromeMediumLow; flyouts and menus are Fluent 2's Flyout fill.
+    foreach (string bg in new[] { "RegionColor", "ChromeLow", "ChromeMediumLow", "Flyout" }) Contrast("T1", "BaseHigh", bg, 4.5, "text");
+    foreach (string bg in new[] { "RegionColor", "ChromeLow", "Flyout" })
     {
         Contrast("T2", "BaseMediumHigh", bg, 4.5, "text");
         Contrast("T3", "BaseMedium", bg, 4.5, "text");
     }
-    Contrast("T4", "ChromeWhite", "Accent", 4.5, "text on accent fill");
-    Contrast("T5", "BaseHigh", "BaseLow", 4.5, "text on default button fill");
-    Contrast("T6", "BaseHigh", "ChromeMedium", 4.5, "text on hover fill");
+    ContrastOn("T4", tokens["TextOnAccentFillColorPrimary"], accentFill, 4.5, "text on accent fill: TextOnAccentFillColorPrimary on AccentFillColorDefault");
+    ContrastOn("T5", Get("BaseHigh"), Over(tokens["ControlFillColorDefault"], region), 4.5, "text on button fill: BaseHigh on ControlFillColorDefault");
+    foreach (var (name, under) in surfaces)
+        ContrastOn("T6", Over(Raw("BaseHigh"), under), Over(tokens["SubtleFillColorSecondary"], under), 4.5, $"text on hover fill: BaseHigh on SubtleFillColorSecondary over {name}");
     Contrast("T7", "ErrorText", "RegionColor", 4.5, "error text");
 
     // ---- Graphics and UI components, 3:1 (G) ----
@@ -114,22 +167,26 @@ foreach (string theme in new[] { "Light", "Dark" })
     Contrast("G1", "BaseMediumLow", "ChromeLow", 3.0, "glyph or border");
     Contrast("G2", "BaseMedium", "RegionColor", 3.0, "control border");
     Contrast("G3", "ErrorText", "RegionColor", 3.0, "error border");
-    Contrast("G4", "BaseHigh", "BaseMediumLow", 3.0, "glyph on pressed fill");
-    Contrast("G5", "ChromeWhite", "Accent", 3.0, "icon on accent fill");
 
-    // Slider brushes bound in CalyTheme.axaml, on the window (RegionColor) and on flyouts (ChromeMediumLow): the thumb in
-    // every state and the filled track 3:1, the empty track 1.5:1 and told from the filled one by lightness.
-    foreach (string bg in new[] { "RegionColor", "ChromeMediumLow" })
+    // Fluent 2 slider: an accent dot (90% and 80% of the accent fill on hover and press) on a ControlSolidFillColorDefault
+    // disc, an accent filled track, and an empty track that is SliderTrackFill when CalyTheme.axaml binds it, else
+    // ControlStrongFillColorDefault. On the window and on flyouts: dot and filled track 3:1, empty track 1.5:1 and told
+    // from the filled one by lightness.
+    Rgba disc = tokens["ControlSolidFillColorDefault"];
+    foreach (var (state, alpha) in new[] { ("rest", 1.0), ("hover", 0.9), ("pressed", 0.8) })
+        ContrastOn("G7", Over(accentFill with { A = (byte)Math.Round(255 * alpha) }, disc), disc, 3.0, $"slider thumb dot, {state}, on its disc");
+    Rgba emptyTrack = bindings.ContainsKey("SliderTrackFill") ? Raw("SliderTrackFill") : tokens["ControlStrongFillColorDefault"];
+    foreach (var (name, under) in surfaces)
     {
-        Contrast("G7", "SliderThumbBackground", bg, 3.0, "slider thumb");
-        Contrast("G7", "SliderThumbBackgroundPointerOver", bg, 3.0, "slider thumb, hover");
-        Contrast("G7", "SliderThumbBackgroundPressed", bg, 3.0, "slider thumb, pressed");
-        Contrast("G7", "SliderTrackValueFill", bg, 3.0, "slider filled track");
-        Contrast("G7", "SliderTrackFill", bg, 1.5, "slider empty track");
+        Rgba filled = Over(accentFill, under), empty = Over(emptyTrack, under);
+        ContrastOn("G7", filled, under, 3.0, $"slider filled track (accent fill) on {name}");
+        ContrastOn("G7", empty, under, 1.5, $"slider empty track on {name}");
+        double trackStep = Math.Abs(LStar(filled) - LStar(empty));
+        Report(theme, "G7", $"slider filled vs empty track on {name}: lightness step (L*)", $"{trackStep:N1} (min 8.0)", trackStep >= 8.0);
     }
 
-    double trackStep = Math.Abs(LStar(Get("SliderTrackValueFill")) - LStar(Get("SliderTrackFill")));
-    Report(theme, "G7", "slider filled vs empty track: lightness step (L*)", $"{trackStep:N1} (min 8.0)", trackStep >= 8.0);
+    // Fluent 2 marks the selected TabItem (navigation pane) with an accent pill.
+    foreach (string bg in new[] { "ChromeLow", "RegionColor" }) Contrast("G8", "AccentFillColorDefault", bg, 3.0, "selected-tab pill (accent fill)");
 
     // Tab and button brushes bound in CalyTheme.axaml.
     (string Fg, string Bg, double Min, string Kind)[] brushPairs =
@@ -150,33 +207,24 @@ foreach (string theme in new[] { "Light", "Dark" })
         ("AddItemCommandButtonForegroundPointerOverBrush", "AddItemCommandButtonBackgroundPressedBrush", 3.0, "add-tab glyph, pressed"),
         ("InactiveWindowAddCommandButtonForegroundBrush", "TabControlWindowActiveBackgroundBrush", 3.0, "add-tab glyph, inactive"),
         ("InactiveWindowAddCommandButtonPointerOverForegroundBrush", "TabControlWindowActiveBackgroundBrush", 3.0, "add-tab glyph, inactive hover"),
-        // Text colours Fluent uses for tab titles: selected = BaseHigh, unselected = BaseMedium, hover = BaseMediumHigh.
-        ("BaseHigh", "SelectedTabItemBackgroundBrush", 4.5, "tab title, selected"),
-        ("BaseMedium", "TabItemBackgroundBrush", 4.5, "tab title, unselected"),
-        ("BaseMedium", "TabItemBackgroundBrushWindowInactive", 4.5, "tab title, inactive"),
-        ("BaseMediumHigh", "TabItemHeaderBackgroundUnselectedPointerOver", 4.5, "tab title, hover"),
-        ("BaseMediumHigh", "TabItemHeaderBackgroundUnselectedPointerOverWindowInactive", 4.5, "tab title, inactive hover"),
-        // Selected items in drop-downs sit on the accent fill.
-        ("ComboBoxItemForegroundSelected", "Accent", 4.5, "selected item text"),
-        ("ComboBoxItemForegroundSelectedPointerOver", "Accent", 4.5, "selected item text, hover"),
-        ("ComboBoxItemForegroundSelectedPressed", "Accent", 4.5, "selected item text, pressed"),
+        // Tab titles: the selected one is Fluent 2's TextFillColorPrimary, the others are bound in CalyTheme.axaml.
+        ("TextFillColorPrimary", "SelectedTabItemBackgroundBrush", 4.5, "tab title, selected"),
+        ("TabItemHeaderForegroundSelectedPointerOver", "SelectedTabItemBackgroundBrush", 4.5, "tab title, selected hover"),
+        ("TabItemHeaderForegroundUnselected", "TabItemBackgroundBrush", 4.5, "tab title, unselected"),
+        ("TabItemHeaderForegroundUnselected", "TabItemBackgroundBrushWindowInactive", 4.5, "tab title, inactive"),
+        ("TabItemHeaderForegroundUnselectedPointerOver", "TabItemHeaderBackgroundUnselectedPointerOver", 4.5, "tab title, hover"),
+        ("TabItemHeaderForegroundUnselectedPointerOver", "TabItemHeaderBackgroundUnselectedPointerOverWindowInactive", 4.5, "tab title, inactive hover"),
     };
     foreach (var (fg, bg, min, kind) in brushPairs) Contrast("G6", fg, bg, min, kind);
 
     // ---- Decorative and disabled, 1.5:1 (D) ----
     Contrast("D1", "TabItemRightSeparatorBackgroundBrush", "TabControlWindowActiveBackgroundBrush", 1.5, "tab separator");
-    Contrast("D2", "BaseMediumLow", "BaseLow", 1.5, "disabled text on disabled fill");
     Contrast("D3", "TabScrollNavigationButtonForegroundDisabledBrush", "TabControlWindowActiveBackgroundBrush", 1.5, "disabled scroll glyph");
 
-    // Fluent paints the scrollbar track with ChromeMedium unless CalyTheme.axaml overrides the brush, and the thumb
-    // with BaseLow (rest), BaseMediumLow (hover) and BaseMedium (pressed).
-    foreach (string track in new[] { "ScrollBarTrackFill", "ScrollBarTrackFillPointerOver" })
-    {
-        string trackColour = bindings.ContainsKey(track) ? track : "ChromeMedium";
-        Contrast("D4", "BaseLow", trackColour, 1.5, $"scrollbar thumb on {track}");
-        Contrast("D4", "BaseMediumLow", trackColour, 1.5, $"scrollbar thumb, hover, on {track}");
-        Contrast("D4", "BaseMedium", trackColour, 1.5, $"scrollbar thumb, pressed, on {track}");
-    }
+    // Fluent 2 paints the scrollbar thumb ControlStrongFillColorDefault in every state, over the content while thin and
+    // over its Flyout-filled track while expanded.
+    foreach (var (name, under) in new[] { ("RegionColor", region), ("the expanded track", flyout) })
+        ContrastOn("D4", Over(tokens["ControlStrongFillColorDefault"], under), under, 1.5, $"scrollbar thumb on {name}");
 
     // ---- Colour blindness (C) ----
     foreach (var (kind, m) in cvd)
@@ -250,6 +298,32 @@ static Dictionary<string, Rgba> ReadPalette(string xaml, string theme)
     }
 
     return result;
+}
+
+static Rgba Hex(string argb)
+{
+    uint v = uint.Parse(argb, NumberStyles.HexNumber);
+    return new Rgba((byte)(v >> 16), (byte)(v >> 8), (byte)v, (byte)(v >> 24));
+}
+
+// Moves the HSL lightness by dl (clamped), keeping hue and saturation.
+static Rgba Shade(Rgba c, double dl)
+{
+    double r = c.R / 255.0, g = c.G / 255.0, b = c.B / 255.0;
+    double max = Math.Max(r, Math.Max(g, b)), min = Math.Min(r, Math.Min(g, b)), d = max - min;
+    double l = (max + min) / 2, h = 0, s = 0;
+    if (d > 0)
+    {
+        s = d / (1 - Math.Abs(2 * l - 1));
+        h = max == r ? (g - b) / d % 6 : max == g ? (b - r) / d + 2 : (r - g) / d + 4;
+        h = h * 60 < 0 ? h * 60 + 360 : h * 60;
+    }
+
+    l = Math.Clamp(l + dl, 0, 1);
+    double ch = (1 - Math.Abs(2 * l - 1)) * s, x = ch * (1 - Math.Abs(h / 60 % 2 - 1)), m = l - ch / 2;
+    var (r1, g1, b1) = h < 60 ? (ch, x, 0.0) : h < 120 ? (x, ch, 0.0) : h < 180 ? (0.0, ch, x)
+        : h < 240 ? (0.0, x, ch) : h < 300 ? (x, 0.0, ch) : (ch, 0.0, x);
+    return new Rgba((byte)Math.Round((r1 + m) * 255), (byte)Math.Round((g1 + m) * 255), (byte)Math.Round((b1 + m) * 255), c.A);
 }
 
 static Rgba Over(Rgba top, Rgba bottom)

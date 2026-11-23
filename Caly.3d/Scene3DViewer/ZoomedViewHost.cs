@@ -10,10 +10,9 @@ namespace Scene3DViewer;
 /// part of that view the viewport shows, at device resolution, and tells the control which part that is.
 /// The control's framebuffer is therefore never larger than the viewport, whatever the zoom.
 /// </summary>
-internal sealed class ZoomedViewHost : Panel
+internal sealed partial class ZoomedViewHost : Panel
 {
-    public static readonly StyledProperty<double> ZoomProperty = AvaloniaProperty.Register<ZoomedViewHost, double>(nameof(Zoom), 1);
-
+    // Not generated: a Point default is not a constant (see Scene3DControl).
     public static readonly StyledProperty<Point> CentreProperty = AvaloniaProperty.Register<ZoomedViewHost, Point>(nameof(Centre), new Point(0.5, 0.5));
 
     static ZoomedViewHost()
@@ -23,11 +22,8 @@ internal sealed class ZoomedViewHost : Panel
     }
 
     /// <summary>How many times larger than the viewport the whole view is.</summary>
-    public double Zoom
-    {
-        get => GetValue(ZoomProperty);
-        set => SetValue(ZoomProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultValue = 1.0)]
+    public partial double Zoom { get; set; }
 
     /// <summary>The point of the whole view, in fractions of it, shown at the middle of the viewport.</summary>
     public Point Centre

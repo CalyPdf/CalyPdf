@@ -31,36 +31,18 @@ namespace Caly.Core.Controls;
 public sealed partial class PageItem
 {
     /// <summary>
-    /// Defines the <see cref="ZoomLevel"/> property.
-    /// </summary>
-    public static readonly StyledProperty<double> ZoomLevelProperty =
-        AvaloniaProperty.Register<PageItem, double>(nameof(ZoomLevel), 1.0);
-
-    /// <summary>
-    /// Defines the <see cref="ActiveArtwork3D"/> property.
-    /// </summary>
-    public static readonly StyledProperty<Artwork3DViewModel?> ActiveArtwork3DProperty =
-        AvaloniaProperty.Register<PageItem, Artwork3DViewModel?>(nameof(ActiveArtwork3D));
-
-    /// <summary>
     /// The zoom the page is shown at. Only what is laid out against the screen rather than the page
     /// needs it (the 3D view).
     /// </summary>
-    public double ZoomLevel
-    {
-        get => GetValue(ZoomLevelProperty);
-        set => SetValue(ZoomLevelProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultValue = 1.0)]
+    public partial double ZoomLevel { get; set; }
 
     /// <summary>
     /// The 3D artwork of this page that is being viewed in place, as the data context of its view;
     /// <c>null</c> when there is none, which is the case of nearly every page.
     /// </summary>
-    public Artwork3DViewModel? ActiveArtwork3D
-    {
-        get => GetValue(ActiveArtwork3DProperty);
-        set => SetValue(ActiveArtwork3DProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial Artwork3DViewModel? ActiveArtwork3D { get; set; }
 
     /// <summary>
     /// Host for the 3D view, and the view currently inside it. Like the skeleton, the view is built on

@@ -29,7 +29,7 @@ namespace Caly.Core.Controls;
 /// <summary>
 /// Control that represents a single page thumbnail in a PDF document, with its visible area rectangle.
 /// </summary>
-public sealed class ThumbnailControl : TemplatedControl
+public sealed partial class ThumbnailControl : TemplatedControl
 {
     /*
      * See PDF Reference 1.7 - C.2 Architectural limits
@@ -51,30 +51,6 @@ public sealed class ThumbnailControl : TemplatedControl
 
     private Matrix _scale = Matrix.Identity;
 
-    /// <summary>
-    /// Defines the <see cref="VisibleArea"/> property.
-    /// </summary>
-    public static readonly StyledProperty<Rect?> VisibleAreaProperty =
-        AvaloniaProperty.Register<ThumbnailControl, Rect?>(nameof(VisibleArea));
-
-    /// <summary>
-    /// Defines the <see cref="ThumbnailSize"/> property.
-    /// </summary>
-    public static readonly StyledProperty<PixelSize> ThumbnailSizeProperty =
-        AvaloniaProperty.Register<ThumbnailControl, PixelSize>(nameof(ThumbnailSize));
-
-    /// <summary>
-    /// Defines the <see cref="PageSize"/> property.
-    /// </summary>
-    public static readonly StyledProperty<Size> PageSizeProperty =
-        AvaloniaProperty.Register<ThumbnailControl, Size>(nameof(PageSize));
-
-    /// <summary>
-    /// Defines the <see cref="Thumbnail"/> property.
-    /// </summary>
-    public static readonly StyledProperty<IImage?> ThumbnailProperty =
-        AvaloniaProperty.Register<ThumbnailControl, IImage?>(nameof(Thumbnail));
-
     static ThumbnailControl()
     {
         AffectsRender<ThumbnailControl>(ThumbnailProperty, VisibleAreaProperty,
@@ -82,29 +58,17 @@ public sealed class ThumbnailControl : TemplatedControl
         AffectsMeasure<ThumbnailControl>(ThumbnailSizeProperty, PageSizeProperty);
     }
 
-    public Rect? VisibleArea
-    {
-        get => GetValue(VisibleAreaProperty);
-        set => SetValue(VisibleAreaProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial Rect? VisibleArea { get; set; }
 
-    public PixelSize ThumbnailSize
-    {
-        get => GetValue(ThumbnailSizeProperty);
-        set => SetValue(ThumbnailSizeProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial PixelSize ThumbnailSize { get; set; }
 
-    public Size PageSize
-    {
-        get => GetValue(PageSizeProperty);
-        set => SetValue(PageSizeProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial Size PageSize { get; set; }
     
-    public IImage? Thumbnail
-    {
-        get => GetValue(ThumbnailProperty);
-        set => SetValue(ThumbnailProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial IImage? Thumbnail { get; set; }
     
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {

@@ -98,7 +98,7 @@
                      TextAlignment="Center"
                      HorizontalContentAlignment="Center"
                      VerticalContentAlignment="Center"
-                     VerticalAlignment="Center"
+                     VerticalAlignment="Stretch"
                      KeyDown="PageNumberTextBox_OnKeyDown"
                      Text="{Binding SelectedPageNumber, UpdateSourceTrigger=Explicit}"
                      AcceptsReturn="False">

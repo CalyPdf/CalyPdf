@@ -41,11 +41,8 @@ namespace Caly.Scene3D.Avalonia;
 /// </summary>
 public partial class Scene3DControl : OpenGlControlBase, ICustomHitTest
 {
-    /// <summary>Defines the <see cref="Scene"/> property.</summary>
-    public static readonly StyledProperty<Scene?> SceneProperty = AvaloniaProperty.Register<Scene3DControl, Scene?>(nameof(Scene));
-
-    /// <summary>Defines the <see cref="View"/> property.</summary>
-    public static readonly StyledProperty<SceneView?> ViewProperty = AvaloniaProperty.Register<Scene3DControl, SceneView?>(nameof(View));
+    // Not generated: [GeneratedStyledProperty] takes only constant defaults, and OverrideDefaultValue throws on
+    // the type that registers the property (Avalonia 12.2), so these three keep their registrations.
 
     /// <summary>Defines the <see cref="VisibleRegion"/> property.</summary>
     public static readonly StyledProperty<Rect> VisibleRegionProperty = AvaloniaProperty.Register<Scene3DControl, Rect>(nameof(VisibleRegion), new Rect(0, 0, 1, 1));
@@ -53,48 +50,9 @@ public partial class Scene3DControl : OpenGlControlBase, ICustomHitTest
     /// <summary>Defines the <see cref="DefaultBackground"/> property.</summary>
     public static readonly StyledProperty<Color> DefaultBackgroundProperty = AvaloniaProperty.Register<Scene3DControl, Color>(nameof(DefaultBackground), Colors.White);
 
-    /// <summary>Defines the <see cref="Shading"/> property.</summary>
-    public static readonly StyledProperty<Scene3DShading?> ShadingProperty = AvaloniaProperty.Register<Scene3DControl, Scene3DShading?>(nameof(Shading));
-
-    /// <summary>Defines the <see cref="ReservedModifiers"/> property.</summary>
-    public static readonly StyledProperty<KeyModifiers> ReservedModifiersProperty =
-        AvaloniaProperty.Register<Scene3DControl, KeyModifiers>(nameof(ReservedModifiers));
-
-    /// <summary>Defines the <see cref="PanModifiers"/> property.</summary>
-    public static readonly StyledProperty<KeyModifiers> PanModifiersProperty =
-        AvaloniaProperty.Register<Scene3DControl, KeyModifiers>(nameof(PanModifiers), KeyModifiers.Control);
-
-    /// <summary>Defines the <see cref="ResetKey"/> property.</summary>
-    public static readonly StyledProperty<Key?> ResetKeyProperty =
-        AvaloniaProperty.Register<Scene3DControl, Key?>(nameof(ResetKey), Key.Home);
-
-    /// <summary>Defines the <see cref="SelectedNode"/> property.</summary>
-    public static readonly StyledProperty<int> SelectedNodeProperty =
-        AvaloniaProperty.Register<Scene3DControl, int>(nameof(SelectedNode), -1);
-
     /// <summary>Defines the <see cref="HighlightColor"/> property.</summary>
     public static readonly StyledProperty<Color> HighlightColorProperty =
         AvaloniaProperty.Register<Scene3DControl, Color>(nameof(HighlightColor), Color.FromRgb(0x33, 0x99, 0xFF));
-
-    /// <summary>Defines the <see cref="Status"/> property.</summary>
-    public static readonly DirectProperty<Scene3DControl, Scene3DStatus> StatusProperty =
-        AvaloniaProperty.RegisterDirect<Scene3DControl, Scene3DStatus>(nameof(Status), o => o.Status);
-
-    /// <summary>Defines the <see cref="StatusMessage"/> property.</summary>
-    public static readonly DirectProperty<Scene3DControl, string?> StatusMessageProperty =
-        AvaloniaProperty.RegisterDirect<Scene3DControl, string?>(nameof(StatusMessage), o => o.StatusMessage);
-
-    /// <summary>Defines the <see cref="CameraOrientation"/> property.</summary>
-    public static readonly DirectProperty<Scene3DControl, Quaternion> CameraOrientationProperty =
-        AvaloniaProperty.RegisterDirect<Scene3DControl, Quaternion>(nameof(CameraOrientation), o => o.CameraOrientation);
-
-    /// <summary>Defines the <see cref="HasAnimation"/> property.</summary>
-    public static readonly DirectProperty<Scene3DControl, bool> HasAnimationProperty =
-        AvaloniaProperty.RegisterDirect<Scene3DControl, bool>(nameof(HasAnimation), o => o.HasAnimation);
-
-    /// <summary>Defines the <see cref="IsAnimationPlaying"/> property.</summary>
-    public static readonly DirectProperty<Scene3DControl, bool> IsAnimationPlayingProperty =
-        AvaloniaProperty.RegisterDirect<Scene3DControl, bool>(nameof(IsAnimationPlaying), o => o.IsAnimationPlaying);
 
     /// <summary>Most the control's multisampled framebuffer may take before it drops samples.</summary>
     private const long FramebufferBudgetBytes = 96L << 20;
@@ -169,18 +127,12 @@ public partial class Scene3DControl : OpenGlControlBase, ICustomHitTest
     }
 
     /// <summary>The scene to draw. The control does not dispose it.</summary>
-    public Scene? Scene
-    {
-        get => GetValue(SceneProperty);
-        set => SetValue(SceneProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial Scene? Scene { get; set; }
 
     /// <summary>The view to show: camera, projection, background, lighting, node overrides. Null for a default view of the whole scene.</summary>
-    public SceneView? View
-    {
-        get => GetValue(ViewProperty);
-        set => SetValue(ViewProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial SceneView? View { get; set; }
 
     /// <summary>
     /// The part of the whole view this control's bounds show, in fractions of the view: (0, 0, 1, 1) is all
@@ -205,11 +157,8 @@ public partial class Scene3DControl : OpenGlControlBase, ICustomHitTest
     /// null or <see cref="Scene3DShading.AsAuthored"/> for the scene as its file has it. Applied from the
     /// next frame; it is kept across a new scene or view.
     /// </summary>
-    public Scene3DShading? Shading
-    {
-        get => GetValue(ShadingProperty);
-        set => SetValue(ShadingProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial Scene3DShading? Shading { get; set; }
 
     /// <summary>
     /// Whether the scene is asked to release its vertex and index data once they are on the GPU. On by
@@ -221,38 +170,26 @@ public partial class Scene3DControl : OpenGlControlBase, ICustomHitTest
     /// Modifier keys that belong to the host. A press or a wheel turn made with any of them down is left
     /// unhandled, for the host's own gestures (a page pan, a page zoom). None by default.
     /// </summary>
-    public KeyModifiers ReservedModifiers
-    {
-        get => GetValue(ReservedModifiersProperty);
-        set => SetValue(ReservedModifiersProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial KeyModifiers ReservedModifiers { get; set; }
 
     /// <summary>
     /// The modifier keys that turn a left-drag into a pan; <see cref="KeyModifiers.None"/> for no such
     /// drag (the middle button always pans). Ctrl by default.
     /// </summary>
-    public KeyModifiers PanModifiers
-    {
-        get => GetValue(PanModifiersProperty);
-        set => SetValue(PanModifiersProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultValue = KeyModifiers.Control)]
+    public partial KeyModifiers PanModifiers { get; set; }
 
     /// <summary>The key that returns the camera to the view, or null for none. Home by default.</summary>
-    public Key? ResetKey
-    {
-        get => GetValue(ResetKeyProperty);
-        set => SetValue(ResetKeyProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultValue = Key.Home)]
+    public partial Key? ResetKey { get; set; }
 
     /// <summary>
     /// The node selected by a click (<see cref="SelectAt"/>): drawn tinted and with its bounding box in
     /// <see cref="HighlightColor"/>; -1 for none. Cleared by Escape and by a new scene or view.
     /// </summary>
-    public int SelectedNode
-    {
-        get => GetValue(SelectedNodeProperty);
-        set => SetValue(SelectedNodeProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultValue = -1)]
+    public partial int SelectedNode { get; set; }
 
     /// <summary>The colour the selected node is tinted and boxed in.</summary>
     public Color HighlightColor
@@ -316,18 +253,12 @@ public partial class Scene3DControl : OpenGlControlBase, ICustomHitTest
     }
 
     /// <summary>Whether the scene has animations to play.</summary>
-    public bool HasAnimation
-    {
-        get;
-        private set => SetAndRaise(HasAnimationProperty, ref field, value);
-    }
+    [GeneratedDirectProperty]
+    public partial bool HasAnimation { get; private set; }
 
     /// <summary>Whether the scene's animations are running.</summary>
-    public bool IsAnimationPlaying
-    {
-        get;
-        private set => SetAndRaise(IsAnimationPlayingProperty, ref field, value);
-    }
+    [GeneratedDirectProperty]
+    public partial bool IsAnimationPlaying { get; private set; }
 
     /// <summary>Seconds the scene's animations have been playing, as of now; held while paused.</summary>
     public double AnimationTime => _animationClock.Elapsed(Stopwatch.GetTimestamp());
@@ -382,25 +313,16 @@ public partial class Scene3DControl : OpenGlControlBase, ICustomHitTest
     }
 
     /// <summary>What the control is doing.</summary>
-    public Scene3DStatus Status
-    {
-        get;
-        private set => SetAndRaise(StatusProperty, ref field, value);
-    }
+    [GeneratedDirectProperty]
+    public partial Scene3DStatus Status { get; private set; }
 
     /// <summary>Detail for <see cref="Scene3DStatus.Failed"/> and <see cref="Scene3DStatus.Unavailable"/>.</summary>
-    public string? StatusMessage
-    {
-        get;
-        private set => SetAndRaise(StatusMessageProperty, ref field, value);
-    }
+    [GeneratedDirectProperty]
+    public partial string? StatusMessage { get; private set; }
 
     /// <summary>The orientation of the camera in world space.</summary>
-    public Quaternion CameraOrientation
-    {
-        get;
-        private set => SetAndRaise(CameraOrientationProperty, ref field, value);
-    } = Quaternion.Identity;
+    [GeneratedDirectProperty]
+    public partial Quaternion CameraOrientation { get; private set; } = Quaternion.Identity;
 
     /// <summary>Figures of the last frame and of the GPU memory held.</summary>
     public Scene3DStatistics Statistics { get; private set; }

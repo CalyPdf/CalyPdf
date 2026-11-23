@@ -31,10 +31,10 @@ namespace Caly.Core.Controls;
 /// Items panel for <see cref="PageItemsControl"/>'s single-page view: realises exactly one page,
 /// measured at its natural size.
 /// </summary>
-public sealed class SinglePageVirtualizingPanel : VirtualizingPanel
+public sealed partial class SinglePageVirtualizingPanel : VirtualizingPanel
 {
-    private static readonly AttachedProperty<object?> RecycleKeyProperty =
-        AvaloniaProperty.RegisterAttached<SinglePageVirtualizingPanel, Control, object?>("RecycleKey");
+    [GeneratedAttachedProperty]
+    private static partial object? GetRecycleKey(Control element);
 
     private static readonly object s_itemIsItsOwnContainer = new();
 

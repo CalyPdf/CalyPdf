@@ -6,7 +6,7 @@ namespace Caly.Tests;
 
 /// <summary>
 /// <see cref="ZoomFit"/> turns a fit mode into a zoom. The expected values are worked out by hand
-/// from a 400×400 viewer with 16 px scroll bars that take room from the viewport (as in
+/// from a 400×400 viewer with 16 px scroll bars (Fluent v1's width; the borderline cases are built around it) that take room from the viewport (as in
 /// PageItemsControl.axaml), the 10 px margin each fit keeps on either side of what it fits, and
 /// the 1 px of slack each fit leaves so that layout rounding never tips the content over the viewport.
 /// </summary>

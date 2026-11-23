@@ -47,7 +47,8 @@
                     <controls:DocumentsTabsControl x:Name="PART_DocumentsTabsControl"/>
 
                     <!-- When no document -> 'Splash Screen' -->
-                    <StackPanel Orientation="Vertical"
+                    <StackPanel Opacity="0.5"
+                                Orientation="Vertical"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 TextElement.Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"

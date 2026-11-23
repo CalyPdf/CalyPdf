@@ -11,15 +11,13 @@ namespace Caly.Scene3D.Avalonia;
 /// A 3D coordinate axis gizmo showing world axes (X = Red, Y = Green, Z = Blue)
 /// oriented according to the camera's orientation.
 /// </summary>
-public sealed class AxisGizmoControl : Control
+public sealed partial class AxisGizmoControl : Control
 {
+    // Not generated: a Quaternion default is not a constant (see Scene3DControl).
+
     /// <summary>Defines the <see cref="CameraOrientation"/> property.</summary>
     public static readonly StyledProperty<Quaternion> CameraOrientationProperty =
         AvaloniaProperty.Register<AxisGizmoControl, Quaternion>(nameof(CameraOrientation), Quaternion.Identity);
-
-    /// <summary>Defines the <see cref="GizmoSize"/> property.</summary>
-    public static readonly StyledProperty<double> GizmoSizeProperty =
-        AvaloniaProperty.Register<AxisGizmoControl, double>(nameof(GizmoSize), 64.0);
 
     private static readonly ImmutableSolidColorBrush XBrush = new(Color.FromRgb(229, 57, 53));
     private static readonly ImmutableSolidColorBrush YBrush = new(Color.FromRgb(67, 160, 71));
@@ -60,11 +58,8 @@ public sealed class AxisGizmoControl : Control
     }
 
     /// <summary>The size (width and height) of the gizmo in device-independent pixels.</summary>
-    public double GizmoSize
-    {
-        get => GetValue(GizmoSizeProperty);
-        set => SetValue(GizmoSizeProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultValue = 64.0)]
+    public partial double GizmoSize { get; set; }
 
     protected override Size MeasureOverride(Size availableSize)
     {
